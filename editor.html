@@ -16,10 +16,15 @@
         .spouse-container { border: 1px solid #ddd; padding: 10px; margin: 10px 0; }
         .spouse-container h4 { margin: 0 0 10px 0; }
         .error { color: red; }
+        .info { font-size: 0.9em; color: #666; margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <h2>Genealogy Record Editor</h2>
+    <div class="info">
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.2</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 06:42:09</span></p>
+    </div>
     <input type="file" id="textFile" accept=".csv">
     <button onclick="loadRecords()">Load Records</button>
     <table id="recordTable">
@@ -52,6 +57,8 @@
             <label>Death Location: <input type="text" id="gen_death_location" name="gen_death_location" autocomplete="off"></label>
             <label>Burial Location: <input type="text" id="gen_burial_location" name="gen_burial_location" autocomplete="off"></label>
             <label>Service: <input type="text" id="gen_service" name="gen_service" autocomplete="off"></label>
+            <label>Version: <input type="text" id="gen_version" name="gen_version" value="2.1.2" autocomplete="off" required></label>
+            <label>Date: <input type="text" id="gen_date" name="gen_date" value="2025-09-10 06:42:09" autocomplete="off" required></label>
             <div id="spouses-container">
                 <h3>Spouses</h3>
                 <button type="button" onclick="addSpouseForm()">Add Spouse</button>
@@ -126,6 +133,8 @@
                         death_location: fields[7] || null,
                         burial_location: fields[8] || null,
                         service: fields[9] || null,
+                        version: '2.1.2',
+                        date: '2025-09-10 06:42:09',
                         spouses: [],
                         spouse_names: fields[14] || null
                     };
@@ -231,6 +240,8 @@
         function validateRecord(record) {
             const errors = [];
             if (!record.name) errors.push('Name is required.');
+            if (!record.version) errors.push('Version is required.');
+            if (!record.date) errors.push('Date is required.');
             if (record.generation && isNaN(record.generation)) errors.push('Generation must be a number.');
             if (record.birth_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(record.birth_date)) {
                 errors.push('Birth Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
@@ -266,6 +277,8 @@
                 death_location: document.getElementById('gen_death_location').value || null,
                 burial_location: document.getElementById('gen_burial_location').value || null,
                 service: document.getElementById('gen_service').value || null,
+                version: document.getElementById('gen_version').value || null,
+                date: document.getElementById('gen_date').value || null,
                 spouses: collectSpouses()
             };
             const errors = validateRecord(record);
@@ -295,6 +308,8 @@
             document.getElementById('gen_death_location').value = record.death_location || '';
             document.getElementById('gen_burial_location').value = record.burial_location || '';
             document.getElementById('gen_service').value = record.service || '';
+            document.getElementById('gen_version').value = record.version || '';
+            document.getElementById('gen_date').value = record.date || '';
             document.getElementById('spouses-container').innerHTML = '<h3>Spouses</h3><button type="button" onclick="addSpouseForm()">Add Spouse</button>';
             (record.spouses || []).forEach(spouse => addSpouseForm(spouse));
         }
@@ -318,6 +333,8 @@
             document.getElementById('gen_death_location').value = '';
             document.getElementById('gen_burial_location').value = '';
             document.getElementById('gen_service').value = '';
+            document.getElementById('gen_version').value = '2.1.2';
+            document.getElementById('gen_date').value = '2025-09-10 06:42:09';
             document.getElementById('spouses-container').innerHTML = '<h3>Spouses</h3><button type="button" onclick="addSpouseForm()">Add Spouse</button>';
             document.getElementById('error').innerText = '';
         }
