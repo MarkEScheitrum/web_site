@@ -13,7 +13,7 @@
         .changed { background-color: #fff3cd; }
         .resize-handle { position: absolute; top: 0; right: -5px; width: 10px; height: 100%; cursor: col-resize; }
         th:nth-child(1), td:nth-child(1) { min-width: 80px; max-width: 200px; } /* Record Type */
-        th:nth-child(2), td:nth-child(2) { min-width: 80px; max-width: 200px; } /* Generation */
+        th:nth-child(2), td:nth-child(2) { min-width: 80px; max-width: 150px; } /* Gen */
         th:nth-child(3), td:nth-child(3) { min-width: 150px; max-width: 300px; } /* Name */
         th:nth-child(4), td:nth-child(4) { min-width: 80px; max-width: 200px; } /* Gender */
         th:nth-child(5), td:nth-child(5) { min-width: 100px; max-width: 200px; } /* Birth Date */
@@ -36,8 +36,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.9</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 02:20:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.11</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 09:00:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv">
     <button onclick="loadRecords()">Load Records</button>
@@ -155,12 +155,12 @@
             const tbody = document.getElementById('recordBody');
             tbody.innerHTML = '';
             const headers = [
-                'Record Type', 'Generation', 'Name', 'Gender', 'Birth Date', 'Birth Location',
+                'Record Type', 'Gen', 'Name', 'Gender', 'Birth Date', 'Birth Location',
                 'Death Date', 'Death Location', 'Burial Location', 'Service',
                 'Marriage Date', 'Relationship', 'Divorced', 'Parents'
             ];
             const table = document.createElement('table');
-            table.innerHTML = `<thead><tr>${headers.map(h => `<th>${h}<div class="resize-handle"></div></th>`).join('')}<th>Actions</th></tr></thead><tbody></tbody>`;
+            table.innerHTML = `<thead><tr>${headers.map(h => `<th>${h}<div class="resize-handle"></div></th>`).𝚊).join('')}<th>Actions</th></tr></thead><tbody></tbody>`;
             const tbodyElement = table.querySelector('tbody');
             records.forEach((record, index) => {
                 const tr = document.createElement('tr');
@@ -183,7 +183,7 @@
                 ];
                 cells.forEach((cell, i) => {
                     const td = document.createElement('td');
-                    if (index === editingIndex && ![0, 1].includes(i)) {
+                    if (index === editingIndex && record.record_type === 'Spouse' && [10, 11, 12, 13].includes(i)) {
                         if (i === 12) { // Divorced
                             td.innerHTML = `<input type="checkbox" ${cell ? 'checked' : ''} onchange="updateField(${index}, 'divorced', this.checked)">`;
                         } else if (i === 11) { // Relationship
@@ -239,7 +239,7 @@
             });
             colWidths.forEach((width, i) => {
                 const selector = `th:nth-child(${i + 1}), td:nth-child(${i + 1})`;
-                const maxWidth = [3, 6, 8, 9, 14].includes(i) ? 300 : 200;
+                const maxWidth = [3, 6, 8, 9, 14].includes(i) ? 300 : (i === 1 ? 150 : 200);
                 document.querySelectorAll(selector).forEach(cell => {
                     cell.style.width = `${Math.min(width + 10, maxWidth)}px`;
                 });
@@ -362,7 +362,7 @@
         function validateRecord(record) {
             const errors = [];
             if (!record.name) errors.push('Name is required.');
-            if (record.generation && isNaN(record.generation)) errors.push('Generation must be a number.');
+            if (record.generation && isNaN(record.generation)) errors.push('Gen must be a number.');
             if (record.birth_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(record.birth_date)) {
                 errors.push('Birth Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
             }
@@ -389,9 +389,9 @@
 
         function downloadCSV() {
             const headers = [
-                'record_type', 'generation', 'name', 'gender', 'birth_date', 'birth_location',
+                'record_type', 'gen', 'name', 'gender', 'birth_date', 'birth_location',
                 'death_date', 'death_location', 'burial_location', 'service',
-                'marriage_date', 'relationship', 'divorced', 'parents', 'spouse_names'
+                'marriage_date', 'relationship', 'divorced', 'parents'
             ];
             const csvContent = [
                 headers.join(','),
@@ -409,8 +409,7 @@
                     escapeCSVField(record.marriage_date),
                     escapeCSVField(record.relationship),
                     escapeCSVField(record.divorced),
-                    escapeCSVField(record.parents),
-                    ''
+                    escapeCSVField(record.parents)
                 ].join(','))
             ].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv' });
