@@ -7,9 +7,11 @@
         body { font-family: Arial, sans-serif; margin: 20px; }
         .table-container { overflow-x: auto; max-width: 100%; }
         table { border-collapse: collapse; width: 100%; min-width: 1200px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; white-space: nowrap; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
         .greyed-out { background-color: #e0e0e0; opacity: 0.5; }
+        .collapsible { max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+        .collapsible.expanded { white-space: normal; overflow: visible; }
         th:nth-child(1), td:nth-child(1) { width: 80px; } /* Record Type */
         th:nth-child(2), td:nth-child(2) { width: 80px; } /* Generation */
         th:nth-child(3), td:nth-child(3) { width: 150px; } /* Name */
@@ -24,7 +26,7 @@
         th:nth-child(12), td:nth-child(12) { width: 80px; } /* Relationship */
         th:nth-child(13), td:nth-child(13) { width: 80px; } /* Divorced */
         th:nth-child(14), td:nth-child(14) { width: 150px; } /* Parents */
-        th:nth-child(15), td:nth-child(15) { width: 100px; } /* Actions */
+        th:nth-child(15), td:nth-child(15) { width: 150px; } /* Actions */
         button { margin: 5px; padding: 8px; }
         .form-container { margin-top: 20px; }
         label { display: block; margin: 5px 0; }
@@ -39,8 +41,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.3</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 00:49:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.4</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 01:05:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv">
     <button onclick="loadRecords()">Load Records</button>
@@ -48,10 +50,11 @@
         <div id="recordBody"></div>
     </div>
     <div class="form-container">
-        <h3>Add/Edit Record</h3>
+        <h3>Add/Edit/Insert Record</h3>
         <form id="genealogyForm" autocomplete="off">
             <div id="error" class="error"></div>
             <input type="hidden" id="gen_editIndex" name="gen_editIndex">
+            <input type="hidden" id="gen_insertIndex" name="gen_insertIndex">
             <label>Generation: <input type="number" id="gen_generation" name="gen_generation" autocomplete="off" min="1"></label>
             <label>Name: <input type="text" id="gen_name" name="gen_name" autocomplete="off" required></label>
             <label>Gender: <input type="text" id="gen_gender" name="gen_gender" autocomplete="off"></label>
@@ -200,6 +203,10 @@
                 cells.forEach((cell, i) => {
                     const td = document.createElement('td');
                     td.textContent = cell;
+                    if ([5, 7, 8, 9, 13].includes(i)) { // birth_location, death_location, burial_location, service, parents
+                        td.classList.add('collapsible');
+                        td.onclick = () => td.classList.toggle('expanded');
+                    }
                     if ((record.record_type === 'Spouse' && i === 1) || 
                         (record.record_type === 'Person' && (i === 10 || i === 11 || i === 12 || i === 13))) {
                         td.classList.add('greyed-out');
@@ -210,6 +217,7 @@
                 actionTd.innerHTML = `
                     <button onclick="editRecord(${index})">Edit</button>
                     <button onclick="deleteRecord(${index})">Delete</button>
+                    <button onclick="insertRecord(${index})">Insert</button>
                 `;
                 tr.appendChild(actionTd);
                 tbodyElement.appendChild(tr);
@@ -319,7 +327,8 @@
                 return;
             }
             const editIndex = document.getElementById('gen_editIndex').value;
-            if (editIndex === '') {
+            const insertIndex = document.getElementById('gen_insertIndex').value;
+            if (editIndex === '' && insertIndex === '') {
                 records.push({ ...record, index: records.length });
                 record.spouses.forEach(spouse => {
                     records.push({
@@ -341,6 +350,36 @@
                         index: records.length
                     });
                 });
+            } else if (insertIndex !== '') {
+                const insertAt = parseInt(insertIndex) + 1;
+                records.splice(insertAt, 0, { ...record, index: insertAt });
+                let personRecord = records[insertAt];
+                let associatedPerson = records[insertAt - 1];
+                if (associatedPerson.record_type === 'Spouse') {
+                    associatedPerson = records.find((r, i) => i < insertAt && r.record_type === 'Person' && r.spouses.some(s => s.other_id === associatedPerson.other_id)) || records[insertAt];
+                }
+                record.spouses.forEach(spouse => {
+                    records.splice(insertAt + 1, 0, {
+                        record_type: 'Spouse',
+                        generation: null,
+                        name: spouse.name,
+                        gender: null,
+                        birth_date: spouse.birth_date,
+                        birth_location: spouse.birth_location,
+                        death_date: spouse.death_date,
+                        death_location: spouse.death_location,
+                        burial_location: spouse.burial_location,
+                        service: spouse.service,
+                        marriage_date: spouse.marriage_date,
+                        relationship: spouse.relationship,
+                        divorced: spouse.divorced,
+                        parents: spouse.parents,
+                        other_id: spouse.other_id,
+                        index: insertAt + 1
+                    });
+                    associatedPerson.spouses.push(records[insertAt + 1]);
+                });
+                records.forEach((r, i) => r.index = i);
             } else {
                 const personIndex = parseInt(editIndex);
                 const oldRecord = records[personIndex];
@@ -377,6 +416,7 @@
             const record = records[index];
             if (record.record_type === 'Person') {
                 document.getElementById('gen_editIndex').value = index;
+                document.getElementById('gen_insertIndex').value = '';
                 document.getElementById('gen_generation').value = record.generation || '';
                 document.getElementById('gen_name').value = record.name || '';
                 document.getElementById('gen_gender').value = record.gender || '';
@@ -392,6 +432,19 @@
                 const person = records.find(p => p.record_type === 'Person' && p.spouses.some(s => s.other_id === record.other_id));
                 if (person) {
                     editRecord(person.index);
+                }
+            }
+        }
+
+        function insertRecord(index) {
+            clearForm();
+            document.getElementById('gen_insertIndex').value = index;
+            document.getElementById('gen_editIndex').value = '';
+            const record = records[index];
+            if (record.record_type === 'Spouse') {
+                const person = records.find((r, i) => i <= index && r.record_type === 'Person' && r.spouses.some(s => s.other_id === record.other_id));
+                if (person) {
+                    document.getElementById('gen_insertIndex').value = person.index;
                 }
             }
         }
@@ -416,6 +469,7 @@
         function clearForm() {
             document.getElementById('genealogyForm').reset();
             document.getElementById('gen_editIndex').value = '';
+            document.getElementById('gen_insertIndex').value = '';
             document.getElementById('gen_generation').value = '';
             document.getElementById('gen_name').value = '';
             document.getElementById('gen_gender').value = '';
