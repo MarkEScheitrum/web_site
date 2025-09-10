@@ -36,8 +36,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.12</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 14:04:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.13</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 14:39:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv">
     <button onclick="loadRecords()">Load Records</button>
@@ -51,20 +51,24 @@
         let editingIndex = null;
 
         function parseCSVLine(line) {
+            console.log("Parsing CSV line:", line);
             const fields = [];
             let currentField = '';
             let inQuotes = false;
             for (let i = 0; i < line.length; i++) {
                 if (line[i] === '"') {
                     inQuotes = !inQuotes;
-                } else if (line[i] === ',' && !inQuotes) {
-                    fields.push(currentField);
+                    continue; // Skip quote characters
+                }
+                if (line[i] === ',' && !inQuotes) {
+                    fields.push(currentField.trim());
                     currentField = '';
                 } else {
                     currentField += line[i];
                 }
             }
-            fields.push(currentField);
+            fields.push(currentField.trim());
+            console.log("Parsed fields:", fields);
             return fields;
         }
 
@@ -103,6 +107,10 @@
 
             for (let i = 1; i < lines.length; i++) {
                 const fields = parseCSVLine(lines[i]);
+                if (fields.length < 14) {
+                    console.warn(`Skipping malformed line ${i + 1}: ${lines[i]}`);
+                    continue;
+                }
                 const recordType = fields[0];
                 const name = fields[2] || '';
                 if (recordType === 'Person') {
@@ -159,8 +167,8 @@
 
         function displayRecords() {
             console.log("Displaying records");
-            const tbody = document.getElementById('recordBody');
-            tbody.innerHTML = '';
+            const recordBody = document.getElementById('recordBody');
+            recordBody.innerHTML = ''; // Clear previous content
             const headers = [
                 'Record Type', 'Gen', 'Name', 'Gender', 'Birth Date', 'Birth Location',
                 'Death Date', 'Death Location', 'Burial Location', 'Service',
@@ -227,8 +235,8 @@
                 tr.appendChild(actionTd);
                 tbodyElement.appendChild(tr);
             });
-            tbody.appendChild(table);
-            console.log("Table rendered, adjusting column widths");
+            recordBody.appendChild(table);
+            console.log("Table appended to DOM, adjusting column widths");
             adjustColumnWidths();
             console.log("Enabling column resizing");
             enableColumnResizing();
@@ -237,6 +245,10 @@
         function adjustColumnWidths() {
             console.log("Adjusting column widths");
             const table = document.querySelector('table');
+            if (!table) {
+                console.error("No table found for column width adjustment");
+                return;
+            }
             const rows = table.querySelectorAll('tr');
             const colWidths = Array.from({ length: 15 }, () => 0);
             rows.forEach(row => {
@@ -259,9 +271,17 @@
         function enableColumnResizing() {
             console.log("Enabling column resizing");
             const headers = document.querySelectorAll('th');
+            if (!headers.length) {
+                console.error("No table headers found for resizing");
+                return;
+            }
             headers.forEach((th, index) => {
                 if (index < 15) {
                     const resizeHandle = th.querySelector('.resize-handle');
+                    if (!resizeHandle) {
+                        console.warn(`No resize handle found for header ${index + 1}`);
+                        return;
+                    }
                     resizeHandle.addEventListener('mousedown', (e) => {
                         e.preventDefault();
                         const startX = e.pageX;
@@ -366,7 +386,7 @@
                     records = records.filter(r => r.index !== index && (r.record_type !== 'Spouse' || !record.spouses.some(s => s.other_id === r.other_id)));
                 } else {
                     records = records.filter(r => r.index !== index);
-                    const person = records.find(p => p.record_type === 'Person' && p.spouses.some(s => s.other_id === record.other_id));
+                    const person = records.find(p => p.record_type === 'Person' && p.spouses.some(s => s.other_id === r.other_id));
                     if (person) {
                         person.spouses = person.spouses.filter(s => s.other_id !== record.other_id);
                     }
@@ -378,7 +398,7 @@
         }
 
         function validateRecord(record) {
-            console.log(`Validating record: ${record.name}`);
+            console.log(`Validating record: ${record.name || 'unnamed'}`);
             const errors = [];
             if (!record.name) errors.push('Name is required.');
             if (record.generation && isNaN(record.generation)) errors.push('Gen must be a number.');
