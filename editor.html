@@ -36,8 +36,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.6</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 01:34:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.9</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 02:20:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv">
     <button onclick="loadRecords()">Load Records</button>
@@ -98,11 +98,12 @@
             for (let i = 1; i < lines.length; i++) {
                 const fields = parseCSVLine(lines[i]);
                 const recordType = fields[0];
+                const name = fields[2] || '';
                 if (recordType === 'Person') {
                     currentPerson = {
                         record_type: 'Person',
                         generation: fields[1] ? parseInt(fields[1]) : null,
-                        name: fields[2] || null,
+                        name: name,
                         gender: fields[3] || null,
                         birth_date: fields[4] || null,
                         birth_location: fields[5] || null,
@@ -119,6 +120,7 @@
                         changed: false
                     };
                     parsedRecords.push(currentPerson);
+                    console.log(`Parsed Person: ${name}, Index: ${currentPerson.index}`);
                 } else if (recordType === 'Spouse' && currentPerson) {
                     const spouse = {
                         record_type: 'Spouse',
@@ -141,6 +143,9 @@
                     };
                     parsedRecords.push(spouse);
                     currentPerson.spouses.push(spouse);
+                    console.log(`Parsed Spouse: ${spouse.name}, Index: ${spouse.index}, Associated with Person: ${currentPerson.name}`);
+                } else {
+                    console.warn(`Unexpected record at line ${i + 1}: ${fields.join(',')}`);
                 }
             }
             return parsedRecords;
@@ -178,9 +183,7 @@
                 ];
                 cells.forEach((cell, i) => {
                     const td = document.createElement('td');
-                    if (index === editingIndex && ![1, 10, 11, 12, 13].includes(i) || 
-                        (index === editingIndex && record.record_type === 'Spouse' && i === 1) ||
-                        (index === editingIndex && record.record_type === 'Person' && [10, 11, 12, 13].includes(i))) {
+                    if (index === editingIndex && ![0, 1].includes(i)) {
                         if (i === 12) { // Divorced
                             td.innerHTML = `<input type="checkbox" ${cell ? 'checked' : ''} onchange="updateField(${index}, 'divorced', this.checked)">`;
                         } else if (i === 11) { // Relationship
@@ -190,19 +193,12 @@
                                     <option value="other" ${cell === 'other' ? 'selected' : ''}>Other</option>
                                 </select>`;
                         } else {
-                            td.innerHTML = `<input type="text" value="${cell}" oninput="updateField(${index}, '${headers[i].toLowerCase().replace(' ', '_')}', this.value)">`;
-                            if (i === 1) td.querySelector('input').type = 'number';
+                            td.innerHTML = `<input type="text" value="${cell || ''}" oninput="updateField(${index}, '${headers[i].toLowerCase().replace(' ', '_')}', this.value)">`;
                             if ([4, 6, 10].includes(i)) td.querySelector('input').pattern = '^\\d{4}(-\\d{2}(-\\d{2})?)?$';
-                        }
-                        if ((record.record_type === 'Spouse' && i === 1) || 
-                            (record.record_type === 'Person' && [10, 11, 12, 13].includes(i))) {
-                            td.querySelector('input, select').disabled = true;
-                            td.classList.add('greyed-out');
                         }
                     } else {
                         td.textContent = cell;
-                        if ((record.record_type === 'Spouse' && i === 1) || 
-                            (record.record_type === 'Person' && [10, 11, 12, 13].includes(i))) {
+                        if (record.record_type === 'Spouse' && i === 1) {
                             td.classList.add('greyed-out');
                         }
                     }
@@ -282,9 +278,10 @@
         }
 
         function updateField(index, field, value) {
-            records[index][field] = value === '' ? null : (field === 'generation' ? parseInt(value) : field === 'divorced' ? value : value);
-            records[index].changed = true;
-            displayRecords();
+            if (field !== 'record_type' && field !== 'generation') {
+                records[index][field] = value === '' ? null : (field === 'divorced' ? value : value);
+                records[index].changed = true;
+            }
         }
 
         function saveEdit(index) {
@@ -317,7 +314,7 @@
         function insertRecord(index) {
             const record = {
                 record_type: 'Person',
-                generation: null,
+                generation: records[index].record_type === 'Person' ? records[index].generation : (records.find((r, i) => i <= index && r.record_type === 'Person')?.generation || null),
                 name: null,
                 gender: null,
                 birth_date: null,
@@ -372,18 +369,10 @@
             if (record.death_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(record.death_date)) {
                 errors.push('Death Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
             }
-            for (const spouse of record.spouses) {
-                if (!spouse.other_id) errors.push('Spouse Other ID is required.');
-                if (!spouse.name) errors.push('Spouse Name is required.');
-                if (!spouse.relationship) errors.push('Spouse Relationship is required.');
-                if (spouse.marriage_date && !/^\d{4}(-\d{2}(-\\d{2})?)?$/.test(spouse.marriage_date)) {
+            if (record.record_type === 'Spouse') {
+                if (!record.relationship) errors.push('Spouse Relationship is required.');
+                if (record.marriage_date && !/^\d{4}(-\d{2}(-\\d{2})?)?$/.test(record.marriage_date)) {
                     errors.push('Spouse Marriage Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
-                }
-                if (spouse.birth_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(spouse.birth_date)) {
-                    errors.push('Spouse Birth Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
-                }
-                if (spouse.death_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(spouse.death_date)) {
-                    errors.push('Spouse Death Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
                 }
             }
             return errors;
