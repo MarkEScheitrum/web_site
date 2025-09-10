@@ -11,8 +11,11 @@
         button { margin: 5px; padding: 8px; }
         .form-container { margin-top: 20px; }
         label { display: block; margin: 5px 0; }
-        input, textarea { width: 100%; max-width: 500px; }
+        input, textarea, select { width: 100%; max-width: 500px; }
         textarea { height: 80px; }
+        .spouse-container { border: 1px solid #ddd; padding: 10px; margin: 10px 0; }
+        .spouse-container h4 { margin: 0 0 10px 0; }
+        .error { color: red; }
     </style>
 </head>
 <body>
@@ -22,15 +25,14 @@
     <table id="recordTable">
         <thead>
             <tr>
-                <th>ID</th>
+                <th>Record ID</th>
                 <th>Name</th>
+                <th>Gender</th>
                 <th>Birth Date</th>
-                <th>Birth Place</th>
-                <th>Marriage</th>
+                <th>Birth Location</th>
+                <th>Spouses</th>
                 <th>Death Date</th>
-                <th>Death Place</th>
-                <th>Burial Place</th>
-                <th>Notes</th>
+                <th>Death Location</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -38,22 +40,58 @@
     </table>
     <div class="form-container">
         <h3>Add/Edit Record</h3>
+        <div id="error" class="error"></div>
         <input type="hidden" id="editIndex">
-        <label>ID: <input type="number" id="id"></label>
-        <label>Name: <input type="text" id="name"></label>
-        <label>Birth Date: <input type="text" id="birthDate"></label>
-        <label>Birth Place: <input type="text" id="birthPlace"></label>
-        <label>Marriage: <input type="text" id="marriage"></label>
-        <label>Death Date: <input type="text" id="deathDate"></label>
-        <label>Death Place: <input type="text" id="deathPlace"></label>
-        <label>Burial Place: <input type="text" id="burialPlace"></label>
-        <label>Notes: <textarea id="notes"></textarea></label>
+        <label>Record ID: <input type="text" id="record_id" required></label>
+        <label>Generation: <input type="number" id="generation" min="1"></label>
+        <label>Name: <input type="text" id="name" required></label>
+        <label>Gender: <input type="text" id="gender"></label>
+        <label>Birth Date (YYYY-MM-DD, YYYY-MM, or YYYY): <input type="text" id="birth_date" pattern="^\\d{4}(-\\d{2}(-\\d{2})?)?$"></label>
+        <label>Birth Location: <input type="text" id="birth_location"></label>
+        <label>Stillborn: <input type="checkbox" id="stillborn"></label>
+        <label>Death Date (YYYY-MM-DD, YYYY-MM, or YYYY): <input type="text" id="death_date" pattern="^\\d{4}(-\\d{2}(-\\d{2})?)?$"></label>
+        <label>Death Location: <input type="text" id="death_location"></label>
+        <label>Burial Location: <input type="text" id="burial_location"></label>
+        <label>Burial Notes: <textarea id="burial_notes"></textarea></label>
+        <label>Service: <input type="text" id="service"></label>
+        <label>Version: <input type="text" id="version" required></label>
+        <label>Date: <input type="text" id="date" required></label>
+        <div id="spouses-container">
+            <h3>Spouses</h3>
+            <button onclick="addSpouseForm()">Add Spouse</button>
+        </div>
         <button onclick="addOrUpdateRecord()">Save Record</button>
     </div>
     <button onclick="downloadText()">Download Updated Records</button>
 
     <script>
         let records = [];
+
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+            const months = {
+                'jan': '01', 'january': '01', 'feb': '02', 'february': '02', 'mar': '03', 'march': '03',
+                'apr': '04', 'april': '04', 'may': '05', 'jun': '06', 'june': '06', 'jul': '07', 'july': '07',
+                'aug': '08', 'august': '08', 'sep': '09', 'sept': '09', 'september': '09', 'oct': '10', 'october': '10',
+                'nov': '11', 'november': '11', 'dec': '12', 'december': '12'
+            };
+            const parts = dateStr.replace(/[.,]/g, '').split(/\s+/);
+            if (parts.length === 1 && /^\d{4}$/.test(parts[0])) return parts[0];
+            if (parts.length >= 2) {
+                let month = months[parts[0].toLowerCase()];
+                if (!month && parts[1].toLowerCase() in months) {
+                    month = months[parts[1].toLowerCase()];
+                    parts[1] = parts[0];
+                }
+                if (month) {
+                    const day = parts[1].length === 1 ? '0' + parts[1] : parts[1];
+                    const year = parts[2] || parts[3];
+                    if (day && year) return `${year}-${month}-${day}`;
+                    return `${year}-${month}`;
+                }
+            }
+            return dateStr;
+        }
 
         function loadRecords() {
             const fileInput = document.getElementById('textFile');
@@ -75,25 +113,88 @@
         }
 
         function parseTextFile(text) {
-            const recordStrings = text.trim().split('---\n');
+            const recordStrings = text.trim().split('\n\n');
             const parsedRecords = [];
+            let spouseCounter = 1;
             for (const recordStr of recordStrings) {
                 if (recordStr.trim() === '') continue;
-                const lines = recordStr.trim().split('\n');
-                const record = {};
-                for (const line of lines) {
-                    const [key, value] = line.split(': ', 2);
-                    if (key === 'ID') record.id = value || '';
-                    if (key === 'Name') record.name = value || '';
-                    if (key === 'Birth Date') record.birthDate = value || '';
-                    if (key === 'Birth Place') record.birthPlace = value || '';
-                    if (key === 'Marriage') record.marriage = value || '';
-                    if (key === 'Death Date') record.deathDate = value || '';
-                    if (key === 'Death Place') record.deathPlace = value || '';
-                    if (key === 'Burial Place') record.burialPlace = value || '';
-                    if (key === 'Notes') record.notes = value || '';
+                const record = {
+                    record_id: '',
+                    name: '',
+                    birth_date: null,
+                    birth_location: null,
+                    gender: null,
+                    stillborn: null,
+                    death_date: null,
+                    death_location: null,
+                    burial_location: null,
+                    burial_notes: null,
+                    service: null,
+                    version: '1.0', // Default
+                    date: '2025-09-09', // Default
+                    spouses: []
+                };
+                const lines = recordStr.trim().split('.').map(s => s.trim());
+                const firstLineParts = lines[0].split(' – ');
+                record.record_id = firstLineParts[0].trim();
+                const nameAndBirth = firstLineParts[1].split(' – born ');
+                record.name = nameAndBirth[0].trim();
+                if (nameAndBirth[1]) {
+                    const birthParts = nameAndBirth[1].split(', ');
+                    record.birth_location = birthParts[0];
+                    record.birth_date = parseDate(birthParts[1]);
                 }
-                if (record.name && record.id) parsedRecords.push(record); // Require ID and Name
+                let currentSpouse = null;
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i];
+                    if (line.startsWith('Married')) {
+                        if (currentSpouse) parsedRecords.push(currentSpouse);
+                        currentSpouse = {
+                            other_id: `S${spouseCounter++}`,
+                            name: '',
+                            marriage_date: null,
+                            married_flag: true,
+                            relationship: 'spouse',
+                            divorced: null,
+                            divorce_date: null,
+                            birth_date: null,
+                            birth_location: null,
+                            death_date: null,
+                            death_location: null,
+                            burial_location: null,
+                            burial_notes: null,
+                            parents: null,
+                            service: null,
+                            children: []
+                        };
+                        const marriageParts = line.split(', ');
+                        currentSpouse.name = marriageParts[0].replace('Married ', '').trim();
+                        currentSpouse.marriage_date = parseDate(marriageParts[1]);
+                        if (marriageParts[2] && marriageParts[2].startsWith('son of')) {
+                            currentSpouse.parents = marriageParts[2].replace('son of ', '');
+                        }
+                    } else if (line.startsWith('Said husband')) {
+                        const husbandParts = line.replace('Said husband ', '').split('; ');
+                        for (const part of husbandParts) {
+                            if (part.includes('born')) {
+                                const bornParts = part.split('born ')[1].split(', ');
+                                currentSpouse.birth_location = bornParts[0];
+                                currentSpouse.birth_date = parseDate(bornParts[1]);
+                            } else if (part.includes('died')) {
+                                const diedParts = part.split('died ')[1].split(', ');
+                                currentSpouse.death_location = diedParts[0];
+                                currentSpouse.death_date = parseDate(diedParts[1]);
+                            }
+                        }
+                    } else if (line.startsWith('Divorced')) {
+                        currentSpouse.divorced = true;
+                        currentSpouse.divorce_date = parseDate(line.replace('Divorced ', ''));
+                    }
+                    if (currentSpouse && i === lines.length - 1) {
+                        record.spouses.push(currentSpouse);
+                    }
+                }
+                parsedRecords.push(record);
             }
             return parsedRecords;
         }
@@ -102,17 +203,17 @@
             const tbody = document.getElementById('recordBody');
             tbody.innerHTML = '';
             records.forEach((record, index) => {
+                const spouseSummary = record.spouses ? record.spouses.map(s => s.name || s.other_id).join(', ') : '';
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${record.id || ''}</td>
+                    <td>${record.record_id || ''}</td>
                     <td>${record.name || ''}</td>
-                    <td>${record.birthDate || ''}</td>
-                    <td>${record.birthPlace || ''}</td>
-                    <td>${record.marriage || ''}</td>
-                    <td>${record.deathDate || ''}</td>
-                    <td>${record.deathPlace || ''}</td>
-                    <td>${record.burialPlace || ''}</td>
-                    <td>${record.notes || ''}</td>
+                    <td>${record.gender || ''}</td>
+                    <td>${record.birth_date || ''}</td>
+                    <td>${record.birth_location || ''}</td>
+                    <td>${spouseSummary}</td>
+                    <td>${record.death_date || ''}</td>
+                    <td>${record.death_location || ''}</td>
                     <td>
                         <button onclick="editRecord(${index})">Edit</button>
                         <button onclick="deleteRecord(${index})">Delete</button>
@@ -122,23 +223,119 @@
             });
         }
 
+        function addSpouseForm(spouse = {}) {
+            const container = document.getElementById('spouses-container');
+            const spouseDiv = document.createElement('div');
+            spouseDiv.className = 'spouse-container';
+            spouseDiv.innerHTML = `
+                <h4>Spouse</h4>
+                <label>Other ID: <input type="text" name="other_id" value="${spouse.other_id || 'S' + (records.length + 1) + Math.random().toString(36).substr(2, 5)}" required></label>
+                <label>Name: <input type="text" name="name" value="${spouse.name || ''}" required></label>
+                <label>Relationship: 
+                    <select name="relationship" required>
+                        <option value="spouse" ${spouse.relationship === 'spouse' ? 'selected' : ''}>Spouse</option>
+                        <option value="surrogate" ${spouse.relationship === 'surrogate' ? 'selected' : ''}>Surrogate</option>
+                        <option value="birth_mother" ${spouse.relationship === 'birth_mother' ? 'selected' : ''}>Birth Mother</option>
+                        <option value="other" ${spouse.relationship === 'other' ? 'selected' : ''}>Other</option>
+                        <option value="TBD" ${spouse.relationship === 'TBD' ? 'selected' : ''}>TBD</option>
+                    </select>
+                </label>
+                <label>Marriage Date (YYYY-MM-DD, YYYY-MM, or YYYY): <input type="text" name="marriage_date" value="${spouse.marriage_date || ''}" pattern="^\\d{4}(-\\d{2}(-\\d{2})?)?$"></label>
+                <label>Married: <input type="checkbox" name="married_flag" ${spouse.married_flag ? 'checked' : ''}></label>
+                <label>Divorced: <input type="checkbox" name="divorced" ${spouse.divorced ? 'checked' : ''}></label>
+                <label>Divorce Date (YYYY-MM-DD, YYYY-MM, or YYYY): <input type="text" name="divorce_date" value="${spouse.divorce_date || ''}" pattern="^\\d{4}(-\\d{2}(-\\d{2})?)?$"></label>
+                <label>Birth Date (YYYY-MM-DD, YYYY-MM, or YYYY): <input type="text" name="birth_date" value="${spouse.birth_date || ''}" pattern="^\\d{4}(-\\d{2}(-\\d{2})?)?$"></label>
+                <label>Birth Location: <input type="text" name="birth_location" value="${spouse.birth_location || ''}"></label>
+                <label>Death Date (YYYY-MM-DD, YYYY-MM, or YYYY): <input type="text" name="death_date" value="${spouse.death_date || ''}" pattern="^\\d{4}(-\\d{2}(-\\d{2})?)?$"></label>
+                <label>Death Location: <input type="text" name="death_location" value="${spouse.death_location || ''}"></label>
+                <label>Burial Location: <input type="text" name="burial_location" value="${spouse.burial_location || ''}"></label>
+                <label>Burial Notes: <textarea name="burial_notes">${spouse.burial_notes || ''}</textarea></label>
+                <label>Parents: <input type="text" name="parents" value="${spouse.parents || ''}"></label>
+                <label>Service: <input type="text" name="service" value="${spouse.service || ''}"></label>
+                <label>Children (comma-separated): <input type="text" name="children" value="${spouse.children ? spouse.children.join(', ') : ''}"></label>
+                <button onclick="this.parentElement.remove()">Remove Spouse</button>
+            `;
+            container.appendChild(spouseDiv);
+        }
+
+        function collectSpouses() {
+            const spouseContainers = document.querySelectorAll('.spouse-container');
+            const spouses = [];
+            for (const container of spouseContainers) {
+                const inputs = container.querySelectorAll('input, select, textarea');
+                const spouse = {};
+                inputs.forEach(input => {
+                    if (input.type === 'checkbox') {
+                        spouse[input.name] = input.checked || null;
+                    } else if (input.name === 'children') {
+                        spouse[input.name] = input.value ? input.value.split(',').map(id => id.trim()) : [];
+                    } else {
+                        spouse[input.name] = input.value || null;
+                    }
+                });
+                if (spouse.other_id && spouse.name && spouse.relationship) {
+                    spouses.push(spouse);
+                }
+            }
+            return spouses;
+        }
+
+        function validateRecord(record) {
+            const errors = [];
+            if (!record.record_id) errors.push('Record ID is required.');
+            if (!record.name) errors.push('Name is required.');
+            if (!record.version) errors.push('Version is required.');
+            if (!record.date) errors.push('Date is required.');
+            if (record.birth_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(record.birth_date)) {
+                errors.push('Birth Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
+            }
+            if (record.death_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(record.death_date)) {
+                errors.push('Death Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
+            }
+            for (const spouse of record.spouses) {
+                if (!spouse.other_id) errors.push('Spouse Other ID is required.');
+                if (!spouse.name) errors.push('Spouse Name is required.');
+                if (!spouse.relationship) errors.push('Spouse Relationship is required.');
+                if (spouse.marriage_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(spouse.marriage_date)) {
+                    errors.push('Spouse Marriage Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
+                }
+                if (spouse.divorce_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(spouse.divorce_date)) {
+                    errors.push('Spouse Divorce Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
+                }
+                if (spouse.birth_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(spouse.birth_date)) {
+                    errors.push('Spouse Birth Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
+                }
+                if (spouse.death_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(spouse.death_date)) {
+                    errors.push('Spouse Death Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
+                }
+            }
+            return errors;
+        }
+
         function addOrUpdateRecord() {
-            const editIndex = document.getElementById('editIndex').value;
             const record = {
-                id: document.getElementById('id').value,
-                name: document.getElementById('name').value,
-                birthDate: document.getElementById('birthDate').value,
-                birthPlace: document.getElementById('birthPlace').value,
-                marriage: document.getElementById('marriage').value,
-                deathDate: document.getElementById('deathDate').value,
-                deathPlace: document.getElementById('deathPlace').value,
-                burialPlace: document.getElementById('burialPlace').value,
-                notes: document.getElementById('notes').value
+                record_id: document.getElementById('record_id').value || null,
+                generation: document.getElementById('generation').value ? parseInt(document.getElementById('generation').value) : null,
+                name: document.getElementById('name').value || null,
+                gender: document.getElementById('gender').value || null,
+                birth_date: document.getElementById('birth_date').value || null,
+                birth_location: document.getElementById('birth_location').value || null,
+                stillborn: document.getElementById('stillborn').checked || null,
+                death_date: document.getElementById('death_date').value || null,
+                death_location: document.getElementById('death_location').value || null,
+                burial_location: document.getElementById('burial_location').value || null,
+                burial_notes: document.getElementById('burial_notes').value || null,
+                service: document.getElementById('service').value || null,
+                version: document.getElementById('version').value || null,
+                date: document.getElementById('date').value || null,
+                spouses: collectSpouses()
             };
-            if (!record.id || !record.name) {
-                alert('ID and Name are required.');
+            const errors = validateRecord(record);
+            if (errors.length > 0) {
+                document.getElementById('error').innerText = errors.join('\n');
                 return;
             }
+            const editIndex = document.getElementById('editIndex').value;
             if (editIndex === '') {
                 records.push(record);
             } else {
@@ -151,15 +348,22 @@
         function editRecord(index) {
             const record = records[index];
             document.getElementById('editIndex').value = index;
-            document.getElementById('id').value = record.id || '';
+            document.getElementById('record_id').value = record.record_id || '';
+            document.getElementById('generation').value = record.generation || '';
             document.getElementById('name').value = record.name || '';
-            document.getElementById('birthDate').value = record.birthDate || '';
-            document.getElementById('birthPlace').value = record.birthPlace || '';
-            document.getElementById('marriage').value = record.marriage || '';
-            document.getElementById('deathDate').value = record.deathDate || '';
-            document.getElementById('deathPlace').value = record.deathPlace || '';
-            document.getElementById('burialPlace').value = record.burialPlace || '';
-            document.getElementById('notes').value = record.notes || '';
+            document.getElementById('gender').value = record.gender || '';
+            document.getElementById('birth_date').value = record.birth_date || '';
+            document.getElementById('birth_location').value = record.birth_location || '';
+            document.getElementById('stillborn').checked = record.stillborn || false;
+            document.getElementById('death_date').value = record.death_date || '';
+            document.getElementById('death_location').value = record.death_location || '';
+            document.getElementById('burial_location').value = record.burial_location || '';
+            document.getElementById('burial_notes').value = record.burial_notes || '';
+            document.getElementById('service').value = record.service || '';
+            document.getElementById('version').value = record.version || '';
+            document.getElementById('date').value = record.date || '';
+            document.getElementById('spouses-container').innerHTML = '<h3>Spouses</h3><button onclick="addSpouseForm()">Add Spouse</button>';
+            (record.spouses || []).forEach(spouse => addSpouseForm(spouse));
         }
 
         function deleteRecord(index) {
@@ -171,21 +375,57 @@
 
         function clearForm() {
             document.getElementById('editIndex').value = '';
-            document.getElementById('id').value = '';
+            document.getElementById('record_id').value = '';
+            document.getElementById('generation').value = '';
             document.getElementById('name').value = '';
-            document.getElementById('birthDate').value = '';
-            document.getElementById('birthPlace').value = '';
-            document.getElementById('marriage').value = '';
-            document.getElementById('deathDate').value = '';
-            document.getElementById('deathPlace').value = '';
-            document.getElementById('burialPlace').value = '';
-            document.getElementById('notes').value = '';
+            document.getElementById('gender').value = '';
+            document.getElementById('birth_date').value = '';
+            document.getElementById('birth_location').value = '';
+            document.getElementById('stillborn').checked = false;
+            document.getElementById('death_date').value = '';
+            document.getElementById('death_location').value = '';
+            document.getElementById('burial_location').value = '';
+            document.getElementById('burial_notes').value = '';
+            document.getElementById('service').value = '';
+            document.getElementById('version').value = '';
+            document.getElementById('date').value = '';
+            document.getElementById('spouses-container').innerHTML = '<h3>Spouses</h3><button onclick="addSpouseForm()">Add Spouse</button>';
+            document.getElementById('error').innerText = '';
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const parts = dateStr.split('-');
+            if (parts.length === 1) return parts[0];
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            if (parts.length === 2) return `${months[parseInt(parts[1]) - 1]} ${parts[0]}`;
+            return `${months[parseInt(parts[1]) - 1]} ${parseInt(parts[2])}, ${parts[0]}`;
         }
 
         function downloadText() {
-            const textContent = records.map(record => 
-                `ID: ${record.id}\nName: ${record.name}\nBirth Date: ${record.birthDate}\nBirth Place: ${record.birthPlace}\nMarriage: ${record.marriage}\nDeath Date: ${record.deathDate}\nDeath Place: ${record.deathPlace}\nBurial Place: ${record.burialPlace}\nNotes: ${record.notes}\n---`
-            ).join('\n');
+            const textContent = records.map(record => {
+                let text = `${record.record_id}   ${record.name}`;
+                if (record.birth_location && record.birth_date) {
+                    text += ` – born ${record.birth_location}, ${formatDate(record.birth_date)}`;
+                }
+                record.spouses.forEach(spouse => {
+                    text += `. Married ${spouse.name}, ${formatDate(spouse.marriage_date)}`;
+                    if (spouse.parents) text += `, son of ${spouse.parents}`;
+                    if (spouse.birth_date || spouse.death_date) {
+                        text += `. Said husband`;
+                        if (spouse.birth_date && spouse.birth_location) {
+                            text += ` born ${spouse.birth_location}, ${formatDate(spouse.birth_date)}`;
+                        }
+                        if (spouse.death_date && spouse.death_location) {
+                            text += `; died ${spouse.death_location}, ${formatDate(spouse.death_date)}`;
+                        }
+                    }
+                    if (spouse.divorced && spouse.divorce_date) {
+                        text += `. Divorced ${formatDate(spouse.divorce_date)}`;
+                    }
+                });
+                return text;
+            }).join('\n\n');
             const blob = new Blob([textContent], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
