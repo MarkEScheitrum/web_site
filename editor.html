@@ -7,23 +7,26 @@
         body { font-family: Arial, sans-serif; margin: 20px; }
         /* Wrap table in a div for horizontal scrolling */
         .table-container { overflow-x: auto; max-width: 100%; }
-        table { border-collapse: collapse; width: 100%; min-width: 1000px; } /* Min-width ensures table is wide enough for all columns */
+        table { border-collapse: collapse; width: 100%; min-width: 1200px; } /* Increased min-width for more columns */
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; white-space: nowrap; } /* Prevent text wrapping */
         th { background-color: #f2f2f2; }
         /* Default column widths - adjust these to fine-tune */
-        th:nth-child(1), td:nth-child(1) { width: 80px; } /* Generation */
-        th:nth-child(2), td:nth-child(2) { width: 150px; } /* Name */
-        th:nth-child(3), td:nth-child(3) { width: 80px; } /* Gender */
-        th:nth-child(4), td:nth-child(4) { width: 100px; } /* Birth Date */
-        th:nth-child(5), td:nth-child(5) { width: 150px; } /* Birth Location */
-        th:nth-child(6), td:nth-child(6) { width: 100px; } /* Death Date */
-        th:nth-child(7), td:nth-child(7) { width: 150px; } /* Death Location */
-        th:nth-child(8), td:nth-child(8) { width: 150px; } /* Burial Location */
-        th:nth-child(9), td:nth-child(9) { width: 150px; } /* Service */
-        th:nth-child(10), td:nth-child(10) { width: 200px; } /* Spouses */
-        th:nth-child(11), td:nth-child(11) { width: 80px; } /* Version */
-        th:nth-child(12), td:nth-child(12) { width: 150px; } /* Date */
-        th:nth-child(13), td:nth-child(13) { width: 100px; } /* Actions */
+        th:nth-child(1), td:nth-child(1) { width: 80px; } /* Record Type */
+        th:nth-child(2), td:nth-child(2) { width: 80px; } /* Generation */
+        th:nth-child(3), td:nth-child(3) { width: 150px; } /* Name */
+        th:nth-child(4), td:nth-child(4) { width: 80px; } /* Gender */
+        th:nth-child(5), td:nth-child(5) { width: 100px; } /* Birth Date */
+        th:nth-child(6), td:nth-child(6) { width: 150px; } /* Birth Location */
+        th:nth-child(7), td:nth-child(7) { width: 100px; } /* Death Date */
+        th:nth-child(8), td:nth-child(8) { width: 150px; } /* Death Location */
+        th:nth-child(9), td:nth-child(9) { width: 150px; } /* Burial Location */
+        th:nth-child(10), td:nth-child(10) { width: 150px; } /* Service */
+        th:nth-child(11), td:nth-child(11) { width: 100px; } /* Marriage Date */
+        th:nth-child(12), td:nth-child(12) { width: 80px; } /* Relationship */
+        th:nth-child(13), td:nth-child(13) { width: 80px; } /* Divorced */
+        th:nth-child(14), td:nth-child(14) { width: 150px; } /* Parents */
+        th:nth-child(15), td:nth-child(15) { width: 200px; } /* Spouse Names */
+        th:nth-child(16), td:nth-child(16) { width: 100px; } /* Actions */
         button { margin: 5px; padding: 8px; }
         .form-container { margin-top: 20px; }
         label { display: block; margin: 5px 0; }
@@ -39,31 +42,12 @@
     <h2>Genealogy Record Editor</h2>
     <div class="info">
         <p><strong>Version:</strong> <span id="pageVersion">2.1.2</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 00:04:00</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 00:22:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv">
     <button onclick="loadRecords()">Load Records</button>
     <div class="table-container">
-        <table id="recordTable">
-            <thead>
-                <tr>
-                    <th>Generation</th>
-                    <th>Name</th>
-                    <th>Gender</th>
-                    <th>Birth Date</th>
-                    <th>Birth Location</th>
-                    <th>Death Date</th>
-                    <th>Death Location</th>
-                    <th>Burial Location</th>
-                    <th>Service</th>
-                    <th>Spouses</th>
-                    <th>Version</th>
-                    <th>Date</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="recordBody"></tbody>
-        </table>
+        <div id="recordBody"></div>
     </div>
     <div class="form-container">
         <h3>Add/Edit Record</h3>
@@ -80,7 +64,7 @@
             <label>Burial Location: <input type="text" id="gen_burial_location" name="gen_burial_location" autocomplete="off"></label>
             <label>Service: <input type="text" id="gen_service" name="gen_service" autocomplete="off"></label>
             <label>Version: <input type="text" id="gen_version" name="gen_version" value="2.1.2" autocomplete="off" required></label>
-            <label>Date: <input type="text" id="gen_date" name="gen_date" value="2025-09-10 00:04:00" autocomplete="off" required></label>
+            <label>Date: <input type="text" id="gen_date" name="gen_date" value="2025-09-10 00:22:00" autocomplete="off" required></label>
             <div id="spouses-container">
                 <h3>Spouses</h3>
                 <button type="button" onclick="addSpouseForm()">Add Spouse</button>
@@ -137,15 +121,15 @@
             if (lines.length < 1) throw new Error('Empty CSV file');
             const headers = parseCSVLine(lines[0]);
             const parsedRecords = [];
-            let currentRecord = null;
+            let currentPerson = null;
             let spouseCounter = 1;
 
             for (let i = 1; i < lines.length; i++) {
                 const fields = parseCSVLine(lines[i]);
                 const recordType = fields[0];
                 if (recordType === 'Person') {
-                    if (currentRecord) parsedRecords.push(currentRecord);
-                    currentRecord = {
+                    currentPerson = {
+                        record_type: 'Person',
                         generation: fields[1] ? parseInt(fields[1]) : null,
                         name: fields[2] || null,
                         gender: fields[3] || null,
@@ -155,15 +139,23 @@
                         death_location: fields[7] || null,
                         burial_location: fields[8] || null,
                         service: fields[9] || null,
+                        marriage_date: null,
+                        relationship: null,
+                        divorced: null,
+                        parents: null,
+                        spouse_names: fields[14] || null,
                         version: '2.1.2', // Default for records
-                        date: '2025-09-10 00:04:00', // Default for records
+                        date: '2025-09-10 00:22:00', // Default for records
                         spouses: [],
-                        spouse_names: fields[14] || null
+                        index: parsedRecords.length // Store index for editing
                     };
-                } else if (recordType === 'Spouse' && currentRecord) {
+                    parsedRecords.push(currentPerson);
+                } else if (recordType === 'Spouse' && currentPerson) {
                     const spouse = {
-                        other_id: `S${spouseCounter++}`,
+                        record_type: 'Spouse',
+                        generation: null,
                         name: fields[2] || null,
+                        gender: null,
                         birth_date: fields[4] || null,
                         birth_location: fields[5] || null,
                         death_date: fields[6] || null,
@@ -173,42 +165,61 @@
                         marriage_date: fields[10] || null,
                         relationship: fields[11] || null,
                         divorced: fields[12] === 'True' ? true : fields[12] === 'False' ? false : null,
-                        parents: fields[13] || null
+                        parents: fields[13] || null,
+                        spouse_names: null,
+                        version: null,
+                        date: null,
+                        other_id: `S${spouseCounter++}`,
+                        index: parsedRecords.length // Store index for editing
                     };
-                    if (spouse.name && spouse.relationship) {
-                        currentRecord.spouses.push(spouse);
-                    }
+                    parsedRecords.push(spouse);
+                    currentPerson.spouses.push(spouse);
                 }
             }
-            if (currentRecord) parsedRecords.push(currentRecord);
             return parsedRecords;
         }
 
         function displayRecords() {
             const tbody = document.getElementById('recordBody');
             tbody.innerHTML = '';
+            const headers = [
+                'Record Type', 'Generation', 'Name', 'Gender', 'Birth Date', 'Birth Location',
+                'Death Date', 'Death Location', 'Burial Location', 'Service',
+                'Marriage Date', 'Relationship', 'Divorced', 'Parents', 'Spouse Names'
+            ];
             records.forEach((record, index) => {
-                const spouseSummary = record.spouses ? record.spouses.map(s => s.name || s.other_id).join(', ') : '';
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${record.generation || ''}</td>
-                    <td>${record.name || ''}</td>
-                    <td>${record.gender || ''}</td>
-                    <td>${record.birth_date || ''}</td>
-                    <td>${record.birth_location || ''}</td>
-                    <td>${record.death_date || ''}</td>
-                    <td>${record.death_location || ''}</td>
-                    <td>${record.burial_location || ''}</td>
-                    <td>${record.service || ''}</td>
-                    <td>${spouseSummary}</td>
-                    <td>${record.version || ''}</td>
-                    <td>${record.date || ''}</td>
-                    <td>
-                        <button onclick="editRecord(${index})">Edit</button>
-                        <button onclick="deleteRecord(${index})">Delete</button>
-                    </td>
+                // Create header table
+                const headerTable = document.createElement('table');
+                headerTable.innerHTML = `<thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>`;
+                tbody.appendChild(headerTable);
+                // Create record table
+                const recordTable = document.createElement('table');
+                recordTable.innerHTML = `
+                    <tbody>
+                        <tr>
+                            <td>${record.record_type || ''}</td>
+                            <td>${record.generation || ''}</td>
+                            <td>${record.name || ''}</td>
+                            <td>${record.gender || ''}</td>
+                            <td>${record.birth_date || ''}</td>
+                            <td>${record.birth_location || ''}</td>
+                            <td>${record.death_date || ''}</td>
+                            <td>${record.death_location || ''}</td>
+                            <td>${record.burial_location || ''}</td>
+                            <td>${record.service || ''}</td>
+                            <td>${record.marriage_date || ''}</td>
+                            <td>${record.relationship || ''}</td>
+                            <td>${record.divorced != null ? record.divorced : ''}</td>
+                            <td>${record.parents || ''}</td>
+                            <td>${record.spouse_names || ''}</td>
+                            <td>
+                                <button onclick="editRecord(${index})">Edit</button>
+                                <button onclick="deleteRecord(${index})">Delete</button>
+                            </td>
+                        </tr>
+                    </tbody>
                 `;
-                tbody.appendChild(row);
+                tbody.appendChild(recordTable);
             });
         }
 
@@ -294,6 +305,7 @@
 
         function addOrUpdateRecord() {
             const record = {
+                record_type: 'Person',
                 generation: document.getElementById('gen_generation').value ? parseInt(document.getElementById('gen_generation').value) : null,
                 name: document.getElementById('gen_name').value || null,
                 gender: document.getElementById('gen_gender').value || null,
@@ -305,6 +317,10 @@
                 service: document.getElementById('gen_service').value || null,
                 version: document.getElementById('gen_version').value || null,
                 date: document.getElementById('gen_date').value || null,
+                marriage_date: null,
+                relationship: null,
+                divorced: null,
+                parents: null,
                 spouses: collectSpouses()
             };
             const errors = validateRecord(record);
@@ -314,9 +330,65 @@
             }
             const editIndex = document.getElementById('gen_editIndex').value;
             if (editIndex === '') {
-                records.push(record);
+                // Add new person and spouses
+                records.push({ ...record, index: records.length });
+                record.spouses.forEach(spouse => {
+                    records.push({
+                        record_type: 'Spouse',
+                        generation: null,
+                        name: spouse.name,
+                        gender: null,
+                        birth_date: spouse.birth_date,
+                        birth_location: spouse.birth_location,
+                        death_date: spouse.death_date,
+                        death_location: spouse.death_location,
+                        burial_location: spouse.burial_location,
+                        service: spouse.service,
+                        marriage_date: spouse.marriage_date,
+                        relationship: spouse.relationship,
+                        divorced: spouse.divorced,
+                        parents: spouse.parents,
+                        spouse_names: null,
+                        version: null,
+                        date: null,
+                        other_id: spouse.other_id,
+                        index: records.length
+                    });
+                });
             } else {
-                records[parseInt(editIndex)] = record;
+                // Update existing person and replace their spouses
+                const personIndex = parseInt(editIndex);
+                const oldRecord = records[personIndex];
+                records[personIndex] = { ...record, index: personIndex };
+                // Remove old spouse records
+                records = records.filter(r => r.record_type !== 'Spouse' || !oldRecord.spouses.some(s => s.other_id === r.other_id));
+                // Add new spouse records after person
+                const insertIndex = personIndex + 1;
+                record.spouses.forEach(spouse => {
+                    records.splice(insertIndex, 0, {
+                        record_type: 'Spouse',
+                        generation: null,
+                        name: spouse.name,
+                        gender: null,
+                        birth_date: spouse.birth_date,
+                        birth_location: spouse.birth_location,
+                        death_date: spouse.death_date,
+                        death_location: spouse.death_location,
+                        burial_location: spouse.burial_location,
+                        service: spouse.service,
+                        marriage_date: spouse.marriage_date,
+                        relationship: spouse.relationship,
+                        divorced: spouse.divorced,
+                        parents: spouse.parents,
+                        spouse_names: null,
+                        version: null,
+                        date: null,
+                        other_id: spouse.other_id,
+                        index: insertIndex
+                    });
+                });
+                // Update indices
+                records.forEach((r, i) => r.index = i);
             }
             displayRecords();
             clearForm();
@@ -324,25 +396,47 @@
 
         function editRecord(index) {
             const record = records[index];
-            document.getElementById('gen_editIndex').value = index;
-            document.getElementById('gen_generation').value = record.generation || '';
-            document.getElementById('gen_name').value = record.name || '';
-            document.getElementById('gen_gender').value = record.gender || '';
-            document.getElementById('gen_birth_date').value = record.birth_date || '';
-            document.getElementById('gen_birth_location').value = record.birth_location || '';
-            document.getElementById('gen_death_date').value = record.death_date || '';
-            document.getElementById('gen_death_location').value = record.death_location || '';
-            document.getElementById('gen_burial_location').value = record.burial_location || '';
-            document.getElementById('gen_service').value = record.service || '';
-            document.getElementById('gen_version').value = record.version || '2.1.2';
-            document.getElementById('gen_date').value = record.date || '2025-09-10 00:04:00';
-            document.getElementById('spouses-container').innerHTML = '<h3>Spouses</h3><button type="button" onclick="addSpouseForm()">Add Spouse</button>';
-            (record.spouses || []).forEach(spouse => addSpouseForm(spouse));
+            if (record.record_type === 'Person') {
+                document.getElementById('gen_editIndex').value = index;
+                document.getElementById('gen_generation').value = record.generation || '';
+                document.getElementById('gen_name').value = record.name || '';
+                document.getElementById('gen_gender').value = record.gender || '';
+                document.getElementById('gen_birth_date').value = record.birth_date || '';
+                document.getElementById('gen_birth_location').value = record.birth_location || '';
+                document.getElementById('gen_death_date').value = record.death_date || '';
+                document.getElementById('gen_death_location').value = record.death_location || '';
+                document.getElementById('gen_burial_location').value = record.burial_location || '';
+                document.getElementById('gen_service').value = record.service || '';
+                document.getElementById('gen_version').value = record.version || '2.1.2';
+                document.getElementById('gen_date').value = record.date || '2025-09-10 00:22:00';
+                document.getElementById('spouses-container').innerHTML = '<h3>Spouses</h3><button type="button" onclick="addSpouseForm()">Add Spouse</button>';
+                records.filter(r => r.record_type === 'Spouse' && records.some(p => p.record_type === 'Person' && p.spouses.some(s => s.other_id === r.other_id) && p.index === index)).forEach(spouse => addSpouseForm(spouse));
+            } else {
+                // Editing a spouse: find the parent person
+                const person = records.find(p => p.record_type === 'Person' && p.spouses.some(s => s.other_id === record.other_id));
+                if (person) {
+                    editRecord(person.index);
+                }
+            }
         }
 
         function deleteRecord(index) {
             if (confirm('Are you sure you want to delete this record?')) {
-                records.splice(index, 1);
+                const record = records[index];
+                if (record.record_type === 'Person') {
+                    // Delete person and their spouses
+                    records = records.filter(r => r.index !== index && (r.record_type !== 'Spouse' || !record.spouses.some(s => s.other_id === r.other_id)));
+                } else {
+                    // Delete single spouse
+                    records = records.filter(r => r.index !== index);
+                    // Update person’s spouses
+                    const person = records.find(p => p.record_type === 'Person' && p.spouses.some(s => s.other_id === record.other_id));
+                    if (person) {
+                        person.spouses = person.spouses.filter(s => s.other_id !== record.other_id);
+                    }
+                }
+                // Update indices
+                records.forEach((r, i) => r.index = i);
                 displayRecords();
             }
         }
@@ -360,7 +454,7 @@
             document.getElementById('gen_burial_location').value = '';
             document.getElementById('gen_service').value = '';
             document.getElementById('gen_version').value = '2.1.2';
-            document.getElementById('gen_date').value = '2025-09-10 00:04:00';
+            document.getElementById('gen_date').value = '2025-09-10 00:22:00';
             document.getElementById('spouses-container').innerHTML = '<h3>Spouses</h3><button type="button" onclick="addSpouseForm()">Add Spouse</button>';
             document.getElementById('error').innerText = '';
         }
@@ -382,43 +476,23 @@
             ];
             const csvContent = [
                 headers.join(','),
-                ...records.flatMap(record => {
-                    const personRow = [
-                        'Person',
-                        escapeCSVField(record.generation),
-                        escapeCSVField(record.name),
-                        escapeCSVField(record.gender),
-                        escapeCSVField(record.birth_date),
-                        escapeCSVField(record.birth_location),
-                        escapeCSVField(record.death_date),
-                        escapeCSVField(record.death_location),
-                        escapeCSVField(record.burial_location),
-                        escapeCSVField(record.service),
-                        '',
-                        '',
-                        '',
-                        '',
-                        escapeCSVField(record.spouses.map(s => s.name).join(';'))
-                    ];
-                    const spouseRows = record.spouses.map(spouse => [
-                        'Spouse',
-                        '',
-                        escapeCSVField(spouse.name),
-                        '',
-                        escapeCSVField(spouse.birth_date),
-                        escapeCSVField(spouse.birth_location),
-                        escapeCSVField(spouse.death_date),
-                        escapeCSVField(spouse.death_location),
-                        escapeCSVField(spouse.burial_location),
-                        escapeCSVField(spouse.service),
-                        escapeCSVField(spouse.marriage_date),
-                        escapeCSVField(spouse.relationship),
-                        escapeCSVField(spouse.divorced),
-                        escapeCSVField(spouse.parents),
-                        ''
-                    ]);
-                    return [personRow.join(','), ...spouseRows.map(row => row.join(','))];
-                })
+                ...records.map(record => [
+                    record.record_type,
+                    escapeCSVField(record.generation),
+                    escapeCSVField(record.name),
+                    escapeCSVField(record.gender),
+                    escapeCSVField(record.birth_date),
+                    escapeCSVField(record.birth_location),
+                    escapeCSVField(record.death_date),
+                    escapeCSVField(record.death_location),
+                    escapeCSVField(record.burial_location),
+                    escapeCSVField(record.service),
+                    escapeCSVField(record.marriage_date),
+                    escapeCSVField(record.relationship),
+                    escapeCSVField(record.divorced),
+                    escapeCSVField(record.parents),
+                    escapeCSVField(record.spouse_names)
+                ].join(','))
             ].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
