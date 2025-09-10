@@ -2,135 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Genealogy Record Editor</title>
+    <title>Genealogy Records</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        button { margin: 5px; padding: 8px; }
-        .form-container { margin-top: 20px; }
+        body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
+        h1 { color: #333; }
+        a { font-size: 18px; color: #0066cc; text-decoration: none; }
+        a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
-    <h2>Genealogy Record Editor</h2>
-    <input type="file" id="jsonFile" accept=".json">
-    <button onclick="loadRecords()">Load Records</button>
-    <table id="recordTable">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Birth Year</th>
-                <th>Death Year</th>
-                <th>Notes</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="recordBody"></tbody>
-    </table>
-    <div class="form-container">
-        <h3>Add/Edit Record</h3>
-        <input type="hidden" id="editIndex">
-        <label>Name: <input type="text" id="name"></label><br>
-        <label>Birth Year: <input type="number" id="birthYear"></label><br>
-        <label>Death Year: <input type="number" id="deathYear"></label><br>
-        <label>Notes: <textarea id="notes"></textarea></label><br>
-        <button onclick="addOrUpdateRecord()">Save Record</button>
-    </div>
-    <button onclick="downloadJson()">Download Updated JSON</button>
-
-    <script>
-        let records = [];
-
-        function loadRecords() {
-            const fileInput = document.getElementById('jsonFile');
-            const file = fileInput.files[0];
-            if (!file) {
-                alert('Please select a JSON file.');
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    records = JSON.parse(e.target.result);
-                    displayRecords();
-                } catch (error) {
-                    alert('Invalid JSON file.');
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        function displayRecords() {
-            const tbody = document.getElementById('recordBody');
-            tbody.innerHTML = '';
-            records.forEach((record, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${record.name || ''}</td>
-                    <td>${record.birthYear || ''}</td>
-                    <td>${record.deathYear || ''}</td>
-                    <td>${record.notes || ''}</td>
-                    <td>
-                        <button onclick="editRecord(${index})">Edit</button>
-                        <button onclick="deleteRecord(${index})">Delete</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        function addOrUpdateRecord() {
-            const editIndex = document.getElementById('editIndex').value;
-            const record = {
-                name: document.getElementById('name').value,
-                birthYear: document.getElementById('birthYear').value,
-                deathYear: document.getElementById('deathYear').value,
-                notes: document.getElementById('notes').value
-            };
-            if (editIndex === '') {
-                records.push(record);
-            } else {
-                records[parseInt(editIndex)] = record;
-            }
-            displayRecords();
-            clearForm();
-        }
-
-        function editRecord(index) {
-            const record = records[index];
-            document.getElementById('editIndex').value = index;
-            document.getElementById('name').value = record.name || '';
-            document.getElementById('birthYear').value = record.birthYear || '';
-            document.getElementById('deathYear').value = record.deathYear || '';
-            document.getElementById('notes').value = record.notes || '';
-        }
-
-        function deleteRecord(index) {
-            if (confirm('Are you sure you want to delete this record?')) {
-                records.splice(index, 1);
-                displayRecords();
-            }
-        }
-
-        function clearForm() {
-            document.getElementById('editIndex').value = '';
-            document.getElementById('name').value = '';
-            document.getElementById('birthYear').value = '';
-            document.getElementById('deathYear').value = '';
-            document.getElementById('notes').value = '';
-        }
-
-        function downloadJson() {
-            const jsonStr = JSON.stringify(records, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'updated_genealogy.json';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-    </script>
+    <h1>Welcome to the Genealogy Records Editor</h1>
+    <p>Click the link below to access the genealogy record editor:</p>
+    <p><a href="editor.html">Open Genealogy Editor</a></p>
+    <p>Upload your genealogy text file to view, add, edit, or delete records, then download the updated file to send back.</p>
 </body>
 </html>
