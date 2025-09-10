@@ -5,14 +5,30 @@
     <title>Genealogy Record Editor</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        /* Wrap table in a div for horizontal scrolling */
+        .table-container { overflow-x: auto; max-width: 100%; }
+        table { border-collapse: collapse; width: 100%; min-width: 1000px; } /* Min-width ensures table is wide enough for all columns */
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; white-space: nowrap; } /* Prevent text wrapping */
         th { background-color: #f2f2f2; }
+        /* Default column widths - adjust these to fine-tune */
+        th:nth-child(1), td:nth-child(1) { width: 80px; } /* Generation */
+        th:nth-child(2), td:nth-child(2) { width: 150px; } /* Name */
+        th:nth-child(3), td:nth-child(3) { width: 80px; } /* Gender */
+        th:nth-child(4), td:nth-child(4) { width: 100px; } /* Birth Date */
+        th:nth-child(5), td:nth-child(5) { width: 150px; } /* Birth Location */
+        th:nth-child(6), td:nth-child(6) { width: 100px; } /* Death Date */
+        th:nth-child(7), td:nth-child(7) { width: 150px; } /* Death Location */
+        th:nth-child(8), td:nth-child(8) { width: 150px; } /* Burial Location */
+        th:nth-child(9), td:nth-child(9) { width: 150px; } /* Service */
+        th:nth-child(10), td:nth-child(10) { width: 200px; } /* Spouses */
+        th:nth-child(11), td:nth-child(11) { width: 80px; } /* Version */
+        th:nth-child(12), td:nth-child(12) { width: 150px; } /* Date */
+        th:nth-child(13), td:nth-child(13) { width: 100px; } /* Actions */
         button { margin: 5px; padding: 8px; }
         .form-container { margin-top: 20px; }
         label { display: block; margin: 5px 0; }
-        input, textarea, select { width: 100%; max-width: 500px; }
-        textarea { height: 80px; }
+        input, select { width: 100%; max-width: 500px; height: 30px; } /* Input height */
+        textarea { width: 100%; max-width: 500px; height: 80px; } /* Textarea height */
         .spouse-container { border: 1px solid #ddd; padding: 10px; margin: 10px 0; }
         .spouse-container h4 { margin: 0 0 10px 0; }
         .error { color: red; }
@@ -23,26 +39,32 @@
     <h2>Genealogy Record Editor</h2>
     <div class="info">
         <p><strong>Version:</strong> <span id="pageVersion">2.1.2</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 06:42:09</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 00:04:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv">
     <button onclick="loadRecords()">Load Records</button>
-    <table id="recordTable">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Generation</th>
-                <th>Gender</th>
-                <th>Birth Date</th>
-                <th>Birth Location</th>
-                <th>Spouses</th>
-                <th>Death Date</th>
-                <th>Death Location</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="recordBody"></tbody>
-    </table>
+    <div class="table-container">
+        <table id="recordTable">
+            <thead>
+                <tr>
+                    <th>Generation</th>
+                    <th>Name</th>
+                    <th>Gender</th>
+                    <th>Birth Date</th>
+                    <th>Birth Location</th>
+                    <th>Death Date</th>
+                    <th>Death Location</th>
+                    <th>Burial Location</th>
+                    <th>Service</th>
+                    <th>Spouses</th>
+                    <th>Version</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="recordBody"></tbody>
+        </table>
+    </div>
     <div class="form-container">
         <h3>Add/Edit Record</h3>
         <form id="genealogyForm" autocomplete="off">
@@ -58,7 +80,7 @@
             <label>Burial Location: <input type="text" id="gen_burial_location" name="gen_burial_location" autocomplete="off"></label>
             <label>Service: <input type="text" id="gen_service" name="gen_service" autocomplete="off"></label>
             <label>Version: <input type="text" id="gen_version" name="gen_version" value="2.1.2" autocomplete="off" required></label>
-            <label>Date: <input type="text" id="gen_date" name="gen_date" value="2025-09-10 06:42:09" autocomplete="off" required></label>
+            <label>Date: <input type="text" id="gen_date" name="gen_date" value="2025-09-10 00:04:00" autocomplete="off" required></label>
             <div id="spouses-container">
                 <h3>Spouses</h3>
                 <button type="button" onclick="addSpouseForm()">Add Spouse</button>
@@ -133,8 +155,8 @@
                         death_location: fields[7] || null,
                         burial_location: fields[8] || null,
                         service: fields[9] || null,
-                        version: '2.1.2',
-                        date: '2025-09-10 06:42:09',
+                        version: '2.1.2', // Default for records
+                        date: '2025-09-10 00:04:00', // Default for records
                         spouses: [],
                         spouse_names: fields[14] || null
                     };
@@ -169,14 +191,18 @@
                 const spouseSummary = record.spouses ? record.spouses.map(s => s.name || s.other_id).join(', ') : '';
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${record.name || ''}</td>
                     <td>${record.generation || ''}</td>
+                    <td>${record.name || ''}</td>
                     <td>${record.gender || ''}</td>
                     <td>${record.birth_date || ''}</td>
                     <td>${record.birth_location || ''}</td>
-                    <td>${spouseSummary}</td>
                     <td>${record.death_date || ''}</td>
                     <td>${record.death_location || ''}</td>
+                    <td>${record.burial_location || ''}</td>
+                    <td>${record.service || ''}</td>
+                    <td>${spouseSummary}</td>
+                    <td>${record.version || ''}</td>
+                    <td>${record.date || ''}</td>
                     <td>
                         <button onclick="editRecord(${index})">Edit</button>
                         <button onclick="deleteRecord(${index})">Delete</button>
@@ -253,7 +279,7 @@
                 if (!spouse.other_id) errors.push('Spouse Other ID is required.');
                 if (!spouse.name) errors.push('Spouse Name is required.');
                 if (!spouse.relationship) errors.push('Spouse Relationship is required.');
-                if (spouse.marriage_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(spouse.marriage_date)) {
+                if (spouse.marriage_date && !/^\d{4}(-\d{2}(-\\d{2})?)?$/.test(spouse.marriage_date)) {
                     errors.push('Spouse Marriage Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
                 }
                 if (spouse.birth_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(spouse.birth_date)) {
@@ -308,8 +334,8 @@
             document.getElementById('gen_death_location').value = record.death_location || '';
             document.getElementById('gen_burial_location').value = record.burial_location || '';
             document.getElementById('gen_service').value = record.service || '';
-            document.getElementById('gen_version').value = record.version || '';
-            document.getElementById('gen_date').value = record.date || '';
+            document.getElementById('gen_version').value = record.version || '2.1.2';
+            document.getElementById('gen_date').value = record.date || '2025-09-10 00:04:00';
             document.getElementById('spouses-container').innerHTML = '<h3>Spouses</h3><button type="button" onclick="addSpouseForm()">Add Spouse</button>';
             (record.spouses || []).forEach(spouse => addSpouseForm(spouse));
         }
@@ -334,7 +360,7 @@
             document.getElementById('gen_burial_location').value = '';
             document.getElementById('gen_service').value = '';
             document.getElementById('gen_version').value = '2.1.2';
-            document.getElementById('gen_date').value = '2025-09-10 06:42:09';
+            document.getElementById('gen_date').value = '2025-09-10 00:04:00';
             document.getElementById('spouses-container').innerHTML = '<h3>Spouses</h3><button type="button" onclick="addSpouseForm()">Add Spouse</button>';
             document.getElementById('error').innerText = '';
         }
