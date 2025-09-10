@@ -13,7 +13,7 @@
         .changed { background-color: #fff3cd; }
         .resize-handle { position: absolute; top: 0; right: -5px; width: 10px; height: 100%; cursor: col-resize; }
         th:nth-child(1), td:nth-child(1) { min-width: 80px; max-width: 200px; } /* Record Type */
-        th:nth-child(2), td:nth-child(2) { min-width: 80px; max-width: 150px; } /* Gen */
+        th:nth-child(2), td:nth-child(2) { min-width: 50px; max-width: 80px; } /* Gen */
         th:nth-child(3), td:nth-child(3) { min-width: 150px; max-width: 300px; } /* Name */
         th:nth-child(4), td:nth-child(4) { min-width: 80px; max-width: 200px; } /* Gender */
         th:nth-child(5), td:nth-child(5) { min-width: 100px; max-width: 200px; } /* Birth Date */
@@ -36,8 +36,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.13</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 14:39:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.15</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 15:10:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv">
     <button onclick="loadRecords()">Load Records</button>
@@ -58,7 +58,7 @@
             for (let i = 0; i < line.length; i++) {
                 if (line[i] === '"') {
                     inQuotes = !inQuotes;
-                    continue; // Skip quote characters
+                    continue;
                 }
                 if (line[i] === ',' && !inQuotes) {
                     fields.push(currentField.trim());
@@ -111,24 +111,24 @@
                     console.warn(`Skipping malformed line ${i + 1}: ${lines[i]}`);
                     continue;
                 }
-                const recordType = fields[0];
-                const name = fields[2] || '';
+                const recordType = fields[0]?.trim();
+                const name = fields[2]?.trim() || '';
                 if (recordType === 'Person') {
                     currentPerson = {
                         record_type: 'Person',
                         generation: fields[1] ? parseInt(fields[1]) : null,
                         name: name,
-                        gender: fields[3] || null,
-                        birth_date: fields[4] || null,
-                        birth_location: fields[5] || null,
-                        death_date: fields[6] || null,
-                        death_location: fields[7] || null,
-                        burial_location: fields[8] || null,
-                        service: fields[9] || null,
+                        gender: fields[3]?.trim() || null,
+                        birth_date: fields[4]?.trim() || null,
+                        birth_location: fields[5]?.trim() || null,
+                        death_date: fields[6]?.trim() || null,
+                        death_location: fields[7]?.trim() || null,
+                        burial_location: fields[8]?.trim() || null,
+                        service: fields[9]?.trim() || null,
                         marriage_date: null,
                         relationship: null,
                         divorced: null,
-                        parents: fields[13] || null,
+                        parents: fields[13]?.trim() || null,
                         spouses: [],
                         index: parsedRecords.length,
                         changed: false
@@ -139,18 +139,18 @@
                     const spouse = {
                         record_type: 'Spouse',
                         generation: null,
-                        name: fields[2] || null,
+                        name: name,
                         gender: null,
-                        birth_date: fields[4] || null,
-                        birth_location: fields[5] || null,
-                        death_date: fields[6] || null,
-                        death_location: fields[7] || null,
-                        burial_location: fields[8] || null,
-                        service: fields[9] || null,
-                        marriage_date: fields[10] || null,
-                        relationship: fields[11] || null,
+                        birth_date: fields[4]?.trim() || null,
+                        birth_location: fields[5]?.trim() || null,
+                        death_date: fields[6]?.trim() || null,
+                        death_location: fields[7]?.trim() || null,
+                        burial_location: fields[8]?.trim() || null,
+                        service: fields[9]?.trim() || null,
+                        marriage_date: fields[10]?.trim() || null,
+                        relationship: fields[11]?.trim() || null,
                         divorced: fields[12] === 'True' ? true : fields[12] === 'False' ? false : null,
-                        parents: fields[13] || null,
+                        parents: fields[13]?.trim() || null,
                         other_id: `S${spouseCounter++}`,
                         index: parsedRecords.length,
                         changed: false
@@ -168,7 +168,7 @@
         function displayRecords() {
             console.log("Displaying records");
             const recordBody = document.getElementById('recordBody');
-            recordBody.innerHTML = ''; // Clear previous content
+            recordBody.innerHTML = '';
             const headers = [
                 'Record Type', 'Gen', 'Name', 'Gender', 'Birth Date', 'Birth Location',
                 'Death Date', 'Death Location', 'Burial Location', 'Service',
@@ -198,22 +198,41 @@
                 ];
                 cells.forEach((cell, i) => {
                     const td = document.createElement('td');
-                    if (index === editingIndex && record.record_type === 'Spouse' && [10, 11, 12, 13].includes(i)) {
-                        if (i === 12) { // Divorced
-                            td.innerHTML = `<input type="checkbox" ${cell ? 'checked' : ''} onchange="updateField(${index}, 'divorced', this.checked)">`;
-                        } else if (i === 11) { // Relationship
-                            td.innerHTML = `
-                                <select onchange="updateField(${index}, 'relationship', this.value)">
-                                    <option value="spouse" ${cell === 'spouse' ? 'selected' : ''}>Spouse</option>
-                                    <option value="other" ${cell === 'other' ? 'selected' : ''}>Other</option>
-                                </select>`;
+                    if (index === editingIndex) {
+                        if (record.record_type === 'Person' && [2, 3, 4, 5, 6, 7, 8, 9].includes(i)) {
+                            if (i === 3) { // Gender
+                                td.innerHTML = `
+                                    <select onchange="updateField(${index}, 'gender', this.value)">
+                                        <option value="male" ${cell === 'male' ? 'selected' : ''}>Male</option>
+                                        <option value="female" ${cell === 'female' ? 'selected' : ''}>Female</option>
+                                        <option value="other" ${cell === 'other' ? 'selected' : ''}>Other</option>
+                                    </select>`;
+                            } else {
+                                td.innerHTML = `<input type="text" value="${cell || ''}" oninput="updateField(${index}, '${headers[i].toLowerCase().replace(' ', '_')}', this.value)">`;
+                                if ([4, 6].includes(i)) td.querySelector('input').pattern = '^\\d{4}(-\\d{2}(-\\d{2})?)?$';
+                            }
+                        } else if (record.record_type === 'Spouse' && [2, 4, 5, 6, 8, 9, 10, 11, 12, 13].includes(i)) {
+                            if (i === 11) { // Relationship
+                                td.innerHTML = `
+                                    <select onchange="updateField(${index}, 'relationship', this.value)">
+                                        <option value="spouse" ${cell === 'spouse' ? 'selected' : ''}>Spouse</option>
+                                        <option value="other" ${cell === 'other' ? 'selected' : ''}>Other</option>
+                                    </select>`;
+                            } else if (i === 12) { // Divorced
+                                td.innerHTML = `<input type="checkbox" ${cell ? 'checked' : ''} onchange="updateField(${index}, 'divorced', this.checked)">`;
+                            } else {
+                                td.innerHTML = `<input type="text" value="${cell || ''}" oninput="updateField(${index}, '${headers[i].toLowerCase().replace(' ', '_')}', this.value)">`;
+                                if ([4, 6, 10].includes(i)) td.querySelector('input').pattern = '^\\d{4}(-\\d{2}(-\\d{2})?)?$';
+                            }
                         } else {
-                            td.innerHTML = `<input type="text" value="${cell || ''}" oninput="updateField(${index}, '${headers[i].toLowerCase().replace(' ', '_')}', this.value)">`;
-                            if ([4, 6, 10].includes(i)) td.querySelector('input').pattern = '^\\d{4}(-\\d{2}(-\\d{2})?)?$';
+                            td.textContent = cell;
+                            if ((record.record_type === 'Spouse' && [1, 3].includes(i)) || (record.record_type === 'Person' && [10, 11, 12, 13].includes(i))) {
+                                td.classList.add('greyed-out');
+                            }
                         }
                     } else {
                         td.textContent = cell;
-                        if (record.record_type === 'Spouse' && i === 1) {
+                        if ((record.record_type === 'Spouse' && [1, 3].includes(i)) || (record.record_type === 'Person' && [10, 11, 12, 13].includes(i))) {
                             td.classList.add('greyed-out');
                         }
                     }
@@ -261,7 +280,7 @@
             });
             colWidths.forEach((width, i) => {
                 const selector = `th:nth-child(${i + 1}), td:nth-child(${i + 1})`;
-                const maxWidth = [3, 6, 8, 9, 14].includes(i) ? 300 : (i === 1 ? 150 : 200);
+                const maxWidth = [3, 6, 8, 9, 14].includes(i) ? 300 : (i === 1 ? 80 : 200);
                 document.querySelectorAll(selector).forEach(cell => {
                     cell.style.width = `${Math.min(width + 10, maxWidth)}px`;
                 });
@@ -371,7 +390,7 @@
             records.splice(index + 1, 0, record);
             let associatedPerson = records[index];
             if (associatedPerson.record_type === 'Spouse') {
-                associatedPerson = records.find((r, i) => i <= index && r.record_type === 'Person' && r.spouses.some(s => s.other_id === associatedPerson.other_id)) || record;
+                associatedPerson = records.find((r, i) => i <= index && r.record_type === 'Person' && r.spouses.some(s => s.other_id === r.other_id)) || record;
             }
             records.forEach((r, i) => r.index = i);
             editingIndex = index + 1;
