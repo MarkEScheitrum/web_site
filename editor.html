@@ -36,8 +36,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.15</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 15:10:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.17</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 16:06:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv">
     <button onclick="loadRecords()">Load Records</button>
@@ -368,33 +368,75 @@
 
         function insertRecord(index) {
             console.log(`Inserting record after index ${index}`);
-            const record = {
-                record_type: 'Person',
-                generation: records[index].record_type === 'Person' ? records[index].generation : (records.find((r, i) => i <= index && r.record_type === 'Person')?.generation || null),
-                name: null,
-                gender: null,
-                birth_date: null,
-                birth_location: null,
-                death_date: null,
-                death_location: null,
-                burial_location: null,
-                service: null,
-                marriage_date: null,
-                relationship: null,
-                divorced: null,
-                parents: null,
-                spouses: [],
-                index: index + 1,
-                changed: true
-            };
-            records.splice(index + 1, 0, record);
-            let associatedPerson = records[index];
-            if (associatedPerson.record_type === 'Spouse') {
-                associatedPerson = records.find((r, i) => i <= index && r.record_type === 'Person' && r.spouses.some(s => s.other_id === r.other_id)) || record;
+            const recordTypeInput = prompt('Insert record as (Person or Spouse)?').trim().toLowerCase();
+            if (!['person', 'spouse'].includes(recordTypeInput)) {
+                alert('Invalid record type. Please enter "Person" or "Spouse".');
+                console.log(`Invalid record type entered: ${recordTypeInput}`);
+                return;
             }
+
+            let record;
+            if (recordTypeInput === 'person') {
+                record = {
+                    record_type: 'Person',
+                    generation: records[index].record_type === 'Person' ? records[index].generation : (records.find((r, i) => i <= index && r.record_type === 'Person')?.generation || null),
+                    name: null,
+                    gender: null,
+                    birth_date: null,
+                    birth_location: null,
+                    death_date: null,
+                    death_location: null,
+                    burial_location: null,
+                    service: null,
+                    marriage_date: null,
+                    relationship: null,
+                    divorced: null,
+                    parents: null,
+                    spouses: [],
+                    index: index + 1,
+                    changed: true
+                };
+            } else {
+                const relationshipInput = prompt('Enter relationship (spouse or other):').trim().toLowerCase();
+                if (!['spouse', 'other'].includes(relationshipInput)) {
+                    alert('Invalid relationship. Please enter "spouse" or "other".');
+                    console.log(`Invalid relationship entered: ${relationshipInput}`);
+                    return;
+                }
+                const associatedPerson = records.slice(0, index + 1).reverse().find(r => r.record_type === 'Person');
+                if (!associatedPerson) {
+                    alert('No preceding Person record found. Spouse records must be associated with a Person.');
+                    console.log('No preceding Person record for Spouse insertion');
+                    return;
+                }
+                record = {
+                    record_type: 'Spouse',
+                    generation: null,
+                    name: null,
+                    gender: null,
+                    birth_date: null,
+                    birth_location: null,
+                    death_date: null,
+                    death_location: null,
+                    burial_location: null,
+                    service: null,
+                    marriage_date: null,
+                    relationship: relationshipInput,
+                    divorced: false,
+                    parents: null,
+                    other_id: `S${records.filter(r => r.record_type === 'Spouse').length + 1}`,
+                    index: index + 1,
+                    changed: true
+                };
+                associatedPerson.spouses.push(record);
+                console.log(`Inserted Spouse associated with Person: ${associatedPerson.name}`);
+            }
+
+            records.splice(index + 1, 0, record);
             records.forEach((r, i) => r.index = i);
             editingIndex = index + 1;
             displayRecords();
+            console.log(`Inserted ${record.record_type} record at index ${index + 1}`);
         }
 
         function deleteRecord(index) {
