@@ -36,8 +36,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.11</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 09:00:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.12</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 14:04:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv">
     <button onclick="loadRecords()">Load Records</button>
@@ -259,7 +259,7 @@
         function enableColumnResizing() {
             console.log("Enabling column resizing");
             const headers = document.querySelectorAll('th');
-            headers.forEach((index, th) => {
+            headers.forEach((th, index) => {
                 if (index < 15) {
                     const resizeHandle = th.querySelector('.resize-handle');
                     resizeHandle.addEventListener('mousedown', (e) => {
