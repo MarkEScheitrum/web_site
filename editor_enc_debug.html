@@ -16,15 +16,24 @@
         .vestigial .header-text { display: none; }
         .vestigial .cell-content { display: none; }
         .vestigial .action-icons { margin: 0; }
-        input.edit-input { width: 100%; box-sizing: border-box; padding: 6px; }
-        .editable-row { background-color: #d9edf7; } /* Highlight for editable row */
+        textarea.edit-textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 6px;
+            font: inherit;
+            border: none;
+            background: transparent;
+            resize: none;
+            min-height: 40px; /* Ensure at least 2 lines visible */
+        }
+        .editable-row { background-color: #d9edf7; }
     </style>
 </head>
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.44</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 13:50:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.45</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 14:00:00 PDT</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
@@ -252,18 +261,19 @@
             editingIndex = index;
             editingField = field;
             td.innerHTML = '';
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'edit-input';
-            input.value = currentValue;
-            td.appendChild(input);
-            input.focus();
+            const textarea = document.createElement('textarea');
+            textarea.className = 'edit-textarea';
+            textarea.value = currentValue;
+            textarea.rows = Math.max(2, currentValue.split('\n').length); // At least 2 rows, or match text lines
+            td.appendChild(textarea);
+            textarea.focus();
             console.log(`Started editing record ${index + 1}, field: ${field}`);
 
-            input.onblur = () => saveEdit(index, field, input.value, td, currentValue);
-            input.onkeydown = (e) => {
-                if (e.key === 'Enter') {
-                    saveEdit(index, field, input.value, td, currentValue);
+            textarea.onblur = () => saveEdit(index, field, textarea.value, td, currentValue);
+            textarea.onkeydown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault(); // Prevent newline in textarea
+                    saveEdit(index, field, textarea.value, td, currentValue);
                 } else if (e.key === 'Escape') {
                     cancelEdit(td, currentValue);
                 }
@@ -282,7 +292,7 @@
             cellContent.textContent = value;
             cellContent.className = 'cell-content';
             td.appendChild(cellContent);
-            displayRecords(); // Refresh to ensure consistency
+            displayRecords();
         }
 
         function cancelEdit(td, originalValue) {
@@ -299,7 +309,7 @@
         function deleteRecord(index) {
             if (confirm(`Delete record ${index + 1}?`)) {
                 records.splice(index, 1);
-                if (editableRow === index) editableRow = null; // Clear if deleting the editable row
+                if (editableRow === index) editableRow = null;
                 displayRecords();
                 console.log(`Deleted record ${index + 1}`);
             }
