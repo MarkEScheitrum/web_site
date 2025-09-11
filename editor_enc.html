@@ -37,8 +37,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.27</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 04:00:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.28</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 05:00:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="loadRecords()">Load Records</button>
@@ -52,10 +52,9 @@
         let editingIndex = null;
 
         function deriveKey(passphrase, salt) {
-            // Encode passphrase as UTF-8
             const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
             const key = CryptoJS.PBKDF2(utf8Passphrase, salt, {
-                keySize: 256/32, // 32 bytes for AES-256
+                keySize: 256/32,
                 iterations: 100000,
                 hasher: CryptoJS.algo.SHA256
             });
@@ -107,6 +106,9 @@
                 const saltBinary = binaryData.slice(0, 16);
                 const ivBinary = binaryData.slice(16, 32);
                 const ciphertextBinary = binaryData.slice(32);
+                // Log salt and IV in hex
+                console.log("Salt (hex):", bytesToHex(saltBinary));
+                console.log("IV (hex):", bytesToHex(ivBinary));
                 // Convert to base64 for CryptoJS
                 const saltBase64 = binaryToBase64(saltBinary);
                 const ivBase64 = binaryToBase64(ivBinary);
@@ -126,11 +128,18 @@
                     key,
                     { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
                 );
-                // Inspect decrypted bytes before UTF-8 conversion
+                // Inspect decrypted bytes
                 const decryptedBytes = decrypted.toString(CryptoJS.enc.Hex);
                 console.log("Decrypted bytes (first 100 hex):", decryptedBytes.slice(0, 100));
-                // Attempt UTF-8 conversion
-                const result = decrypted.toString(CryptoJS.enc.Utf8);
+                // Attempt UTF-8 conversion with fallback
+                let result;
+                try {
+                    result = decrypted.toString(CryptoJS.enc.Utf8);
+                } catch (e) {
+                    console.error("UTF-8 conversion failed:", e.message);
+                    console.log("Raw decrypted bytes (full hex):", decryptedBytes);
+                    throw new Error("Decryption produced invalid UTF-8 data");
+                }
                 if (!result) throw new Error("Decryption resulted in empty output");
                 console.log("Decrypted CSV length:", result.length);
                 return result;
