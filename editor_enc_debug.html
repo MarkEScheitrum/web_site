@@ -7,6 +7,8 @@
         .table-container { overflow-x: auto; }
         table { border-collapse: collapse; width: auto; table-layout: auto; }
         th, td { border: 1px solid black; padding: 8px; text-align: left; width: 150px; }
+        th.record_type, td.record_type { width: 80px; } /* Narrower width for record_type */
+        th.gen, td.gen { width: 50px; } /* Narrower width for gen */
         th { background-color: #f2f2f2; }
         .editable:hover { background-color: #e0e0e0; cursor: pointer; }
         button { margin: 5px; padding: 8px 16px; }
@@ -33,8 +35,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.46</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 14:13:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.47</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 14:38:00 PDT</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
@@ -208,7 +210,7 @@
 
         function isFieldEditable(recordType, field) {
             const restrictions = fieldRestrictions[recordType.toLowerCase()];
-            if (!restrictions) return false; // Default to uneditable if record_type is unknown
+            if (!restrictions) return false;
             return restrictions.editable.includes(field);
         }
 
@@ -227,6 +229,7 @@
             const headers = Object.keys(records[0]);
             headers.forEach(header => {
                 const th = document.createElement('th');
+                th.className = header; // Apply column-specific class (e.g., record_type, gen)
                 const toggleButton = document.createElement('span');
                 toggleButton.textContent = vestigialColumns.has(header) ? '👁️‍🗨️' : '👁️';
                 toggleButton.className = 'action-icons';
@@ -236,7 +239,7 @@
                 headerText.textContent = ` ${header}`;
                 headerText.className = 'header-text';
                 th.appendChild(headerText);
-                if (vestigialColumns.has(header)) th.className = 'vestigial';
+                if (vestigialColumns.has(header)) th.className += ' vestigial';
                 headerRow.appendChild(th);
             });
             const actionTh = document.createElement('th');
@@ -249,19 +252,20 @@
                 if (index === editableRow) tr.className = 'editable-row';
                 headers.forEach(header => {
                     const td = document.createElement('td');
+                    td.className = header; // Apply column-specific class
                     const cellContent = document.createElement('span');
                     cellContent.textContent = record[header];
                     cellContent.className = 'cell-content';
                     td.appendChild(cellContent);
                     if (index === editableRow && isFieldEditable(record.record_type, header) && !vestigialColumns.has(header)) {
-                        td.className = 'editable';
+                        td.className += ' editable';
                         td.onclick = () => {
                             if (editingIndex === null) {
                                 startEditing(index, header, td, cellContent.textContent);
                             }
                         };
                     } else if (isFieldGreyedOut(record.record_type, header)) {
-                        td.className = 'greyed-out';
+                        td.className += ' greyed-out';
                     }
                     if (vestigialColumns.has(header)) td.className += ' vestigial';
                     tr.appendChild(td);
