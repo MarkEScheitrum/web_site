@@ -37,8 +37,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.20</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 21:15:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.21</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 21:45:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="loadRecords()">Load Records</button>
@@ -61,9 +61,15 @@
 
         function decryptFile(encryptedData, passphrase) {
             try {
-                // Decode base64 data
-                const binaryData = atob(String.fromCharCode(...new Uint8Array(encryptedData)));
-                // Extract salt (16 bytes), IV (16 bytes), and ciphertext
+                // Convert Uint8Array to base64 string
+                let base64String = '';
+                for (let i = 0; i < encryptedData.length; i++) {
+                    base64String += String.fromCharCode(encryptedData[i]);
+                }
+                base64String = btoa(base64String);
+                // Decode base64 to get salt (16 bytes), IV (16 bytes), and ciphertext
+                const binaryData = atob(base64String);
+                if (binaryData.length < 48) throw new Error("Encrypted data too short");
                 const salt = CryptoJS.enc.Base64.parse(binaryData.slice(0, 24)); // 16 bytes base64-encoded
                 const iv = CryptoJS.enc.Base64.parse(binaryData.slice(24, 48)); // 16 bytes base64-encoded
                 const ciphertext = CryptoJS.enc.Base64.parse(binaryData.slice(48));
@@ -377,7 +383,7 @@
 
                         function onMouseMove(e) {
                             const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + (e.pageX - startX)));
-                            document.querySelectorAll(`th:nth-child(${index + 1}), td:nth-child(${index + 1})`).forEach(cell => {
+                            document.querySelectorAll(`th:nth-child(${index + 1}), td:nth-child(${i + 1})`).forEach(cell => {
                                 cell.style.width = `${newWidth}px`;
                             });
                         }
@@ -577,7 +583,7 @@
                     escapeCSVField(record.marriage_date),
                     escapeCSVField(record.relationship),
                     escapeCSVField(record.divorced),
-                    escapeCSVField(record.parents)
+                    escapeCSVField(row.parents)
                 ].join(','))
             ].join('\n');
             const encrypt = confirm('Encrypt the downloaded CSV?');
