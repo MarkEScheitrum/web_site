@@ -24,16 +24,17 @@
             border: none;
             background: transparent;
             resize: none;
-            min-height: 40px; /* Ensure at least 2 lines visible */
+            min-height: 40px;
         }
         .editable-row { background-color: #d9edf7; }
+        .greyed-out { background-color: #e0e0e0; cursor: not-allowed; }
     </style>
 </head>
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.45</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 14:00:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.46</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 14:13:00 PDT</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
@@ -48,6 +49,20 @@
         let editingField = null;
         let editableRow = null;
         let vestigialColumns = new Set();
+
+        // Field restrictions based on record_type
+        const fieldRestrictions = {
+            person: {
+                editable: ['gen', 'name', 'gender', 'birth_date', 'birth_location', 'death_date', 'burial_location', 'service'],
+                uneditable: ['record_type'],
+                greyedOut: ['marriage_date', 'relationship', 'divorced', 'parents']
+            },
+            spouse: {
+                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents'],
+                uneditable: ['record_type'],
+                greyedOut: ['gen', 'gender']
+            }
+        };
 
         function deriveKey(passphrase, salt) {
             return CryptoJS.PBKDF2(passphrase, salt, {
@@ -191,6 +206,18 @@
             displayRecords();
         }
 
+        function isFieldEditable(recordType, field) {
+            const restrictions = fieldRestrictions[recordType.toLowerCase()];
+            if (!restrictions) return false; // Default to uneditable if record_type is unknown
+            return restrictions.editable.includes(field);
+        }
+
+        function isFieldGreyedOut(recordType, field) {
+            const restrictions = fieldRestrictions[recordType.toLowerCase()];
+            if (!restrictions) return false;
+            return restrictions.greyedOut.includes(field);
+        }
+
         function displayRecords() {
             const recordBody = document.getElementById('recordBody');
             recordBody.innerHTML = '';
@@ -226,12 +253,16 @@
                     cellContent.textContent = record[header];
                     cellContent.className = 'cell-content';
                     td.appendChild(cellContent);
-                    td.className = 'editable';
-                    td.onclick = () => {
-                        if (index === editableRow && !vestigialColumns.has(header) && editingIndex === null) {
-                            startEditing(index, header, td, cellContent.textContent);
-                        }
-                    };
+                    if (index === editableRow && isFieldEditable(record.record_type, header) && !vestigialColumns.has(header)) {
+                        td.className = 'editable';
+                        td.onclick = () => {
+                            if (editingIndex === null) {
+                                startEditing(index, header, td, cellContent.textContent);
+                            }
+                        };
+                    } else if (isFieldGreyedOut(record.record_type, header)) {
+                        td.className = 'greyed-out';
+                    }
                     if (vestigialColumns.has(header)) td.className += ' vestigial';
                     tr.appendChild(td);
                 });
@@ -264,7 +295,7 @@
             const textarea = document.createElement('textarea');
             textarea.className = 'edit-textarea';
             textarea.value = currentValue;
-            textarea.rows = Math.max(2, currentValue.split('\n').length); // At least 2 rows, or match text lines
+            textarea.rows = Math.max(2, currentValue.split('\n').length);
             td.appendChild(textarea);
             textarea.focus();
             console.log(`Started editing record ${index + 1}, field: ${field}`);
@@ -272,7 +303,7 @@
             textarea.onblur = () => saveEdit(index, field, textarea.value, td, currentValue);
             textarea.onkeydown = (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault(); // Prevent newline in textarea
+                    e.preventDefault();
                     saveEdit(index, field, textarea.value, td, currentValue);
                 } else if (e.key === 'Escape') {
                     cancelEdit(td, currentValue);
@@ -289,72 +320,4 @@
             editingField = null;
             td.innerHTML = '';
             const cellContent = document.createElement('span');
-            cellContent.textContent = value;
-            cellContent.className = 'cell-content';
-            td.appendChild(cellContent);
-            displayRecords();
-        }
-
-        function cancelEdit(td, originalValue) {
-            editingIndex = null;
-            editingField = null;
-            td.innerHTML = '';
-            const cellContent = document.createElement('span');
-            cellContent.textContent = originalValue;
-            cellContent.className = 'cell-content';
-            td.appendChild(cellContent);
-            console.log('Cancelled edit');
-        }
-
-        function deleteRecord(index) {
-            if (confirm(`Delete record ${index + 1}?`)) {
-                records.splice(index, 1);
-                if (editableRow === index) editableRow = null;
-                displayRecords();
-                console.log(`Deleted record ${index + 1}`);
-            }
-        }
-
-        function insertRecord(index) {
-            const newRecord = {};
-            Object.keys(records[0]).forEach(header => {
-                newRecord[header] = prompt(`Enter ${header} for new record:`) || '';
-            });
-            records.splice(index + 1, 0, newRecord);
-            displayRecords();
-            console.log(`Inserted record at index ${index + 1}`);
-        }
-
-        function validateRecord(record) {
-            return Object.values(record).every(value => typeof value === 'string');
-        }
-
-        function escapeCSVField(field) {
-            if (typeof field !== 'string') field = String(field);
-            if (field.includes('"') || field.includes(',')) {
-                return `"${field.replace(/"/g, '""')}"`;
-            }
-            return field;
-        }
-
-        function downloadCSV() {
-            if (records.length === 0) {
-                alert('No records to download');
-                return;
-            }
-            const headers = Object.keys(records[0]);
-            const csv = [
-                headers.map(escapeCSVField).join(','),
-                ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
-            ].join('\r\n');
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'records.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-    </script>
-</body>
-</html>
+            cellContent.textContent = value
