@@ -37,8 +37,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.18</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 17:23:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.19</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 20:34:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="loadRecords()">Load Records</button>
@@ -52,36 +52,50 @@
         let editingIndex = null;
 
         function deriveKey(passphrase, salt) {
-            return CryptoJS.PBKDF2(passphrase, CryptoJS.enc.Base64.parse(salt), {
-                keySize: 256/32,
-                iterations: 100000
-            }).toString(CryptoJS.enc.Base64);
+            // Derive a 32-byte key using PBKDF2 to match Python's cryptography library
+            return CryptoJS.PBKDF2(passphrase, salt, {
+                keySize: 256/32, // 32 bytes
+                iterations: 100000,
+                hasher: CryptoJS.algo.SHA256
+            });
         }
 
         function decryptFile(encryptedData, passphrase) {
             try {
+                // Extract salt (first 16 bytes)
                 const salt = encryptedData.slice(0, 16);
                 const ciphertext = encryptedData.slice(16);
-                const key = deriveKey(passphrase, btoa(String.fromCharCode(...new Uint8Array(salt))));
+                // Convert salt to WordArray for PBKDF2
+                const saltWords = CryptoJS.lib.WordArray.create(salt);
+                // Derive key
+                const key = deriveKey(passphrase, saltWords);
+                // Fernet uses AES-128-CBC, but CryptoJS needs base64-encoded ciphertext
+                const ciphertextBase64 = btoa(String.fromCharCode(...new Uint8Array(ciphertext)));
                 const decrypted = CryptoJS.AES.decrypt(
-                    { ciphertext: CryptoJS.enc.Base64.parse(btoa(String.fromCharCode(...new Uint8Array(ciphertext)))) },
-                    CryptoJS.enc.Base64.parse(key),
-                    { mode: CryptoJS.mode.ECB }
+                    { ciphertext: CryptoJS.enc.Base64.parse(ciphertextBase64) },
+                    key,
+                    { mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
                 );
-                return decrypted.toString(CryptoJS.enc.Utf8);
+                const result = decrypted.toString(CryptoJS.enc.Utf8);
+                if (!result) throw new Error("Decryption resulted in empty output");
+                return result;
             } catch (e) {
-                console.error("Decryption error:", e);
+                console.error("Decryption error:", e.message);
                 return null;
             }
         }
 
         function encryptFile(data, passphrase) {
             const salt = CryptoJS.lib.WordArray.random(16);
-            const key = deriveKey(passphrase, salt.toString(CryptoJS.enc.Base64));
-            const encrypted = CryptoJS.AES.encrypt(data, CryptoJS.enc.Base64.parse(key), {
-                mode: CryptoJS.mode.ECB
+            const key = deriveKey(passphrase, salt);
+            const encrypted = CryptoJS.AES.encrypt(data, key, {
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
             });
-            return salt.toString(CryptoJS.enc.Base64) + encrypted.ciphertext.toString(CryptoJS.enc.Base64);
+            // Prepend salt to ciphertext (base64-encoded)
+            const saltBase64 = salt.toString(CryptoJS.enc.Base64);
+            const ciphertextBase64 = encrypted.ciphertext.toString(CryptoJS.enc.Base64);
+            return saltBase64 + ciphertextBase64;
         }
 
         function parseCSVLine(line) {
