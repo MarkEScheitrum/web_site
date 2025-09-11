@@ -37,8 +37,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.21</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 21:45:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.22</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 22:30:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="loadRecords()">Load Records</button>
@@ -59,19 +59,18 @@
             });
         }
 
-        function decryptFile(encryptedData, passphrase) {
+        function decryptFile(base64Data, passphrase) {
             try {
-                // Convert Uint8Array to base64 string
-                let base64String = '';
-                for (let i = 0; i < encryptedData.length; i++) {
-                    base64String += String.fromCharCode(encryptedData[i]);
+                // Validate base64 string
+                if (!/^[A-Za-z0-9+/=]+$/.test(base64Data)) {
+                    throw new Error("Invalid base64 data");
                 }
-                base64String = btoa(base64String);
-                // Decode base64 to get salt (16 bytes), IV (16 bytes), and ciphertext
-                const binaryData = atob(base64String);
+                // Decode base64 to binary string
+                const binaryData = atob(base64Data);
                 if (binaryData.length < 48) throw new Error("Encrypted data too short");
-                const salt = CryptoJS.enc.Base64.parse(binaryData.slice(0, 24)); // 16 bytes base64-encoded
-                const iv = CryptoJS.enc.Base64.parse(binaryData.slice(24, 48)); // 16 bytes base64-encoded
+                // Extract salt (16 bytes, base64-encoded to 24 chars), IV (16 bytes, base64-encoded to 24 chars), and ciphertext
+                const salt = CryptoJS.enc.Base64.parse(binaryData.slice(0, 24));
+                const iv = CryptoJS.enc.Base64.parse(binaryData.slice(24, 48));
                 const ciphertext = CryptoJS.enc.Base64.parse(binaryData.slice(48));
                 // Derive key
                 const key = deriveKey(passphrase, salt);
@@ -147,8 +146,7 @@
                         alert('Passphrase required for encrypted file.');
                         return;
                     }
-                    const binaryData = new Uint8Array(e.target.result);
-                    text = decryptFile(binaryData, passphrase);
+                    text = decryptFile(text.trim(), passphrase);
                     if (!text) {
                         alert('Decryption failed. Please check the passphrase.');
                         return;
@@ -163,11 +161,7 @@
                     console.error("CSV parsing error:", error);
                 }
             };
-            if (file.name.endsWith('.csv.enc')) {
-                reader.readAsArrayBuffer(file);
-            } else {
-                reader.readAsText(file);
-            }
+            reader.readAsText(file); // Read all files as text
         }
 
         function parseCSVFile(text) {
@@ -583,7 +577,7 @@
                     escapeCSVField(record.marriage_date),
                     escapeCSVField(record.relationship),
                     escapeCSVField(record.divorced),
-                    escapeCSVField(row.parents)
+                    escapeCSVField(record.parents)
                 ].join(','))
             ].join('\n');
             const encrypt = confirm('Encrypt the downloaded CSV?');
@@ -597,8 +591,7 @@
                 }
                 filename += '.enc';
                 const encryptedData = encryptFile(csvContent, passphrase);
-                const binaryData = Uint8Array.from(atob(encryptedData), c => c.charCodeAt(0));
-                blob = new Blob([binaryData], { type: 'application/octet-stream' });
+                blob = new Blob([encryptedData], { type: 'application/octet-stream' });
             } else {
                 blob = new Blob([csvContent], { type: 'text/csv' });
             }
