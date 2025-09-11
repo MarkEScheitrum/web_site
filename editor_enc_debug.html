@@ -16,13 +16,15 @@
         .vestigial .header-text { display: none; }
         .vestigial .cell-content { display: none; }
         .vestigial .action-icons { margin: 0; }
+        input.edit-input { width: 100%; box-sizing: border-box; padding: 6px; }
+        .editable-row { background-color: #d9edf7; } /* Highlight for editable row */
     </style>
 </head>
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.42</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 13:25:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.44</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 13:50:00 PDT</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
@@ -34,6 +36,8 @@
     <script>
         let records = [];
         let editingIndex = null;
+        let editingField = null;
+        let editableRow = null;
         let vestigialColumns = new Set();
 
         function deriveKey(passphrase, salt) {
@@ -167,6 +171,17 @@
             displayRecords();
         }
 
+        function enableEditingRow(index) {
+            if (editableRow === index) {
+                editableRow = null;
+                console.log(`Disabled editing for row ${index + 1}`);
+            } else {
+                editableRow = index;
+                console.log(`Enabled editing for row ${index + 1}`);
+            }
+            displayRecords();
+        }
+
         function displayRecords() {
             const recordBody = document.getElementById('recordBody');
             recordBody.innerHTML = '';
@@ -195,6 +210,7 @@
             table.appendChild(headerRow);
             records.forEach((record, index) => {
                 const tr = document.createElement('tr');
+                if (index === editableRow) tr.className = 'editable-row';
                 headers.forEach(header => {
                     const td = document.createElement('td');
                     const cellContent = document.createElement('span');
@@ -203,7 +219,9 @@
                     td.appendChild(cellContent);
                     td.className = 'editable';
                     td.onclick = () => {
-                        if (!vestigialColumns.has(header)) editRecord(index, header);
+                        if (index === editableRow && !vestigialColumns.has(header) && editingIndex === null) {
+                            startEditing(index, header, td, cellContent.textContent);
+                        }
                     };
                     if (vestigialColumns.has(header)) td.className += ' vestigial';
                     tr.appendChild(td);
@@ -212,7 +230,7 @@
                 const editIcon = document.createElement('span');
                 editIcon.textContent = '✏️';
                 editIcon.className = 'action-icons';
-                editIcon.onclick = () => editRecord(index);
+                editIcon.onclick = () => enableEditingRow(index);
                 const deleteIcon = document.createElement('span');
                 deleteIcon.textContent = '🗑️';
                 deleteIcon.className = 'action-icons';
@@ -230,26 +248,60 @@
             recordBody.appendChild(table);
         }
 
-        function updateField(index, field, value) {
-            records[index][field] = value;
-            displayRecords();
+        function startEditing(index, field, td, currentValue) {
+            editingIndex = index;
+            editingField = field;
+            td.innerHTML = '';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'edit-input';
+            input.value = currentValue;
+            td.appendChild(input);
+            input.focus();
+            console.log(`Started editing record ${index + 1}, field: ${field}`);
+
+            input.onblur = () => saveEdit(index, field, input.value, td, currentValue);
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    saveEdit(index, field, input.value, td, currentValue);
+                } else if (e.key === 'Escape') {
+                    cancelEdit(td, currentValue);
+                }
+            };
         }
 
-        function editRecord(index, field) {
-            if (field) {
-                const value = prompt(`Edit ${field} for record ${index + 1}:`, records[index][field]);
-                if (value !== null) {
-                    updateField(index, field, value);
-                }
-            } else {
-                alert('Select a specific field to edit');
+        function saveEdit(index, field, value, td, originalValue) {
+            if (value !== originalValue) {
+                records[index][field] = value;
+                console.log(`Saved edit: record ${index + 1}, field ${field}, value ${value}`);
             }
+            editingIndex = null;
+            editingField = null;
+            td.innerHTML = '';
+            const cellContent = document.createElement('span');
+            cellContent.textContent = value;
+            cellContent.className = 'cell-content';
+            td.appendChild(cellContent);
+            displayRecords(); // Refresh to ensure consistency
+        }
+
+        function cancelEdit(td, originalValue) {
+            editingIndex = null;
+            editingField = null;
+            td.innerHTML = '';
+            const cellContent = document.createElement('span');
+            cellContent.textContent = originalValue;
+            cellContent.className = 'cell-content';
+            td.appendChild(cellContent);
+            console.log('Cancelled edit');
         }
 
         function deleteRecord(index) {
             if (confirm(`Delete record ${index + 1}?`)) {
                 records.splice(index, 1);
+                if (editableRow === index) editableRow = null; // Clear if deleting the editable row
                 displayRecords();
+                console.log(`Deleted record ${index + 1}`);
             }
         }
 
@@ -260,6 +312,7 @@
             });
             records.splice(index + 1, 0, newRecord);
             displayRecords();
+            console.log(`Inserted record at index ${index + 1}`);
         }
 
         function validateRecord(record) {
