@@ -16,8 +16,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.38</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 11:16:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.39</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 11:51:00 PDT</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
@@ -66,6 +66,8 @@
 
         function decryptFile(encryptedData, passphrase) {
             try {
+                const hash = await computeFileHash(encryptedData);
+                console.log("Uploaded file SHA-256 hash:", hash);
                 computeFileHash(encryptedData).then(hash => {
                     console.log("Uploaded file SHA-256 hash:", hash);
                 });
