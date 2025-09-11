@@ -37,8 +37,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.29</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 06:30:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.31</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 22:45:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="loadRecords()">Load Records</button>
@@ -80,8 +80,18 @@
             return Array.from(bytes, byte => byte.charCodeAt(0).toString(16).padStart(2, '0')).join('');
         }
 
+        async function computeFileHash(buffer) {
+            const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
         function decryptFile(encryptedData, passphrase) {
             try {
+                // Compute file hash
+                computeFileHash(encryptedData).then(hash => {
+                    console.log("File SHA-256 hash:", hash);
+                });
                 // Convert ArrayBuffer to base64
                 const base64Data = arrayBufferToBase64(encryptedData);
                 console.log("Base64 length:", base64Data.length);
@@ -108,7 +118,11 @@
                 const ivBinary = binaryData.slice(16, 32);
                 const ciphertextBinary = binaryData.slice(32);
                 // Log salt and IV in hex
-                console.log("Salt (hex):", bytesToHex(saltBinary));
+                const saltHex = bytesToHex(saltBinary);
+                console.log("Salt (hex):", saltHex);
+                if (saltHex !== "a432d8a517e461414a6573c7a27fb08b") {
+                    console.warn("Salt mismatch! Expected: a432d8a517e461414a6573c7a27fb08b, Got:", saltHex);
+                }
                 console.log("IV (hex):", bytesToHex(ivBinary));
                 // Convert to base64 for CryptoJS
                 const saltBase64 = binaryToBase64(saltBinary);
@@ -142,8 +156,16 @@
                 } catch (e) {
                     console.error("UTF-8 conversion failed:", e.message);
                     console.log("Raw decrypted bytes (full hex):", decryptedBytes);
-                    // Return hex for debugging
-                    return { error: "Invalid UTF-8", decryptedHex: decryptedBytes };
+                    // Try Latin1 as fallback
+                    try {
+                        result = decrypted.toString(CryptoJS.enc.Latin1);
+                        console.log("Decrypted CSV (Latin1) length:", result.length);
+                        console.log("Decrypted CSV (first 100 chars):", result.slice(0, 100));
+                        return result;
+                    } catch (e2) {
+                        console.error("Latin1 conversion failed:", e2.message);
+                        return { error: "Invalid UTF-8 and Latin1", decryptedHex: decryptedBytes };
+                    }
                 }
             } catch (e) {
                 console.error("Decryption error:", e.message);
@@ -214,7 +236,7 @@
                         return;
                     }
                     if (typeof text === 'object' && text.error) {
-                        alert('Decryption produced invalid UTF-8 data. Check console for raw decrypted bytes.');
+                        alert('Decryption produced invalid UTF-8 and Latin1 data. Check console for raw decrypted bytes.');
                         console.log("Decryption result:", text);
                         return;
                     }
