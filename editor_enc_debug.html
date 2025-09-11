@@ -5,23 +5,24 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
         .table-container { overflow-x: auto; }
-        table { border-collapse: collapse; width: auto; }
-        th, td { border: 1px solid black; padding: 8px; text-align: left; min-width: 150px; }
+        table { border-collapse: collapse; width: auto; table-layout: auto; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; width: 150px; }
         th { background-color: #f2f2f2; }
         .editable:hover { background-color: #e0e0e0; cursor: pointer; }
         button { margin: 5px; padding: 8px 16px; }
         .info { margin-bottom: 10px; }
         .action-icons { cursor: pointer; color: #007bff; margin-right: 8px; }
-        .vestigial { width: 30px; overflow: hidden; }
+        .vestigial { width: 30px !important; max-width: 30px !important; min-width: 0 !important; overflow: hidden; }
         .vestigial .header-text { display: none; }
+        .vestigial .cell-content { display: none; }
         .vestigial .action-icons { margin: 0; }
     </style>
 </head>
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.41</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 13:17:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.42</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 13:25:00 PDT</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
@@ -158,8 +159,10 @@
         function toggleColumn(column) {
             if (vestigialColumns.has(column)) {
                 vestigialColumns.delete(column);
+                console.log(`Restored column: ${column}`);
             } else {
                 vestigialColumns.add(column);
+                console.log(`Collapsed column: ${column}`);
             }
             displayRecords();
         }
@@ -187,16 +190,21 @@
             });
             const actionTh = document.createElement('th');
             actionTh.textContent = 'Actions';
-            actionTh.style.minWidth = '100px';
+            actionTh.style.width = '100px';
             headerRow.appendChild(actionTh);
             table.appendChild(headerRow);
             records.forEach((record, index) => {
                 const tr = document.createElement('tr');
                 headers.forEach(header => {
                     const td = document.createElement('td');
-                    td.textContent = record[header];
+                    const cellContent = document.createElement('span');
+                    cellContent.textContent = record[header];
+                    cellContent.className = 'cell-content';
+                    td.appendChild(cellContent);
                     td.className = 'editable';
-                    td.onclick = () => editRecord(index, header);
+                    td.onclick = () => {
+                        if (!vestigialColumns.has(header)) editRecord(index, header);
+                    };
                     if (vestigialColumns.has(header)) td.className += ' vestigial';
                     tr.appendChild(td);
                 });
