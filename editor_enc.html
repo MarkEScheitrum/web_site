@@ -37,8 +37,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.24</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 00:00:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.21</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 21:45:00</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="loadRecords()">Load Records</button>
@@ -59,40 +59,20 @@
             });
         }
 
-        function arrayBufferToBase64(buffer) {
-            let binary = '';
-            const bytes = new Uint8Array(buffer);
-            for (let i = 0; i < bytes.length; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            return btoa(binary);
-        }
-
         function decryptFile(encryptedData, passphrase) {
             try {
-                // Convert ArrayBuffer to base64
-                const base64Data = arrayBufferToBase64(encryptedData);
-                console.log("Base64 length:", base64Data.length);
-                console.log("First 100 chars of base64:", base64Data.slice(0, 100));
-                // Validate base64 string
-                if (!/^[A-Za-z0-9+/=]+$/.test(base64Data)) {
-                    throw new Error("Invalid base64 data");
+                // Convert Uint8Array to base64 string
+                let base64String = '';
+                for (let i = 0; i < encryptedData.length; i++) {
+                    base64String += String.fromCharCode(encryptedData[i]);
                 }
-                // Ensure length is sufficient (16 bytes salt + 16 bytes IV = 32 bytes, base64-encoded to ~44 chars)
-                if (base64Data.length < 44) throw new Error("Encrypted data too short");
-                // Decode base64 to binary string
-                let binaryData;
-                try {
-                    binaryData = atob(base64Data);
-                } catch (e) {
-                    console.error("atob failed:", e.message);
-                    throw new Error("Failed to decode base64 data");
-                }
-                console.log("Binary data length:", binaryData.length);
-                // Extract salt (16 bytes, base64-encoded to ~24 chars), IV (16 bytes, base64-encoded to ~24 chars), ciphertext
-                const salt = CryptoJS.enc.Base64.parse(base64Data.slice(0, 24));
-                const iv = CryptoJS.enc.Base64.parse(base64Data.slice(24, 48));
-                const ciphertext = CryptoJS.enc.Base64.parse(base64Data.slice(48));
+                base64String = btoa(base64String);
+                // Decode base64 to get salt (16 bytes), IV (16 bytes), and ciphertext
+                const binaryData = atob(base64String);
+                if (binaryData.length < 48) throw new Error("Encrypted data too short");
+                const salt = CryptoJS.enc.Base64.parse(binaryData.slice(0, 24)); // 16 bytes base64-encoded
+                const iv = CryptoJS.enc.Base64.parse(binaryData.slice(24, 48)); // 16 bytes base64-encoded
+                const ciphertext = CryptoJS.enc.Base64.parse(binaryData.slice(48));
                 // Derive key
                 const key = deriveKey(passphrase, salt);
                 // Decrypt
@@ -103,7 +83,6 @@
                 );
                 const result = decrypted.toString(CryptoJS.enc.Utf8);
                 if (!result) throw new Error("Decryption resulted in empty output");
-                console.log("Decrypted CSV length:", result.length);
                 return result;
             } catch (e) {
                 console.error("Decryption error:", e.message);
@@ -160,7 +139,7 @@
             console.log("File selected:", file.name);
             const reader = new FileReader();
             reader.onload = function(e) {
-                console.log("File read, raw data length:", e.target.result.byteLength || e.target.result.length);
+                console.log("File read, parsing CSV");
                 let text = e.target.result;
                 if (file.name.endsWith('.csv.enc')) {
                     const passphrase = prompt('Enter decryption passphrase:');
@@ -168,9 +147,10 @@
                         alert('Passphrase required for encrypted file.');
                         return;
                     }
-                    text = decryptFile(e.target.result, passphrase);
+                    const binaryData = new Uint8Array(e.target.result);
+                    text = decryptFile(binaryData, passphrase);
                     if (!text) {
-                        alert('Decryption failed. Please check the passphrase or file format.');
+                        alert('Decryption failed. Please check the passphrase.');
                         return;
                     }
                 }
@@ -403,7 +383,7 @@
 
                         function onMouseMove(e) {
                             const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + (e.pageX - startX)));
-                            document.querySelectorAll(`th:nth-child(${index + 1}), td:nth-child(${index + 1})`).forEach(cell => {
+                            document.querySelectorAll(`th:nth-child(${index + 1}), td:nth-child(${i + 1})`).forEach(cell => {
                                 cell.style.width = `${newWidth}px`;
                             });
                         }
@@ -603,7 +583,7 @@
                     escapeCSVField(record.marriage_date),
                     escapeCSVField(record.relationship),
                     escapeCSVField(record.divorced),
-                    escapeCSVField(record.parents)
+                    escapeCSVField(row.parents)
                 ].join(','))
             ].join('\n');
             const encrypt = confirm('Encrypt the downloaded CSV?');
@@ -617,7 +597,8 @@
                 }
                 filename += '.enc';
                 const encryptedData = encryptFile(csvContent, passphrase);
-                blob = new Blob([encryptedData], { type: 'application/octet-stream' });
+                const binaryData = Uint8Array.from(atob(encryptedData), c => c.charCodeAt(0));
+                blob = new Blob([binaryData], { type: 'application/octet-stream' });
             } else {
                 blob = new Blob([csvContent], { type: 'text/csv' });
             }
