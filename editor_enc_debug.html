@@ -7,21 +7,22 @@
         .table-container { overflow-x: auto; max-width: 100%; }
         table { border-collapse: collapse; width: 100%; }
         th, td { border: 1px solid black; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; cursor: ew-resize; }
+        th { background-color: #f2f2f2; }
         .editable:hover { background-color: #e0e0e0; cursor: pointer; }
         button { margin: 5px; padding: 8px 16px; }
         .info { margin-bottom: 10px; }
+        .action-icons { cursor: pointer; color: #007bff; margin-right: 8px; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.38</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 11:16:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.40</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 12:59:00 PDT</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
-    <button onclick="downloadRawFile()">Download Raw File</button>
     <div class="table-container">
         <div id="recordBody"></div>
     </div>
@@ -30,17 +31,14 @@
     <script>
         let records = [];
         let editingIndex = null;
+        let hiddenColumns = new Set();
 
         function deriveKey(passphrase, salt) {
-            const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
-            console.log("Passphrase bytes (hex):", utf8Passphrase.toString(CryptoJS.enc.Hex));
-            const key = CryptoJS.PBKDF2(utf8Passphrase, salt, {
+            return CryptoJS.PBKDF2(passphrase, salt, {
                 keySize: 256/32,
                 iterations: 100000,
                 hasher: CryptoJS.algo.SHA256
             });
-            console.log("Derived key (hex):", key.toString(CryptoJS.enc.Hex));
-            return key;
         }
 
         function arrayBufferToBinary(buffer) {
@@ -49,38 +47,16 @@
             for (let i = 0; i < bytes.length; i++) {
                 binary += String.fromCharCode(bytes[i]);
             }
-            console.log("Uploaded file binary length:", binary.length);
             return binary;
-        }
-
-        function bytesToHex(bytes) {
-            const bytesArray = new Uint8Array(bytes.split('').map(c => c.charCodeAt(0)));
-            return Array.from(bytesArray, byte => byte.toString(16).padStart(2, '0')).join('');
-        }
-
-        async function computeFileHash(buffer) {
-            const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
         function decryptFile(encryptedData, passphrase) {
             try {
-                computeFileHash(encryptedData).then(hash => {
-                    console.log("Uploaded file SHA-256 hash:", hash);
-                });
                 const binaryData = arrayBufferToBinary(encryptedData);
-                console.log("First 32 bytes (hex):", bytesToHex(binaryData.slice(0, 32)));
                 if (binaryData.length < 32) throw new Error("Data too short for salt and IV");
                 const saltBinary = binaryData.slice(0, 16);
                 const ivBinary = binaryData.slice(16, 32);
                 const ciphertextBinary = binaryData.slice(32);
-                const saltHex = bytesToHex(saltBinary);
-                const ivHex = bytesToHex(ivBinary);
-                console.log("Salt (hex):", saltHex);
-                console.log("IV (hex):", ivHex);
-                console.log("Ciphertext length:", ciphertextBinary.length);
-                console.log("Ciphertext (first 100 bytes, hex):", bytesToHex(ciphertextBinary.slice(0, 100)));
                 const salt = CryptoJS.enc.Latin1.parse(saltBinary);
                 const iv = CryptoJS.enc.Latin1.parse(ivBinary);
                 const ciphertext = CryptoJS.enc.Latin1.parse(ciphertextBinary);
@@ -90,75 +66,18 @@
                     key,
                     { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
                 );
-                console.log("Decrypted bytes length:", decrypted.sigBytes);
-                console.log("Decrypted bytes (first 100 hex):", decrypted.toString(CryptoJS.enc.Hex).slice(0, 100));
-                let result;
                 try {
-                    result = decrypted.toString(CryptoJS.enc.Utf8);
-                    console.log("Decrypted CSV length:", result.length);
-                    console.log("Decrypted CSV (first 100 chars):", result.slice(0, 100));
-                    const blob = new Blob([result], { type: 'text/csv' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'decrypted_output.csv';
-                    console.log("Initiating download of decrypted_output.csv");
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    return result;
+                    return decrypted.toString(CryptoJS.enc.Utf8);
                 } catch (e) {
-                    console.error("UTF-8 conversion failed:", e.message);
-                    console.log("Raw decrypted bytes (full hex):", decrypted.toString(CryptoJS.enc.Hex));
                     try {
-                        result = decrypted.toString(CryptoJS.enc.Latin1);
-                        console.log("Decrypted CSV (Latin1) length:", result.length);
-                        console.log("Decrypted CSV (first 100 chars):", result.slice(0, 100));
-                        const blob = new Blob([result], { type: 'text/csv' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'decrypted_output_latin1.csv';
-                        console.log("Initiating download of decrypted_output_latin1.csv");
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        return result;
+                        return decrypted.toString(CryptoJS.enc.Latin1);
                     } catch (e2) {
-                        console.error("Latin1 conversion failed:", e2.message);
                         return { error: "Invalid UTF-8 and Latin1", decryptedHex: decrypted.toString(CryptoJS.enc.Hex) };
                     }
                 }
             } catch (e) {
-                console.error("Decryption error:", e.message);
                 return { error: e.message, decryptedHex: null };
             }
-        }
-
-        function downloadRawFile() {
-            const fileInput = document.getElementById('textFile');
-            const file = fileInput.files[0];
-            if (!file) {
-                alert('Please select a file');
-                return;
-            }
-            console.log("downloadRawFile started");
-            console.log("File selected:", file.name);
-            console.log("File size:", file.size);
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                console.log("Raw file read, data length:", e.target.result.byteLength);
-                computeFileHash(e.target.result).then(hash => {
-                    console.log("Raw file SHA-256 hash:", hash);
-                });
-                const blob = new Blob([e.target.result], { type: 'application/octet-stream' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `raw_${file.name}`;
-                console.log(`Initiating download of raw_${file.name}`);
-                a.click();
-                URL.revokeObjectURL(url);
-            };
-            reader.readAsArrayBuffer(file);
         }
 
         function parseCSVLine(line) {
@@ -179,32 +98,23 @@
                 field += char;
             }
             fields.push(field);
-            console.log("Parsed fields:", fields);
             return fields;
         }
 
         function parseCSVFile(text) {
-            console.log("Parsing CSV file");
             const lines = text.split('\n').filter(line => line.trim() !== '');
             const headers = parseCSVLine(lines[0]);
             const records = [];
             for (let i = 1; i < lines.length; i++) {
-                try {
-                    const fields = parseCSVLine(lines[i]);
-                    if (fields.length === headers.length) {
-                        const record = {};
-                        headers.forEach((header, index) => {
-                            record[header] = fields[index];
-                        });
-                        records.push(record);
-                    } else {
-                        console.log(`Skipping malformed line ${i + 1}: ${lines[i]}`);
-                    }
-                } catch (e) {
-                    console.log(`Error parsing line ${i + 1}: ${e.message}`);
+                const fields = parseCSVLine(lines[i]);
+                if (fields.length === headers.length) {
+                    const record = {};
+                    headers.forEach((header, index) => {
+                        record[header] = fields[index];
+                    });
+                    records.push(record);
                 }
             }
-            console.log("Parsed records:", records);
             return records;
         }
 
@@ -215,12 +125,8 @@
                 alert('Please select a file');
                 return;
             }
-            console.log("processFile started");
-            console.log("File selected:", file.name);
-            console.log("File size:", file.size);
             const reader = new FileReader();
             reader.onload = function(e) {
-                console.log("File read, raw data length:", e.target.result.byteLength);
                 if (file.name.endsWith('.csv.enc')) {
                     const passphrase = prompt('Enter passphrase:');
                     if (!passphrase) {
@@ -229,14 +135,12 @@
                     }
                     const result = decryptFile(e.target.result, passphrase);
                     if (typeof result === 'string') {
-                        console.log("Decryption successful, processing CSV");
                         records = parseCSVFile(result);
                         displayRecords();
                     } else {
                         alert(`Decryption failed: ${result.error}`);
                     }
                 } else {
-                    console.log("Processing plain CSV");
                     const text = e.target.result;
                     records = parseCSVFile(text);
                     displayRecords();
@@ -249,44 +153,104 @@
             }
         }
 
-        function encryptFile(data, passphrase) {
-            console.log("encryptFile: Not implemented");
+        function toggleColumn(column) {
+            if (hiddenColumns.has(column)) {
+                hiddenColumns.delete(column);
+            } else {
+                hiddenColumns.add(column);
+            }
+            displayRecords();
         }
 
         function displayRecords() {
-            console.log("displayRecords: Rendering", records.length, "records");
             const recordBody = document.getElementById('recordBody');
             recordBody.innerHTML = '';
             if (records.length === 0) return;
             const table = document.createElement('table');
             const headerRow = document.createElement('tr');
-            Object.keys(records[0]).forEach(header => {
+            const headers = Object.keys(records[0]);
+            headers.forEach(header => {
                 const th = document.createElement('th');
-                th.textContent = header;
+                const toggleButton = document.createElement('span');
+                toggleButton.textContent = hiddenColumns.has(header) ? '👁️‍🗨️' : '👁️';
+                toggleButton.className = 'action-icons';
+                toggleButton.onclick = () => toggleColumn(header);
+                th.appendChild(toggleButton);
+                th.appendChild(document.createTextNode(` ${header}`));
+                if (hiddenColumns.has(header)) th.className = 'hidden';
                 headerRow.appendChild(th);
             });
+            const actionTh = document.createElement('th');
+            actionTh.textContent = 'Actions';
+            headerRow.appendChild(actionTh);
             table.appendChild(headerRow);
             records.forEach((record, index) => {
                 const tr = document.createElement('tr');
-                Object.values(record).forEach(value => {
+                headers.forEach(header => {
                     const td = document.createElement('td');
-                    td.textContent = value;
+                    td.textContent = record[header];
+                    td.className = 'editable';
+                    td.onclick = () => editRecord(index, header);
+                    if (hiddenColumns.has(header)) td.className += ' hidden';
                     tr.appendChild(td);
                 });
+                const actionTd = document.createElement('td');
+                const editIcon = document.createElement('span');
+                editIcon.textContent = '✏️';
+                editIcon.className = 'action-icons';
+                editIcon.onclick = () => editRecord(index);
+                const deleteIcon = document.createElement('span');
+                deleteIcon.textContent = '🗑️';
+                deleteIcon.className = 'action-icons';
+                deleteIcon.onclick = () => deleteRecord(index);
+                const insertIcon = document.createElement('span');
+                insertIcon.textContent = '➕';
+                insertIcon.className = 'action-icons';
+                insertIcon.onclick = () => insertRecord(index);
+                actionTd.appendChild(editIcon);
+                actionTd.appendChild(deleteIcon);
+                actionTd.appendChild(insertIcon);
+                tr.appendChild(actionTd);
                 table.appendChild(tr);
             });
             recordBody.appendChild(table);
         }
 
-        function adjustColumnWidths() { console.log("adjustColumnWidths: Not implemented"); }
-        function enableColumnResizing() { console.log("enableColumnResizing: Not implemented"); }
-        function updateField(index, field, value) { console.log("updateField: Not implemented"); }
-        function saveEdit(index) { console.log("saveEdit: Not implemented"); }
-        function cancelEdit(index) { console.log("cancelEdit: Not implemented"); }
-        function editRecord(index) { console.log("editRecord: Not implemented"); }
-        function insertRecord(index) { console.log("insertRecord: Not implemented"); }
-        function deleteRecord(index) { console.log("deleteRecord: Not implemented"); }
-        function validateRecord(record) { console.log("validateRecord: Not implemented"); }
+        function updateField(index, field, value) {
+            records[index][field] = value;
+            displayRecords();
+        }
+
+        function editRecord(index, field) {
+            if (field) {
+                const value = prompt(`Edit ${field} for record ${index + 1}:`, records[index][field]);
+                if (value !== null) {
+                    updateField(index, field, value);
+                }
+            } else {
+                alert('Select a specific field to edit');
+            }
+        }
+
+        function deleteRecord(index) {
+            if (confirm(`Delete record ${index + 1}?`)) {
+                records.splice(index, 1);
+                displayRecords();
+            }
+        }
+
+        function insertRecord(index) {
+            const newRecord = {};
+            Object.keys(records[0]).forEach(header => {
+                newRecord[header] = prompt(`Enter ${header} for new record:`) || '';
+            });
+            records.splice(index + 1, 0, newRecord);
+            displayRecords();
+        }
+
+        function validateRecord(record) {
+            return Object.values(record).every(value => typeof value === 'string');
+        }
 
         function escapeCSVField(field) {
             if (typeof field !== 'string') field = String(field);
@@ -297,7 +261,6 @@
         }
 
         function downloadCSV() {
-            console.log("downloadCSV: Generating CSV");
             if (records.length === 0) {
                 alert('No records to download');
                 return;
@@ -306,7 +269,7 @@
             const csv = [
                 headers.map(escapeCSVField).join(','),
                 ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
-            ].join('\r\n'); // Use CRLF to match text.csv
+            ].join('\r\n');
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -317,4 +280,4 @@
         }
     </script>
 </body>
-</html
+</html>
