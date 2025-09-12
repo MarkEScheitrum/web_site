@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <title>Genealogy Record Editor</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' https://cdnjs.cloudflare.com;">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" integrity="sha512-E8QS5sbd1p+SYbWC2Wh3xOhu1C94k+9yAS0WkT91mupM5T4rEIOufR6FVy14GPsn9+MBZ25GGrF44W/fxKodT2g==" crossorigin="anonymous"></script>
     <style>
         .table-container { overflow-x: auto; }
         table { border-collapse: collapse; width: auto; table-layout: auto; }
@@ -13,6 +15,7 @@
         .editable:hover { background-color: #e0e0e0; cursor: pointer; }
         button { margin: 5px; padding: 8px 16px; }
         .info { margin-bottom: 10px; }
+        .warning { color: red; font-weight: bold; margin-bottom: 10px; }
         .action-icons { cursor: pointer; color: #007bff; margin-right: 8px; }
         .vestigial { width: 30px !important; max-width: 30px !important; min-width: 0 !important; overflow: hidden; }
         .vestigial .header-text { display: none; }
@@ -35,16 +38,18 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.53</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 20:42:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.55</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 21:30:00 PDT</span></p>
+    </div>
+    <div class="warning">
+        <p>Warning: Use a strong passphrase and store the encrypted file securely. Do not share them publicly. Close this tab after use to clear data.</p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
     <div class="table-container">
         <div id="recordBody"></div>
     </div>
-    <button onclick="downloadCSV()">Download Updated Records</button>
-    <button onclick="downloadCSVNoEnc()">Download records no enc</button>
+    <button onclick="downloadCSV()">Download Encrypted Records</button>
 
     <script>
         let records = [];
@@ -52,6 +57,19 @@
         let editingField = null;
         let editableRow = null;
         let vestigialColumns = new Set();
+        let debugMode = false;
+
+        // Debug mode setup
+        const debugPassphraseHash = 'e5e9fa1ba31ecd1ae84f75caaa474f3a663f05f4'; // SHA-256 of 'your-secret-debug-passphrase'
+        if (window.location.search.includes('debug=1')) {
+            const debugPass = prompt('Enter debug passphrase:');
+            if (debugPass && CryptoJS.SHA256(debugPass).toString() === debugPassphraseHash) {
+                debugMode = true;
+            }
+        }
+
+        // Clear records on page unload
+        window.addEventListener('unload', () => { records = []; });
 
         // Field restrictions based on record_type
         const fieldRestrictions = {
@@ -96,21 +114,33 @@
                 const iv = CryptoJS.enc.Latin1.parse(ivBinary);
                 const ciphertext = CryptoJS.enc.Latin1.parse(ciphertextBinary);
                 const key = deriveKey(passphrase, salt);
+                if (debugMode) {
+                    console.log(`Decryption: data length=${binaryData.length} bytes`);
+                    console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                    console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                    console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+                }
                 const decrypted = CryptoJS.AES.decrypt(
                     { ciphertext: ciphertext },
                     key,
                     { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
                 );
                 try {
-                    return decrypted.toString(CryptoJS.enc.Utf8);
+                    const result = decrypted.toString(CryptoJS.enc.Utf8);
+                    if (debugMode) console.log(`Decrypted data (first 100 chars): ${result.slice(0, 100)}`);
+                    return result;
                 } catch (e) {
                     try {
-                        return decrypted.toString(CryptoJS.enc.Latin1);
+                        const result = decrypted.toString(CryptoJS.enc.Latin1);
+                        if (debugMode) console.log(`Decrypted data (first 100 chars, Latin1): ${result.slice(0, 100)}`);
+                        return result;
                     } catch (e2) {
+                        if (debugMode) console.log(`Decryption failed: Invalid UTF-8 and Latin1, hex: ${decrypted.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
                         return { error: "Invalid UTF-8 and Latin1", decryptedHex: decrypted.toString(CryptoJS.enc.Hex) };
                     }
                 }
             } catch (e) {
+                if (debugMode) console.log(`Decryption error: ${e.message}`);
                 return { error: e.message, decryptedHex: null };
             }
         }
@@ -124,20 +154,20 @@
                 mode: CryptoJS.mode.CBC,
                 padding: CryptoJS.pad.Pkcs7
             });
-            // Binary-safe concatenation
             const fullBinary = salt.concat(iv).concat(encrypted.ciphertext);
-            // Convert to Uint8Array (big-endian)
             const uint8Array = new Uint8Array(fullBinary.sigBytes);
             for (let i = 0; i < fullBinary.sigBytes; i++) {
                 const wordIndex = Math.floor(i / 4);
                 const byteIndex = i % 4;
                 uint8Array[i] = (fullBinary.words[wordIndex] >>> (24 - byteIndex * 8)) & 0xff;
             }
-            console.log(`Encryption: plaintext=${data.length} bytes, ciphertext=${encrypted.ciphertext.sigBytes} bytes, total=${uint8Array.length} bytes`);
-            console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
-            console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
-            console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
-            console.log(`Ciphertext (first 32 bytes, hex): ${encrypted.ciphertext.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+            if (debugMode) {
+                console.log(`Encryption: plaintext=${data.length} bytes, ciphertext=${encrypted.ciphertext.sigBytes} bytes, total=${uint8Array.length} bytes`);
+                console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+                console.log(`Ciphertext (first 32 bytes, hex): ${encrypted.ciphertext.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+            }
             return uint8Array;
         }
 
@@ -163,7 +193,6 @@
         }
 
         function parseCSVFile(text) {
-            // Normalize line endings to \n
             const normalizedText = text.replace(/\r\n|\r\r\n|\r/g, '\n');
             const lines = normalizedText.split('\n').filter(line => line.trim() !== '');
             const headers = parseCSVLine(lines[0]);
@@ -178,6 +207,7 @@
                     records.push(record);
                 }
             }
+            if (debugMode) console.log(`Parsed ${records.length} records`);
             return records;
         }
 
@@ -219,10 +249,10 @@
         function toggleColumn(column) {
             if (vestigialColumns.has(column)) {
                 vestigialColumns.delete(column);
-                console.log(`Restored column: ${column}`);
+                if (debugMode) console.log(`Restored column: ${column}`);
             } else {
                 vestigialColumns.add(column);
-                console.log(`Collapsed column: ${column}`);
+                if (debugMode) console.log(`Collapsed column: ${column}`);
             }
             displayRecords();
         }
@@ -230,10 +260,10 @@
         function enableEditingRow(index) {
             if (editableRow === index) {
                 editableRow = null;
-                console.log(`Disabled editing for row ${index + 1}`);
+                if (debugMode) console.log(`Disabled editing for row ${index + 1}`);
             } else {
                 editableRow = index;
-                console.log(`Enabled editing for row ${index + 1}`);
+                if (debugMode) console.log(`Enabled editing for row ${index + 1}`);
             }
             displayRecords();
         }
@@ -242,11 +272,11 @@
             const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
             const restrictions = fieldRestrictions[cleanType];
             if (!restrictions) {
-                console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to uneditable`);
+                if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to uneditable`);
                 return false;
             }
             const isEditable = restrictions.editable.includes(field);
-            console.log(`Checking editable: record_type='${cleanType}', field=${field}, isEditable=${isEditable}`);
+            if (debugMode) console.log(`Checking editable: record_type='${cleanType}', field=${field}, isEditable=${isEditable}`);
             return isEditable;
         }
 
@@ -254,11 +284,11 @@
             const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
             const restrictions = fieldRestrictions[cleanType];
             if (!restrictions) {
-                console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to not greyed-out`);
+                if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to not greyed-out`);
                 return false;
             }
             const isGreyedOut = restrictions.greyedOut.includes(field);
-            console.log(`Checking greyed-out: record_type='${cleanType}', field=${field}, isGreyedOut=${isGreyedOut}`);
+            if (debugMode) console.log(`Checking greyed-out: record_type='${cleanType}', field=${field}, isGreyedOut=${isGreyedOut}`);
             return isGreyedOut;
         }
 
@@ -310,7 +340,7 @@
                         };
                     } else if (isGrey) {
                         td.className += ' greyed-out';
-                        console.log(`Applied greyed-out to ${header} in row ${index} (record_type: ${record.record_type})`);
+                        if (debugMode) console.log(`Applied greyed-out to ${header} in row ${index} (record_type: ${record.record_type})`);
                     }
                     if (vestigialColumns.has(header)) td.className += ' vestigial';
                     tr.appendChild(td);
@@ -350,8 +380,7 @@
             textarea.rows = Math.max(2, currentValue.split('\n').length);
             td.appendChild(textarea);
             textarea.focus();
-            console.log(`Started editing record ${index + 1}, field: ${field}`);
-
+            if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field}`);
             textarea.onblur = () => saveEdit(index, field, textarea.value, td, currentValue);
             textarea.onkeydown = (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -366,7 +395,7 @@
         function saveEdit(index, field, value, td, originalValue) {
             if (value !== originalValue) {
                 records[index][field] = value;
-                console.log(`Saved edit: record ${index + 1}, field ${field}, value ${value}`);
+                if (debugMode) console.log(`Saved edit: record ${index + 1}, field ${field}, value ${value}`);
             }
             editingIndex = null;
             editingField = null;
@@ -386,7 +415,7 @@
             cellContent.textContent = originalValue;
             cellContent.className = 'cell-content';
             td.appendChild(cellContent);
-            console.log('Cancelled edit');
+            if (debugMode) console.log('Cancelled edit');
         }
 
         function deleteRecord(index) {
@@ -396,23 +425,22 @@
                 records.splice(index, 1);
                 if (editableRow === index) editableRow = null;
                 displayRecords();
-                console.log(`Deleted record ${index + 1}`);
+                if (debugMode) console.log(`Deleted record ${index + 1}`);
             }
         }
 
         function insertRecord(index) {
-            const response = prompt('Do you want to insert a Person or Spouse record below this line?');
-            if (!response) return;
-            const recordType = response.trim().toLowerCase();
-            if (recordType === 'person' || recordType === 'spouse') {
+            const response = prompt("Enter 'P' for person or 'S' for spouse to insert a record below this line:");
+            if (response === 'P' || response === 'S') {
+                const recordType = response === 'P' ? 'person' : 'spouse';
                 const newRecord = {};
                 Object.keys(records[0]).forEach(header => {
                     newRecord[header] = header === 'record_type' ? recordType : '';
                 });
                 records.splice(index + 1, 0, newRecord);
                 displayRecords();
-                console.log(`Inserted ${recordType} record at index ${index + 1}`);
-            } else {
+                if (debugMode) console.log(`Inserted ${recordType} record at index ${index + 1}`);
+            } else if (debugMode) {
                 console.log(`Aborted insert: Invalid response '${response}'`);
             }
         }
@@ -452,27 +480,7 @@
             a.download = 'records.csv.enc';
             a.click();
             URL.revokeObjectURL(url);
-            console.log(`Downloaded encrypted records.csv.enc, plaintext size=${csv.length} bytes`);
-        }
-
-        function downloadCSVNoEnc() {
-            if (records.length === 0) {
-                alert('No records to download');
-                return;
-            }
-            const headers = Object.keys(records[0]);
-            const csv = [
-                headers.map(escapeCSVField).join(','),
-                ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
-            ].join('\r\n') + '\r\n';
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'records.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-            console.log(`Downloaded plaintext records.csv, size=${csv.length} bytes`);
+            if (debugMode) console.log(`Downloaded encrypted records.csv.enc, plaintext size=${csv.length} bytes`);
         }
     </script>
 </body>
