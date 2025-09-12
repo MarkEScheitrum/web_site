@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
     <title>Genealogy Record Editor</title>
-    <!-- <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;"> -->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;">
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" integrity="sha512-E8QS5sbd1p+SYbWC2Wh3xOhu1C94k+9yAS0WkT91mupM5T4rEIOufR6FVy14GPsn9+MBZ25GGrF44W/fxKodT2g==" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
     <style>
         .table-container { overflow-x: auto; }
         table { border-collapse: collapse; width: auto; table-layout: auto; }
@@ -38,8 +38,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.57</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 22:00:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.58</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 22:30:00 PDT</span></p>
     </div>
     <div class="warning">
         <p>Warning: Use a strong passphrase and store the encrypted file securely. Do not share them publicly. Close this tab after use to clear data.</p>
@@ -59,16 +59,34 @@
         let vestigialColumns = new Set();
         let debugMode = false;
 
-        // Debug mode setup
+        // Debug mode setup with fallback for CryptoJS loading
         const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5'; // SHA-256 of 'MarkS-Debug_passphrase#01'
-        if (window.location.search.includes('debug=1')) {
-            const debugPass = prompt('Enter debug passphrase:');
-            if (debugPass && CryptoJS.SHA256(debugPass).toString() === debugPassphraseHash) {
-                debugMode = true;
-                if (debugMode) console.log('Debug mode enabled');
-            } else if (debugMode) {
-                console.log('Debug mode disabled - incorrect passphrase');
+        function initDebugMode() {
+            if (window.location.search.includes('debug=1')) {
+                const debugPass = prompt('Enter debug passphrase:');
+                if (debugPass) {
+                    if (typeof CryptoJS !== 'undefined' && CryptoJS.SHA256(debugPass).toString() === debugPassphraseHash) {
+                        debugMode = true;
+                        console.log('Debug mode enabled');
+                    } else {
+                        console.log('Debug mode disabled - incorrect passphrase');
+                    }
+                }
             }
+        }
+        // Run immediately if CryptoJS is ready, else wait
+        if (typeof CryptoJS !== 'undefined') {
+            initDebugMode();
+        } else {
+            // Poll for CryptoJS (rare race condition)
+            const checkInterval = setInterval(() => {
+                if (typeof CryptoJS !== 'undefined') {
+                    clearInterval(checkInterval);
+                    initDebugMode();
+                }
+            }, 100);
+            // Timeout after 2s
+            setTimeout(() => clearInterval(checkInterval), 2000);
         }
 
         // Clear records on page unload
