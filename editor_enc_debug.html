@@ -35,8 +35,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.52</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 20:25:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.53</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 20:42:00 PDT</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
@@ -163,7 +163,9 @@
         }
 
         function parseCSVFile(text) {
-            const lines = text.split('\n').filter(line => line.trim() !== '');
+            // Normalize line endings to \n
+            const normalizedText = text.replace(/\r\n|\r\r\n|\r/g, '\n');
+            const lines = normalizedText.split('\n').filter(line => line.trim() !== '');
             const headers = parseCSVLine(lines[0]);
             const records = [];
             for (let i = 1; i < lines.length; i++) {
