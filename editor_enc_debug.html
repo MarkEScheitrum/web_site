@@ -7,8 +7,8 @@
         .table-container { overflow-x: auto; }
         table { border-collapse: collapse; width: auto; table-layout: auto; }
         th, td { border: 1px solid black; padding: 8px; text-align: left; width: 150px; }
-        th.record_type, td.record_type { width: 80px; } /* Narrower width for record_type */
-        th.gen, td.gen { width: 50px; } /* Narrower width for gen */
+        th.record_type, td.record_type { width: 80px; }
+        th.gen, td.gen { width: 50px; }
         th { background-color: #f2f2f2; }
         .editable:hover { background-color: #e0e0e0; cursor: pointer; }
         button { margin: 5px; padding: 8px 16px; }
@@ -35,8 +35,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.47</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 14:38:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.48</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 17:06:00 PDT</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
@@ -217,6 +217,7 @@
         function isFieldGreyedOut(recordType, field) {
             const restrictions = fieldRestrictions[recordType.toLowerCase()];
             if (!restrictions) return false;
+            console.log(`Checking greyed-out: record_type=${recordType}, field=${field}, isGreyedOut=${restrictions.greyedOut.includes(field)}`);
             return restrictions.greyedOut.includes(field);
         }
 
@@ -229,7 +230,7 @@
             const headers = Object.keys(records[0]);
             headers.forEach(header => {
                 const th = document.createElement('th');
-                th.className = header; // Apply column-specific class (e.g., record_type, gen)
+                th.className = header;
                 const toggleButton = document.createElement('span');
                 toggleButton.textContent = vestigialColumns.has(header) ? '👁️‍🗨️' : '👁️';
                 toggleButton.className = 'action-icons';
@@ -252,7 +253,7 @@
                 if (index === editableRow) tr.className = 'editable-row';
                 headers.forEach(header => {
                     const td = document.createElement('td');
-                    td.className = header; // Apply column-specific class
+                    td.className = header;
                     const cellContent = document.createElement('span');
                     cellContent.textContent = record[header];
                     cellContent.className = 'cell-content';
@@ -274,14 +275,17 @@
                 const editIcon = document.createElement('span');
                 editIcon.textContent = '✏️';
                 editIcon.className = 'action-icons';
+                editIcon.title = 'Edit record';
                 editIcon.onclick = () => enableEditingRow(index);
                 const deleteIcon = document.createElement('span');
                 deleteIcon.textContent = '🗑️';
                 deleteIcon.className = 'action-icons';
+                deleteIcon.title = 'Delete this record';
                 deleteIcon.onclick = () => deleteRecord(index);
                 const insertIcon = document.createElement('span');
                 insertIcon.textContent = '➕';
                 insertIcon.className = 'action-icons';
+                insertIcon.title = 'Insert record below';
                 insertIcon.onclick = () => insertRecord(index);
                 actionTd.appendChild(editIcon);
                 actionTd.appendChild(deleteIcon);
@@ -342,7 +346,9 @@
         }
 
         function deleteRecord(index) {
-            if (confirm(`Delete record ${index + 1}?`)) {
+            const record = records[index];
+            const name = record.name || '';
+            if (name ? confirm(`Delete record for ${name}?`) : confirm('Do you want to delete this line?')) {
                 records.splice(index, 1);
                 if (editableRow === index) editableRow = null;
                 displayRecords();
@@ -351,13 +357,20 @@
         }
 
         function insertRecord(index) {
-            const newRecord = {};
-            Object.keys(records[0]).forEach(header => {
-                newRecord[header] = prompt(`Enter ${header} for new record:`) || '';
-            });
-            records.splice(index + 1, 0, newRecord);
-            displayRecords();
-            console.log(`Inserted record at index ${index + 1}`);
+            const response = prompt('Do you want to insert a Person or Spouse record below this line?');
+            if (!response) return;
+            const recordType = response.trim().toLowerCase();
+            if (recordType === 'person' || recordType === 'spouse') {
+                const newRecord = {};
+                Object.keys(records[0]).forEach(header => {
+                    newRecord[header] = header === 'record_type' ? recordType : '';
+                });
+                records.splice(index + 1, 0, newRecord);
+                displayRecords();
+                console.log(`Inserted ${recordType} record at index ${index + 1}`);
+            } else {
+                console.log(`Aborted insert: Invalid response '${response}'`);
+            }
         }
 
         function validateRecord(record) {
