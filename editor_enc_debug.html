@@ -55,12 +55,12 @@
         // Field restrictions based on record_type
         const fieldRestrictions = {
             person: {
-                editable: ['gen', 'name', 'gender', 'birth_date', 'birth_location', 'death_date', 'burial_location', 'service'],
+                editable: ['gen', 'name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service'],
                 uneditable: ['record_type'],
                 greyedOut: ['marriage_date', 'relationship', 'divorced', 'parents']
             },
             spouse: {
-                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents'],
+                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents'],
                 uneditable: ['record_type'],
                 greyedOut: ['gen', 'gender']
             }
