@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Genealogy Record Editor Save</title>
+    <title>Genealogy Record Editor</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
         .table-container { overflow-x: auto; }
@@ -35,8 +35,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.49</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 17:49:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.50</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 18:35:00 PDT</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
@@ -44,6 +44,7 @@
         <div id="recordBody"></div>
     </div>
     <button onclick="downloadCSV()">Download Updated Records</button>
+    <button onclick="downloadCSVNoEnc()">Download records no enc</button>
 
     <script>
         let records = [];
@@ -67,7 +68,8 @@
         };
 
         function deriveKey(passphrase, salt) {
-            return CryptoJS.PBKDF2(passphrase, salt, {
+            const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
+            return CryptoJS.PBKDF2(utf8Passphrase, salt, {
                 keySize: 256/32,
                 iterations: 100000,
                 hasher: CryptoJS.algo.SHA256
@@ -114,19 +116,26 @@
         }
 
         function encryptFile(data, passphrase) {
-            const salt = CryptoJS.lib.WordArray.random(16); // 16-byte salt
-            const iv = CryptoJS.lib.WordArray.random(16); // 16-byte IV
+            const salt = CryptoJS.lib.WordArray.random(16);
+            const iv = CryptoJS.lib.WordArray.random(16);
             const key = deriveKey(passphrase, salt);
             const encrypted = CryptoJS.AES.encrypt(data, key, {
                 iv: iv,
                 mode: CryptoJS.mode.CBC,
                 padding: CryptoJS.pad.Pkcs7
             });
-            // Concatenate salt, IV, and ciphertext
-            const saltBinary = CryptoJS.enc.Latin1.stringify(salt);
-            const ivBinary = CryptoJS.enc.Latin1.stringify(iv);
-            const ciphertextBinary = CryptoJS.enc.Latin1.stringify(encrypted.ciphertext);
-            return saltBinary + ivBinary + ciphertextBinary;
+            // Binary-safe concatenation using WordArray
+            const fullBinary = CryptoJS.lib.WordArray.create(
+                salt.concat(iv).concat(encrypted.ciphertext),
+                salt.sigBytes + iv.sigBytes + encrypted.ciphertext.sigBytes
+            );
+            // Convert to Uint8Array for Blob
+            const uint8Array = new Uint8Array(fullBinary.sigBytes);
+            for (let i = 0; i < fullBinary.sigBytes; i++) {
+                uint8Array[i] = (fullBinary.words[Math.floor(i / 4)] >>> ((i % 4) * 8)) & 0xff;
+            }
+            console.log(`Encryption: plaintext=${data.length} bytes, ciphertext=${encrypted.ciphertext.sigBytes} bytes, total=${uint8Array.length} bytes`);
+            return uint8Array;
         }
 
         function parseCSVLine(line) {
@@ -159,7 +168,7 @@
                 if (fields.length === headers.length) {
                     const record = {};
                     headers.forEach((header, index) => {
-                        record[header] = fields[index];
+                        record[header] = fields[index].trim(); // Trim for robustness
                     });
                     records.push(record);
                 }
@@ -225,17 +234,27 @@
         }
 
         function isFieldEditable(recordType, field) {
-            const restrictions = fieldRestrictions[recordType.toLowerCase()];
-            if (!restrictions) return false;
-            console.log(`Checking editable: record_type=${recordType}, field=${field}, isEditable=${restrictions.editable.includes(field)}`);
-            return restrictions.editable.includes(field);
+            const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
+            const restrictions = fieldRestrictions[cleanType];
+            if (!restrictions) {
+                console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to uneditable`);
+                return false;
+            }
+            const isEditable = restrictions.editable.includes(field);
+            console.log(`Checking editable: record_type='${cleanType}', field=${field}, isEditable=${isEditable}`);
+            return isEditable;
         }
 
         function isFieldGreyedOut(recordType, field) {
-            const restrictions = fieldRestrictions[recordType.toLowerCase()];
-            if (!restrictions) return false;
-            console.log(`Checking greyed-out: record_type=${recordType}, field=${field}, isGreyedOut=${restrictions.greyedOut.includes(field)}`);
-            return restrictions.greyedOut.includes(field);
+            const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
+            const restrictions = fieldRestrictions[cleanType];
+            if (!restrictions) {
+                console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to not greyed-out`);
+                return false;
+            }
+            const isGreyedOut = restrictions.greyedOut.includes(field);
+            console.log(`Checking greyed-out: record_type='${cleanType}', field=${field}, isGreyedOut=${isGreyedOut}`);
+            return isGreyedOut;
         }
 
         function displayRecords() {
@@ -272,18 +291,21 @@
                     const td = document.createElement('td');
                     td.className = header;
                     const cellContent = document.createElement('span');
-                    cellContent.textContent = record[header];
+                    cellContent.textContent = record[header] || '';
                     cellContent.className = 'cell-content';
                     td.appendChild(cellContent);
-                    if (index === editableRow && isFieldEditable(record.record_type, header) && !vestigialColumns.has(header)) {
+                    const isEditable = isFieldEditable(record.record_type, header);
+                    const isGrey = isFieldGreyedOut(record.record_type, header);
+                    if (index === editableRow && isEditable && !vestigialColumns.has(header)) {
                         td.className += ' editable';
                         td.onclick = () => {
                             if (editingIndex === null) {
                                 startEditing(index, header, td, cellContent.textContent);
                             }
                         };
-                    } else if (isFieldGreyedOut(record.record_type, header)) {
+                    } else if (isGrey) {
                         td.className += ' greyed-out';
+                        console.log(`Applied greyed-out to ${header} in row ${index} (record_type: ${record.record_type})`);
                     }
                     if (vestigialColumns.has(header)) td.className += ' vestigial';
                     tr.appendChild(td);
@@ -416,7 +438,7 @@
             const csv = [
                 headers.map(escapeCSVField).join(','),
                 ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
-            ].join('\r\n');
+            ].join('\n'); // Use \n for consistency with test.csv
             const encryptedData = encryptFile(csv, passphrase);
             const blob = new Blob([encryptedData], { type: 'application/octet-stream' });
             const url = URL.createObjectURL(blob);
@@ -425,7 +447,27 @@
             a.download = 'records.csv.enc';
             a.click();
             URL.revokeObjectURL(url);
-            console.log('Downloaded encrypted records.csv.enc');
+            console.log(`Downloaded encrypted records.csv.enc, plaintext size=${csv.length} bytes`);
+        }
+
+        function downloadCSVNoEnc() {
+            if (records.length === 0) {
+                alert('No records to download');
+                return;
+            }
+            const headers = Object.keys(records[0]);
+            const csv = [
+                headers.map(escapeCSVField).join(','),
+                ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
+            ].join('\n'); // Use \n for consistency
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'records.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+            console.log(`Downloaded plaintext records.csv, size=${csv.length} bytes`);
         }
     </script>
 </body>
