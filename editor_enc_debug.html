@@ -35,8 +35,8 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.48</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 17:06:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.49</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 17:49:00 PDT</span></p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
@@ -111,6 +111,22 @@
             } catch (e) {
                 return { error: e.message, decryptedHex: null };
             }
+        }
+
+        function encryptFile(data, passphrase) {
+            const salt = CryptoJS.lib.WordArray.random(16); // 16-byte salt
+            const iv = CryptoJS.lib.WordArray.random(16); // 16-byte IV
+            const key = deriveKey(passphrase, salt);
+            const encrypted = CryptoJS.AES.encrypt(data, key, {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            });
+            // Concatenate salt, IV, and ciphertext
+            const saltBinary = CryptoJS.enc.Latin1.stringify(salt);
+            const ivBinary = CryptoJS.enc.Latin1.stringify(iv);
+            const ciphertextBinary = CryptoJS.enc.Latin1.stringify(encrypted.ciphertext);
+            return saltBinary + ivBinary + ciphertextBinary;
         }
 
         function parseCSVLine(line) {
@@ -211,6 +227,7 @@
         function isFieldEditable(recordType, field) {
             const restrictions = fieldRestrictions[recordType.toLowerCase()];
             if (!restrictions) return false;
+            console.log(`Checking editable: record_type=${recordType}, field=${field}, isEditable=${restrictions.editable.includes(field)}`);
             return restrictions.editable.includes(field);
         }
 
@@ -390,18 +407,25 @@
                 alert('No records to download');
                 return;
             }
+            const passphrase = prompt('Enter passphrase for encryption:');
+            if (!passphrase) {
+                alert('Passphrase is required for encryption');
+                return;
+            }
             const headers = Object.keys(records[0]);
             const csv = [
                 headers.map(escapeCSVField).join(','),
                 ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
             ].join('\r\n');
-            const blob = new Blob([csv], { type: 'text/csv' });
+            const encryptedData = encryptFile(csv, passphrase);
+            const blob = new Blob([encryptedData], { type: 'application/octet-stream' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'records.csv';
+            a.download = 'records.csv.enc';
             a.click();
             URL.revokeObjectURL(url);
+            console.log('Downloaded encrypted records.csv.enc');
         }
     </script>
 </body>
