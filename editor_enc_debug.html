@@ -16,6 +16,7 @@
         button { margin: 5px; padding: 8px 16px; }
         .info { margin-bottom: 10px; }
         .warning { color: red; font-weight: bold; margin-bottom: 10px; }
+        .persistent-warning { color: red; font-weight: bold; margin-bottom: 10px; border: 1px solid red; padding: 10px; background-color: #ffe6e6; }
         .action-icons { cursor: pointer; color: #007bff; margin-right: 8px; }
         .vestigial { width: 30px !important; max-width: 30px !important; min-width: 0 !important; overflow: hidden; }
         .vestigial .header-text { display: none; }
@@ -38,11 +39,14 @@
 <body>
     <h2>Genealogy Record Editor</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.58</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-11 22:30:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.60</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-12 10:00:00 PDT</span></p>
     </div>
     <div class="warning">
         <p>Warning: Use a strong passphrase and store the encrypted file securely. Do not share them publicly. Close this tab after use to clear data.</p>
+    </div>
+    <div class="persistent-warning">
+        <p>Once you leave this page, all data is deleted. Please download any edits before closing the page.</p>
     </div>
     <input type="file" id="textFile" accept=".csv,.csv.enc">
     <button onclick="processFile()">Load and Decrypt File</button>
@@ -59,6 +63,35 @@
         let vestigialColumns = new Set();
         let debugMode = false;
 
+        // Date fields for validation
+        const dateFields = ['birth_date', 'death_date', 'marriage_date'];
+
+        // Validate date format: YYYY, YYYY-MM, or YYYY-MM-DD
+        function isValidDate(dateStr) {
+            if (!dateStr || dateStr.trim() === '') return true; // Allow empty
+            const parts = dateStr.split('-');
+            if (parts.length === 1) {
+                // YYYY
+                const year = parseInt(parts[0], 10);
+                return !isNaN(year) && year >= 1 && year <= 9999;
+            } else if (parts.length === 2) {
+                // YYYY-MM
+                const year = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                return !isNaN(year) && year >= 1 && year <= 9999 &&
+                       !isNaN(month) && month >= 1 && month <= 12;
+            } else if (parts.length === 3) {
+                // YYYY-MM-DD
+                const date = Date.parse(dateStr + 'T00:00:00'); // Append time for full parse
+                if (isNaN(date)) return false;
+                const parsedDate = new Date(date);
+                return parsedDate.getFullYear() == parts[0] && // Ensure no year wrap-around
+                       (parsedDate.getMonth() + 1) == parts[1] &&
+                       parsedDate.getDate() == parts[2];
+            }
+            return false;
+        }
+
         // Debug mode setup with fallback for CryptoJS loading
         const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5'; // SHA-256 of 'MarkS-Debug_passphrase#01'
         function initDebugMode() {
@@ -74,18 +107,15 @@
                 }
             }
         }
-        // Run immediately if CryptoJS is ready, else wait
         if (typeof CryptoJS !== 'undefined') {
             initDebugMode();
         } else {
-            // Poll for CryptoJS (rare race condition)
             const checkInterval = setInterval(() => {
                 if (typeof CryptoJS !== 'undefined') {
                     clearInterval(checkInterval);
                     initDebugMode();
                 }
             }, 100);
-            // Timeout after 2s
             setTimeout(() => clearInterval(checkInterval), 2000);
         }
 
@@ -413,15 +443,23 @@
         }
 
         function saveEdit(index, field, value, td, originalValue) {
-            if (value !== originalValue) {
-                records[index][field] = value;
-                if (debugMode) console.log(`Saved edit: record ${index + 1}, field ${field}, value ${value}`);
+            const trimmedValue = value.trim();
+            // Validate date fields
+            if (dateFields.includes(field) && !isValidDate(trimmedValue)) {
+                alert(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD (e.g., 2023, 2023-05, 2023-05-15).`);
+                if (debugMode) console.log(`Date validation failed for ${field}: ${trimmedValue}`);
+                cancelEdit(td, originalValue);
+                return;
+            }
+            if (trimmedValue !== originalValue) {
+                records[index][field] = trimmedValue;
+                if (debugMode) console.log(`Saved edit: record ${index + 1}, field ${field}, value ${trimmedValue}`);
             }
             editingIndex = null;
             editingField = null;
             td.innerHTML = '';
             const cellContent = document.createElement('span');
-            cellContent.textContent = value;
+            cellContent.textContent = trimmedValue;
             cellContent.className = 'cell-content';
             td.appendChild(cellContent);
             displayRecords();
