@@ -1,525 +1,542 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
     <title>Genealogy Record Editor</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .table-container { overflow-x: auto; max-width: 100%; }
-        table { border-collapse: collapse; width: 100%; min-width: 800px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; white-space: normal; word-wrap: break-word; }
-        th { background-color: #f2f2f2; position: relative; cursor: col-resize; user-select: none; }
-        .greyed-out { background-color: #e0e0e0; opacity: 0.5; }
-        .changed { background-color: #fff3cd; }
-        .resize-handle { position: absolute; top: 0; right: -5px; width: 10px; height: 100%; cursor: col-resize; }
-        th:nth-child(1), td:nth-child(1) { min-width: 80px; max-width: 200px; } /* Record Type */
-        th:nth-child(2), td:nth-child(2) { min-width: 50px; max-width: 80px; } /* Gen */
-        th:nth-child(3), td:nth-child(3) { min-width: 150px; max-width: 300px; } /* Name */
-        th:nth-child(4), td:nth-child(4) { min-width: 80px; max-width: 200px; } /* Gender */
-        th:nth-child(5), td:nth-child(5) { min-width: 100px; max-width: 200px; } /* Birth Date */
-        th:nth-child(6), td:nth-child(6) { min-width: 150px; max-width: 300px; } /* Birth Location */
-        th:nth-child(7), td:nth-child(7) { min-width: 100px; max-width: 200px; } /* Death Date */
-        th:nth-child(8), td:nth-child(8) { min-width: 150px; max-width: 300px; } /* Death Location */
-        th:nth-child(9), td:nth-child(9) { min-width: 150px; max-width: 300px; } /* Burial Location */
-        th:nth-child(10), td:nth-child(10) { min-width: 150px; max-width: 300px; } /* Service */
-        th:nth-child(11), td:nth-child(11) { min-width: 100px; max-width: 200px; } /* Marriage Date */
-        th:nth-child(12), td:nth-child(12) { min-width: 80px; max-width: 200px; } /* Relationship */
-        th:nth-child(13), td:nth-child(13) { min-width: 80px; max-width: 200px; } /* Divorced */
-        th:nth-child(14), td:nth-child(14) { min-width: 150px; max-width: 300px; } /* Parents */
-        th:nth-child(15), td:nth-child(15) { min-width: 150px; max-width: 300px; } /* Actions */
-        button { margin: 5px; padding: 8px; }
-        input, select { width: 100%; height: 30px; box-sizing: border-box; }
-        .error { color: red; }
-        .info { font-size: 0.9em; color: #666; margin-bottom: 10px; }
+        .table-container { overflow-x: auto; }
+        table { border-collapse: collapse; width: auto; table-layout: auto; }
+        th, td { border: 1px solid black; padding: 8px; text-align: left; width: 150px; }
+        th.record_type, td.record_type { width: 80px; }
+        th.gen, td.gen { width: 50px; }
+        th { background-color: #f2f2f2; }
+        .editable:hover { background-color: #e0e0e0; cursor: pointer; }
+        button { margin: 5px; padding: 8px 16px; }
+        .info { margin-bottom: 10px; }
+        .warning { color: red; font-weight: bold; margin-bottom: 10px; }
+        .persistent-warning { color: red; font-weight: bold; margin-bottom: 10px; border: 1px solid red; padding: 10px; background-color: #ffe6e6; }
+        .action-icons { cursor: pointer; color: #007bff; margin-right: 8px; }
+        .vestigial { width: 30px !important; max-width: 30px !important; min-width: 0 !important; overflow: hidden; }
+        .vestigial .header-text { display: none; }
+        .vestigial .cell-content { display: none; }
+        .vestigial .action-icons { margin: 0; }
+        textarea.edit-textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 6px;
+            font: inherit;
+            border: none;
+            background: transparent;
+            resize: none;
+            min-height: 40px;
+        }
+        .editable-row { background-color: #d9edf7; }
+        .greyed-out { background-color: #e0e0e0; cursor: not-allowed; }
     </style>
 </head>
 <body>
-    <h2>Genealogy Record Editor</h2>
+    <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.17</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-10 16:06:00</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.60</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-12 10:00:00 PDT</span></p>
     </div>
-    <input type="file" id="textFile" accept=".csv">
-    <button onclick="loadRecords()">Load Records</button>
+    <div class="warning">
+        <p>Use a strong passphrase and store the encrypted file securely. Do not share publicly.</p>
+        <p>Once you leave this page, all data is deleted. Please download any edits before closing the page.</p>
+    </div>
+    <input type="file" id="textFile" accept=".csv,.csv.enc">
+    <button onclick="processFile()">Load and Decrypt File</button>
     <div class="table-container">
         <div id="recordBody"></div>
     </div>
-    <button onclick="downloadCSV()">Download Updated Records</button>
+    <button onclick="downloadCSV()">Download Encrypted Records</button>
 
     <script>
         let records = [];
         let editingIndex = null;
+        let editingField = null;
+        let editableRow = null;
+        let vestigialColumns = new Set();
+        let debugMode = false;
+
+        // Date fields for validation
+        const dateFields = ['birth_date', 'death_date', 'marriage_date'];
+
+        // Validate date format: YYYY, YYYY-MM, or YYYY-MM-DD
+        function isValidDate(dateStr) {
+            if (!dateStr || dateStr.trim() === '') return true; // Allow empty
+            const parts = dateStr.split('-');
+            if (parts.length === 1) {
+                // YYYY
+                const year = parseInt(parts[0], 10);
+                return !isNaN(year) && year >= 1 && year <= 9999;
+            } else if (parts.length === 2) {
+                // YYYY-MM
+                const year = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                return !isNaN(year) && year >= 1 && year <= 9999 &&
+                       !isNaN(month) && month >= 1 && month <= 12;
+            } else if (parts.length === 3) {
+                // YYYY-MM-DD
+                const date = Date.parse(dateStr + 'T00:00:00'); // Append time for full parse
+                if (isNaN(date)) return false;
+                const parsedDate = new Date(date);
+                return parsedDate.getFullYear() == parts[0] && // Ensure no year wrap-around
+                       (parsedDate.getMonth() + 1) == parts[1] &&
+                       parsedDate.getDate() == parts[2];
+            }
+            return false;
+        }
+
+        // Debug mode setup with fallback for CryptoJS loading
+        const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5'; // SHA-256 of 'MarkS-Debug_passphrase#01'
+        function initDebugMode() {
+            if (window.location.search.includes('debug=1')) {
+                const debugPass = prompt('Enter debug passphrase:');
+                if (debugPass) {
+                    if (typeof CryptoJS !== 'undefined' && CryptoJS.SHA256(debugPass).toString() === debugPassphraseHash) {
+                        debugMode = true;
+                        console.log('Debug mode enabled');
+                    } else {
+                        console.log('Debug mode disabled - incorrect passphrase');
+                    }
+                }
+            }
+        }
+        if (typeof CryptoJS !== 'undefined') {
+            initDebugMode();
+        } else {
+            const checkInterval = setInterval(() => {
+                if (typeof CryptoJS !== 'undefined') {
+                    clearInterval(checkInterval);
+                    initDebugMode();
+                }
+            }, 100);
+            setTimeout(() => clearInterval(checkInterval), 2000);
+        }
+
+        // Clear records on page unload
+        window.addEventListener('unload', () => { records = []; });
+
+        // Field restrictions based on record_type
+        const fieldRestrictions = {
+            person: {
+                editable: ['gen', 'name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service'],
+                uneditable: ['record_type'],
+                greyedOut: ['marriage_date', 'relationship', 'divorced', 'parents']
+            },
+            spouse: {
+                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents'],
+                uneditable: ['record_type'],
+                greyedOut: ['gen', 'gender']
+            }
+        };
+
+        function deriveKey(passphrase, salt) {
+            const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
+            return CryptoJS.PBKDF2(utf8Passphrase, salt, {
+                keySize: 8, // 32 bytes for AES-256
+                iterations: 100000,
+                hasher: CryptoJS.algo.SHA256
+            });
+        }
+
+        function arrayBufferToBinary(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return binary;
+        }
+
+        function decryptFile(encryptedData, passphrase) {
+            try {
+                const binaryData = arrayBufferToBinary(encryptedData);
+                if (binaryData.length < 32) throw new Error("Data too short for salt and IV");
+                const saltBinary = binaryData.slice(0, 16);
+                const ivBinary = binaryData.slice(16, 32);
+                const ciphertextBinary = binaryData.slice(32);
+                const salt = CryptoJS.enc.Latin1.parse(saltBinary);
+                const iv = CryptoJS.enc.Latin1.parse(ivBinary);
+                const ciphertext = CryptoJS.enc.Latin1.parse(ciphertextBinary);
+                const key = deriveKey(passphrase, salt);
+                if (debugMode) {
+                    console.log(`Decryption: data length=${binaryData.length} bytes`);
+                    console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                    console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                    console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+                }
+                const decrypted = CryptoJS.AES.decrypt(
+                    { ciphertext: ciphertext },
+                    key,
+                    { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+                );
+                try {
+                    const result = decrypted.toString(CryptoJS.enc.Utf8);
+                    if (debugMode) console.log(`Decrypted data (first 100 chars): ${result.slice(0, 100)}`);
+                    return result;
+                } catch (e) {
+                    try {
+                        const result = decrypted.toString(CryptoJS.enc.Latin1);
+                        if (debugMode) console.log(`Decrypted data (first 100 chars, Latin1): ${result.slice(0, 100)}`);
+                        return result;
+                    } catch (e2) {
+                        if (debugMode) console.log(`Decryption failed: Invalid UTF-8 and Latin1, hex: ${decrypted.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+                        return { error: "Invalid UTF-8 and Latin1", decryptedHex: decrypted.toString(CryptoJS.enc.Hex) };
+                    }
+                }
+            } catch (e) {
+                if (debugMode) console.log(`Decryption error: ${e.message}`);
+                return { error: e.message, decryptedHex: null };
+            }
+        }
+
+        function encryptFile(data, passphrase) {
+            const salt = CryptoJS.lib.WordArray.random(16);
+            const iv = CryptoJS.lib.WordArray.random(16);
+            const key = deriveKey(passphrase, salt);
+            const encrypted = CryptoJS.AES.encrypt(data, key, {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            });
+            const fullBinary = salt.concat(iv).concat(encrypted.ciphertext);
+            const uint8Array = new Uint8Array(fullBinary.sigBytes);
+            for (let i = 0; i < fullBinary.sigBytes; i++) {
+                const wordIndex = Math.floor(i / 4);
+                const byteIndex = i % 4;
+                uint8Array[i] = (fullBinary.words[wordIndex] >>> (24 - byteIndex * 8)) & 0xff;
+            }
+            if (debugMode) {
+                console.log(`Encryption: plaintext=${data.length} bytes, ciphertext=${encrypted.ciphertext.sigBytes} bytes, total=${uint8Array.length} bytes`);
+                console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+                console.log(`Ciphertext (first 32 bytes, hex): ${encrypted.ciphertext.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+            }
+            return uint8Array;
+        }
 
         function parseCSVLine(line) {
-            console.log("Parsing CSV line:", line);
             const fields = [];
-            let currentField = '';
+            let field = '';
             let inQuotes = false;
             for (let i = 0; i < line.length; i++) {
-                if (line[i] === '"') {
+                const char = line[i];
+                if (char === '"') {
                     inQuotes = !inQuotes;
                     continue;
                 }
-                if (line[i] === ',' && !inQuotes) {
-                    fields.push(currentField.trim());
-                    currentField = '';
-                } else {
-                    currentField += line[i];
+                if (char === ',' && !inQuotes) {
+                    fields.push(field);
+                    field = '';
+                    continue;
                 }
+                field += char;
             }
-            fields.push(currentField.trim());
-            console.log("Parsed fields:", fields);
+            fields.push(field);
             return fields;
         }
 
-        function loadRecords() {
-            console.log("loadRecords started");
+        function parseCSVFile(text) {
+            const normalizedText = text.replace(/\r\n|\r\r\n|\r/g, '\n');
+            const lines = normalizedText.split('\n').filter(line => line.trim() !== '');
+            const headers = parseCSVLine(lines[0]);
+            const records = [];
+            for (let i = 1; i < lines.length; i++) {
+                const fields = parseCSVLine(lines[i]);
+                if (fields.length === headers.length) {
+                    const record = {};
+                    headers.forEach((header, index) => {
+                        record[header] = fields[index].trim();
+                    });
+                    records.push(record);
+                }
+            }
+            if (debugMode) console.log(`Parsed ${records.length} records`);
+            return records;
+        }
+
+        function processFile() {
             const fileInput = document.getElementById('textFile');
             const file = fileInput.files[0];
             if (!file) {
-                alert('Please select a CSV file.');
-                console.log("No file selected");
+                alert('Please select a file');
                 return;
             }
-            console.log("File selected:", file.name);
             const reader = new FileReader();
             reader.onload = function(e) {
-                console.log("File read, parsing CSV");
-                try {
-                    records = parseCSVFile(e.target.result);
-                    console.log("Parsed CSV, records:", records.length);
+                if (file.name.endsWith('.csv.enc')) {
+                    const passphrase = prompt('Enter passphrase:');
+                    if (!passphrase) {
+                        alert('Passphrase is required for encrypted files');
+                        return;
+                    }
+                    const result = decryptFile(e.target.result, passphrase);
+                    if (typeof result === 'string') {
+                        records = parseCSVFile(result);
+                        displayRecords();
+                    } else {
+                        alert(`Decryption failed: ${result.error}`);
+                    }
+                } else {
+                    const text = e.target.result;
+                    records = parseCSVFile(text);
                     displayRecords();
-                } catch (error) {
-                    alert('Error reading CSV file. Please ensure it follows the correct format.');
-                    console.error("CSV parsing error:", error);
                 }
             };
-            reader.readAsText(file);
+            if (file.name.endsWith('.csv.enc')) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file);
+            }
         }
 
-        function parseCSVFile(text) {
-            console.log("Parsing CSV file");
-            const lines = text.trim().split('\n').map(line => line.trim());
-            if (lines.length < 1) throw new Error('Empty CSV file');
-            const parsedRecords = [];
-            let currentPerson = null;
-            let spouseCounter = 1;
-
-            for (let i = 1; i < lines.length; i++) {
-                const fields = parseCSVLine(lines[i]);
-                if (fields.length < 14) {
-                    console.warn(`Skipping malformed line ${i + 1}: ${lines[i]}`);
-                    continue;
-                }
-                const recordType = fields[0]?.trim();
-                const name = fields[2]?.trim() || '';
-                if (recordType === 'Person') {
-                    currentPerson = {
-                        record_type: 'Person',
-                        generation: fields[1] ? parseInt(fields[1]) : null,
-                        name: name,
-                        gender: fields[3]?.trim() || null,
-                        birth_date: fields[4]?.trim() || null,
-                        birth_location: fields[5]?.trim() || null,
-                        death_date: fields[6]?.trim() || null,
-                        death_location: fields[7]?.trim() || null,
-                        burial_location: fields[8]?.trim() || null,
-                        service: fields[9]?.trim() || null,
-                        marriage_date: null,
-                        relationship: null,
-                        divorced: null,
-                        parents: fields[13]?.trim() || null,
-                        spouses: [],
-                        index: parsedRecords.length,
-                        changed: false
-                    };
-                    parsedRecords.push(currentPerson);
-                    console.log(`Parsed Person: ${name}, Index: ${currentPerson.index}`);
-                } else if (recordType === 'Spouse' && currentPerson) {
-                    const spouse = {
-                        record_type: 'Spouse',
-                        generation: null,
-                        name: name,
-                        gender: null,
-                        birth_date: fields[4]?.trim() || null,
-                        birth_location: fields[5]?.trim() || null,
-                        death_date: fields[6]?.trim() || null,
-                        death_location: fields[7]?.trim() || null,
-                        burial_location: fields[8]?.trim() || null,
-                        service: fields[9]?.trim() || null,
-                        marriage_date: fields[10]?.trim() || null,
-                        relationship: fields[11]?.trim() || null,
-                        divorced: fields[12] === 'True' ? true : fields[12] === 'False' ? false : null,
-                        parents: fields[13]?.trim() || null,
-                        other_id: `S${spouseCounter++}`,
-                        index: parsedRecords.length,
-                        changed: false
-                    };
-                    parsedRecords.push(spouse);
-                    currentPerson.spouses.push(spouse);
-                    console.log(`Parsed Spouse: ${spouse.name}, Index: ${spouse.index}, Associated with Person: ${currentPerson.name}`);
-                } else {
-                    console.warn(`Unexpected record at line ${i + 1}: ${fields.join(',')}`);
-                }
+        function toggleColumn(column) {
+            if (vestigialColumns.has(column)) {
+                vestigialColumns.delete(column);
+                if (debugMode) console.log(`Restored column: ${column}`);
+            } else {
+                vestigialColumns.add(column);
+                if (debugMode) console.log(`Collapsed column: ${column}`);
             }
-            return parsedRecords;
+            displayRecords();
+        }
+
+        function enableEditingRow(index) {
+            if (editableRow === index) {
+                editableRow = null;
+                if (debugMode) console.log(`Disabled editing for row ${index + 1}`);
+            } else {
+                editableRow = index;
+                if (debugMode) console.log(`Enabled editing for row ${index + 1}`);
+            }
+            displayRecords();
+        }
+
+        function isFieldEditable(recordType, field) {
+            const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
+            const restrictions = fieldRestrictions[cleanType];
+            if (!restrictions) {
+                if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to uneditable`);
+                return false;
+            }
+            const isEditable = restrictions.editable.includes(field);
+            if (debugMode) console.log(`Checking editable: record_type='${cleanType}', field=${field}, isEditable=${isEditable}`);
+            return isEditable;
+        }
+
+        function isFieldGreyedOut(recordType, field) {
+            const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
+            const restrictions = fieldRestrictions[cleanType];
+            if (!restrictions) {
+                if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to not greyed-out`);
+                return false;
+            }
+            const isGreyedOut = restrictions.greyedOut.includes(field);
+            if (debugMode) console.log(`Checking greyed-out: record_type='${cleanType}', field=${field}, isGreyedOut=${isGreyedOut}`);
+            return isGreyedOut;
         }
 
         function displayRecords() {
-            console.log("Displaying records");
             const recordBody = document.getElementById('recordBody');
             recordBody.innerHTML = '';
-            const headers = [
-                'Record Type', 'Gen', 'Name', 'Gender', 'Birth Date', 'Birth Location',
-                'Death Date', 'Death Location', 'Burial Location', 'Service',
-                'Marriage Date', 'Relationship', 'Divorced', 'Parents'
-            ];
+            if (records.length === 0) return;
             const table = document.createElement('table');
-            table.innerHTML = `<thead><tr>${headers.map(h => `<th>${h}<div class="resize-handle"></div></th>`).join('')}<th>Actions</th></tr></thead><tbody></tbody>`;
-            const tbodyElement = table.querySelector('tbody');
+            const headerRow = document.createElement('tr');
+            const headers = Object.keys(records[0]);
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.className = header;
+                const toggleButton = document.createElement('span');
+                toggleButton.textContent = vestigialColumns.has(header) ? '👁️‍🗨️' : '👁️';
+                toggleButton.className = 'action-icons';
+                toggleButton.onclick = () => toggleColumn(header);
+                th.appendChild(toggleButton);
+                const headerText = document.createElement('span');
+                headerText.textContent = ` ${header}`;
+                headerText.className = 'header-text';
+                th.appendChild(headerText);
+                if (vestigialColumns.has(header)) th.className += ' vestigial';
+                headerRow.appendChild(th);
+            });
+            const actionTh = document.createElement('th');
+            actionTh.textContent = 'Actions';
+            actionTh.style.width = '100px';
+            headerRow.appendChild(actionTh);
+            table.appendChild(headerRow);
             records.forEach((record, index) => {
                 const tr = document.createElement('tr');
-                if (record.changed) tr.classList.add('changed');
-                const cells = [
-                    record.record_type || '',
-                    record.generation || '',
-                    record.name || '',
-                    record.gender || '',
-                    record.birth_date || '',
-                    record.birth_location || '',
-                    record.death_date || '',
-                    record.death_location || '',
-                    record.burial_location || '',
-                    record.service || '',
-                    record.marriage_date || '',
-                    record.relationship || '',
-                    record.divorced != null ? record.divorced : '',
-                    record.parents || ''
-                ];
-                cells.forEach((cell, i) => {
+                if (index === editableRow) tr.className = 'editable-row';
+                headers.forEach(header => {
                     const td = document.createElement('td');
-                    if (index === editingIndex) {
-                        if (record.record_type === 'Person' && [2, 3, 4, 5, 6, 7, 8, 9].includes(i)) {
-                            if (i === 3) { // Gender
-                                td.innerHTML = `
-                                    <select onchange="updateField(${index}, 'gender', this.value)">
-                                        <option value="male" ${cell === 'male' ? 'selected' : ''}>Male</option>
-                                        <option value="female" ${cell === 'female' ? 'selected' : ''}>Female</option>
-                                        <option value="other" ${cell === 'other' ? 'selected' : ''}>Other</option>
-                                    </select>`;
-                            } else {
-                                td.innerHTML = `<input type="text" value="${cell || ''}" oninput="updateField(${index}, '${headers[i].toLowerCase().replace(' ', '_')}', this.value)">`;
-                                if ([4, 6].includes(i)) td.querySelector('input').pattern = '^\\d{4}(-\\d{2}(-\\d{2})?)?$';
+                    td.className = header;
+                    const cellContent = document.createElement('span');
+                    cellContent.textContent = record[header] || '';
+                    cellContent.className = 'cell-content';
+                    td.appendChild(cellContent);
+                    const isEditable = isFieldEditable(record.record_type, header);
+                    const isGrey = isFieldGreyedOut(record.record_type, header);
+                    if (index === editableRow && isEditable && !vestigialColumns.has(header)) {
+                        td.className += ' editable';
+                        td.onclick = () => {
+                            if (editingIndex === null) {
+                                startEditing(index, header, td, cellContent.textContent);
                             }
-                        } else if (record.record_type === 'Spouse' && [2, 4, 5, 6, 8, 9, 10, 11, 12, 13].includes(i)) {
-                            if (i === 11) { // Relationship
-                                td.innerHTML = `
-                                    <select onchange="updateField(${index}, 'relationship', this.value)">
-                                        <option value="spouse" ${cell === 'spouse' ? 'selected' : ''}>Spouse</option>
-                                        <option value="other" ${cell === 'other' ? 'selected' : ''}>Other</option>
-                                    </select>`;
-                            } else if (i === 12) { // Divorced
-                                td.innerHTML = `<input type="checkbox" ${cell ? 'checked' : ''} onchange="updateField(${index}, 'divorced', this.checked)">`;
-                            } else {
-                                td.innerHTML = `<input type="text" value="${cell || ''}" oninput="updateField(${index}, '${headers[i].toLowerCase().replace(' ', '_')}', this.value)">`;
-                                if ([4, 6, 10].includes(i)) td.querySelector('input').pattern = '^\\d{4}(-\\d{2}(-\\d{2})?)?$';
-                            }
-                        } else {
-                            td.textContent = cell;
-                            if ((record.record_type === 'Spouse' && [1, 3].includes(i)) || (record.record_type === 'Person' && [10, 11, 12, 13].includes(i))) {
-                                td.classList.add('greyed-out');
-                            }
-                        }
-                    } else {
-                        td.textContent = cell;
-                        if ((record.record_type === 'Spouse' && [1, 3].includes(i)) || (record.record_type === 'Person' && [10, 11, 12, 13].includes(i))) {
-                            td.classList.add('greyed-out');
-                        }
+                        };
+                    } else if (isGrey) {
+                        td.className += ' greyed-out';
                     }
+                    if (vestigialColumns.has(header)) td.className += ' vestigial';
                     tr.appendChild(td);
                 });
                 const actionTd = document.createElement('td');
-                if (index === editingIndex) {
-                    actionTd.innerHTML = `
-                        <button onclick="saveEdit(${index})">Save</button>
-                        <button onclick="cancelEdit(${index})">Cancel</button>
-                    `;
-                } else {
-                    actionTd.innerHTML = `
-                        <button onclick="editRecord(${index})">Edit</button>
-                        <button onclick="deleteRecord(${index})">Delete</button>
-                        <button onclick="insertRecord(${index})">Insert</button>
-                    `;
-                }
+                const editIcon = document.createElement('span');
+                editIcon.textContent = '✏️';
+                editIcon.className = 'action-icons';
+                editIcon.title = 'Edit record';
+                editIcon.onclick = () => enableEditingRow(index);
+                const deleteIcon = document.createElement('span');
+                deleteIcon.textContent = '🗑️';
+                deleteIcon.className = 'action-icons';
+                deleteIcon.title = 'Delete this record';
+                deleteIcon.onclick = () => deleteRecord(index);
+                const insertIcon = document.createElement('span');
+                insertIcon.textContent = '➕';
+                insertIcon.className = 'action-icons';
+                insertIcon.title = 'Insert record below';
+                insertIcon.onclick = () => insertRecord(index);
+                actionTd.appendChild(editIcon);
+                actionTd.appendChild(deleteIcon);
+                actionTd.appendChild(insertIcon);
                 tr.appendChild(actionTd);
-                tbodyElement.appendChild(tr);
+                table.appendChild(tr);
             });
             recordBody.appendChild(table);
-            console.log("Table appended to DOM, adjusting column widths");
-            adjustColumnWidths();
-            console.log("Enabling column resizing");
-            enableColumnResizing();
         }
 
-        function adjustColumnWidths() {
-            console.log("Adjusting column widths");
-            const table = document.querySelector('table');
-            if (!table) {
-                console.error("No table found for column width adjustment");
-                return;
-            }
-            const rows = table.querySelectorAll('tr');
-            const colWidths = Array.from({ length: 15 }, () => 0);
-            rows.forEach(row => {
-                row.querySelectorAll('td, th').forEach((cell, i) => {
-                    if (i < 15) {
-                        const width = cell.scrollWidth;
-                        colWidths[i] = Math.max(colWidths[i], width);
-                    }
-                });
-            });
-            colWidths.forEach((width, i) => {
-                const selector = `th:nth-child(${i + 1}), td:nth-child(${i + 1})`;
-                const maxWidth = [3, 6, 8, 9, 14].includes(i) ? 300 : (i === 1 ? 80 : 200);
-                document.querySelectorAll(selector).forEach(cell => {
-                    cell.style.width = `${Math.min(width + 10, maxWidth)}px`;
-                });
-            });
-        }
-
-        function enableColumnResizing() {
-            console.log("Enabling column resizing");
-            const headers = document.querySelectorAll('th');
-            if (!headers.length) {
-                console.error("No table headers found for resizing");
-                return;
-            }
-            headers.forEach((th, index) => {
-                if (index < 15) {
-                    const resizeHandle = th.querySelector('.resize-handle');
-                    if (!resizeHandle) {
-                        console.warn(`No resize handle found for header ${index + 1}`);
-                        return;
-                    }
-                    resizeHandle.addEventListener('mousedown', (e) => {
-                        e.preventDefault();
-                        const startX = e.pageX;
-                        const startWidth = th.offsetWidth;
-                        const minWidth = parseInt(getComputedStyle(th).minWidth) || 50;
-                        const maxWidth = parseInt(getComputedStyle(th).maxWidth) || 500;
-
-                        function onMouseMove(e) {
-                            const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + (e.pageX - startX)));
-                            document.querySelectorAll(`th:nth-child(${index + 1}), td:nth-child(${index + 1})`).forEach(cell => {
-                                cell.style.width = `${newWidth}px`;
-                            });
-                        }
-
-                        function onMouseUp() {
-                            document.removeEventListener('mousemove', onMouseMove);
-                            document.removeEventListener('mouseup', onMouseUp);
-                        }
-
-                        document.addEventListener('mousemove', onMouseMove);
-                        document.addEventListener('mouseup', onMouseUp);
-                    });
-                }
-            });
-        }
-
-        function updateField(index, field, value) {
-            console.log(`Updating field ${field} for record ${index} to ${value}`);
-            if (field !== 'record_type' && field !== 'generation') {
-                records[index][field] = value === '' ? null : (field === 'divorced' ? value : value);
-                records[index].changed = true;
-            }
-        }
-
-        function saveEdit(index) {
-            console.log(`Saving edit for record ${index}`);
-            const record = records[index];
-            const errors = validateRecord(record);
-            if (errors.length > 0) {
-                alert('Validation errors:\n' + errors.join('\n'));
-                console.log("Validation errors:", errors);
-                return;
-            }
-            record.changed = false;
-            editingIndex = null;
-            if (record.record_type === 'Person') {
-                records.filter(r => r.record_type === 'Spouse' && r.other_id && record.spouses.some(s => s.other_id === r.other_id)).forEach(spouse => {
-                    spouse.changed = false;
-                });
-            }
-            displayRecords();
-        }
-
-        function cancelEdit(index) {
-            console.log(`Canceling edit for record ${index}`);
-            editingIndex = null;
-            displayRecords();
-        }
-
-        function editRecord(index) {
-            console.log(`Editing record ${index}`);
+        function startEditing(index, field, td, currentValue) {
             editingIndex = index;
+            editingField = field;
+            td.innerHTML = '';
+            const textarea = document.createElement('textarea');
+            textarea.className = 'edit-textarea';
+            textarea.value = currentValue;
+            textarea.rows = Math.max(2, currentValue.split('\n').length);
+            td.appendChild(textarea);
+            textarea.focus();
+            if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field}`);
+            textarea.onblur = () => saveEdit(index, field, textarea.value, td, currentValue);
+            textarea.onkeydown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    saveEdit(index, field, textarea.value, td, currentValue);
+                } else if (e.key === 'Escape') {
+                    cancelEdit(td, currentValue);
+                }
+            };
+        }
+
+        function saveEdit(index, field, value, td, originalValue) {
+            const trimmedValue = value.trim();
+            // Validate date fields
+            if (dateFields.includes(field) && !isValidDate(trimmedValue)) {
+                alert(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD (e.g., 2023, 2023-05, 2023-05-15).`);
+                if (debugMode) console.log(`Date validation failed for ${field}: ${trimmedValue}`);
+                cancelEdit(td, originalValue);
+                return;
+            }
+            if (trimmedValue !== originalValue) {
+                records[index][field] = trimmedValue;
+                if (debugMode) console.log(`Saved edit: record ${index + 1}, field ${field}, value ${trimmedValue}`);
+            }
+            editingIndex = null;
+            editingField = null;
+            td.innerHTML = '';
+            const cellContent = document.createElement('span');
+            cellContent.textContent = trimmedValue;
+            cellContent.className = 'cell-content';
+            td.appendChild(cellContent);
             displayRecords();
         }
 
-        function insertRecord(index) {
-            console.log(`Inserting record after index ${index}`);
-            const recordTypeInput = prompt('Insert record as (Person or Spouse)?').trim().toLowerCase();
-            if (!['person', 'spouse'].includes(recordTypeInput)) {
-                alert('Invalid record type. Please enter "Person" or "Spouse".');
-                console.log(`Invalid record type entered: ${recordTypeInput}`);
-                return;
-            }
-
-            let record;
-            if (recordTypeInput === 'person') {
-                record = {
-                    record_type: 'Person',
-                    generation: records[index].record_type === 'Person' ? records[index].generation : (records.find((r, i) => i <= index && r.record_type === 'Person')?.generation || null),
-                    name: null,
-                    gender: null,
-                    birth_date: null,
-                    birth_location: null,
-                    death_date: null,
-                    death_location: null,
-                    burial_location: null,
-                    service: null,
-                    marriage_date: null,
-                    relationship: null,
-                    divorced: null,
-                    parents: null,
-                    spouses: [],
-                    index: index + 1,
-                    changed: true
-                };
-            } else {
-                const relationshipInput = prompt('Enter relationship (spouse or other):').trim().toLowerCase();
-                if (!['spouse', 'other'].includes(relationshipInput)) {
-                    alert('Invalid relationship. Please enter "spouse" or "other".');
-                    console.log(`Invalid relationship entered: ${relationshipInput}`);
-                    return;
-                }
-                const associatedPerson = records.slice(0, index + 1).reverse().find(r => r.record_type === 'Person');
-                if (!associatedPerson) {
-                    alert('No preceding Person record found. Spouse records must be associated with a Person.');
-                    console.log('No preceding Person record for Spouse insertion');
-                    return;
-                }
-                record = {
-                    record_type: 'Spouse',
-                    generation: null,
-                    name: null,
-                    gender: null,
-                    birth_date: null,
-                    birth_location: null,
-                    death_date: null,
-                    death_location: null,
-                    burial_location: null,
-                    service: null,
-                    marriage_date: null,
-                    relationship: relationshipInput,
-                    divorced: false,
-                    parents: null,
-                    other_id: `S${records.filter(r => r.record_type === 'Spouse').length + 1}`,
-                    index: index + 1,
-                    changed: true
-                };
-                associatedPerson.spouses.push(record);
-                console.log(`Inserted Spouse associated with Person: ${associatedPerson.name}`);
-            }
-
-            records.splice(index + 1, 0, record);
-            records.forEach((r, i) => r.index = i);
-            editingIndex = index + 1;
-            displayRecords();
-            console.log(`Inserted ${record.record_type} record at index ${index + 1}`);
+        function cancelEdit(td, originalValue) {
+            editingIndex = null;
+            editingField = null;
+            td.innerHTML = '';
+            const cellContent = document.createElement('span');
+            cellContent.textContent = originalValue;
+            cellContent.className = 'cell-content';
+            td.appendChild(cellContent);
+            if (debugMode) console.log('Cancelled edit');
         }
 
         function deleteRecord(index) {
-            console.log(`Deleting record ${index}`);
-            if (confirm('Are you sure you want to delete this record?')) {
-                const record = records[index];
-                if (record.record_type === 'Person') {
-                    records = records.filter(r => r.index !== index && (r.record_type !== 'Spouse' || !record.spouses.some(s => s.other_id === r.other_id)));
-                } else {
-                    records = records.filter(r => r.index !== index);
-                    const person = records.find(p => p.record_type === 'Person' && p.spouses.some(s => s.other_id === r.other_id));
-                    if (person) {
-                        person.spouses = person.spouses.filter(s => s.other_id !== record.other_id);
-                    }
-                }
-                records.forEach((r, i) => r.index = i);
-                editingIndex = null;
+            const record = records[index];
+            const name = record.name || '';
+            if (name ? confirm(`Delete record for ${name}?`) : confirm('Do you want to delete this line?')) {
+                records.splice(index, 1);
+                if (editableRow === index) editableRow = null;
                 displayRecords();
+                if (debugMode) console.log(`Deleted record ${index + 1}`);
+            }
+        }
+
+        function insertRecord(index) {
+            const response = prompt("Enter 'P' for person or 'S' for spouse to insert a record below this line:");
+            if (response === 'P' || response === 'S') {
+                const recordType = response === 'P' ? 'person' : 'spouse';
+                const newRecord = {};
+                Object.keys(records[0]).forEach(header => {
+                    newRecord[header] = header === 'record_type' ? recordType : '';
+                });
+                records.splice(index + 1, 0, newRecord);
+                displayRecords();
+                if (debugMode) console.log(`Inserted ${recordType} record at index ${index + 1}`);
+            } else if (debugMode) {
+                console.log(`Aborted insert: Invalid response '${response}'`);
             }
         }
 
         function validateRecord(record) {
-            console.log(`Validating record: ${record.name || 'unnamed'}`);
-            const errors = [];
-            if (!record.name) errors.push('Name is required.');
-            if (record.generation && isNaN(record.generation)) errors.push('Gen must be a number.');
-            if (record.birth_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(record.birth_date)) {
-                errors.push('Birth Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
-            }
-            if (record.death_date && !/^\d{4}(-\d{2}(-\d{2})?)?$/.test(record.death_date)) {
-                errors.push('Death Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
-            }
-            if (record.record_type === 'Spouse') {
-                if (!record.relationship) errors.push('Spouse Relationship is required.');
-                if (record.marriage_date && !/^\d{4}(-\d{2}(-\\d{2})?)?$/.test(record.marriage_date)) {
-                    errors.push('Spouse Marriage Date must be YYYY, YYYY-MM, or YYYY-MM-DD.');
-                }
-            }
-            return errors;
+            return Object.values(record).every(value => typeof value === 'string');
         }
 
         function escapeCSVField(field) {
-            if (field === null || field === undefined) return '';
-            const str = String(field);
-            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-                return `"${str.replace(/"/g, '""')}"`;
+            if (typeof field !== 'string') field = String(field);
+            if (field.includes('"') || field.includes(',')) {
+                return `"${field.replace(/"/g, '""')}"`;
             }
-            return str;
+            return field;
         }
 
         function downloadCSV() {
-            console.log("Downloading CSV");
-            const headers = [
-                'record_type', 'gen', 'name', 'gender', 'birth_date', 'birth_location',
-                'death_date', 'death_location', 'burial_location', 'service',
-                'marriage_date', 'relationship', 'divorced', 'parents'
-            ];
-            const csvContent = [
-                headers.join(','),
-                ...records.map(record => [
-                    record.record_type,
-                    escapeCSVField(record.generation),
-                    escapeCSVField(record.name),
-                    escapeCSVField(record.gender),
-                    escapeCSVField(record.birth_date),
-                    escapeCSVField(record.birth_location),
-                    escapeCSVField(record.death_date),
-                    escapeCSVField(record.death_location),
-                    escapeCSVField(record.burial_location),
-                    escapeCSVField(record.service),
-                    escapeCSVField(record.marriage_date),
-                    escapeCSVField(record.relationship),
-                    escapeCSVField(record.divorced),
-                    escapeCSVField(record.parents)
-                ].join(','))
-            ].join('\n');
-            const blob = new Blob([csvContent], { type: 'text/csv' });
+            if (records.length === 0) {
+                alert('No records to download');
+                return;
+            }
+            const passphrase = prompt('Enter passphrase for encryption:');
+            if (!passphrase) {
+                alert('Passphrase is required for encryption');
+                return;
+            }
+            const headers = Object.keys(records[0]);
+            const csv = [
+                headers.map(escapeCSVField).join(','),
+                ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
+            ].join('\r\n') + '\r\n';
+            const encryptedData = encryptFile(csv, passphrase);
+            const blob = new Blob([encryptedData], { type: 'application/octet-stream' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'updated_genealogy.csv';
+            a.download = 'records.csv.enc';
             a.click();
             URL.revokeObjectURL(url);
+            if (debugMode) console.log(`Downloaded encrypted records.csv.enc, plaintext size=${csv.length} bytes`);
         }
     </script>
 </body>
