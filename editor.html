@@ -37,13 +37,14 @@
         th.reorder, td.reorder { width: 60px; }
         .reorder-arrow { cursor: pointer; margin: 2px; font-size: 16px; }
         .reorder-arrow:disabled { color: #ccc; cursor: not-allowed; }
+        .children-icon { cursor: pointer; color: #28a745; margin-right: 8px; }
     </style>
 </head>
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">2.1.60</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-12 10:00:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">2.1.61</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 10:00:00 PDT</span></p>
     </div>
     <div class="warning">
         <p>Use a strong passphrase and store the encrypted file securely. Do not share publicly.</p>
@@ -360,6 +361,25 @@
             }
         }
 
+        function addChild(index) {
+            if (records[index].record_type.trim().toLowerCase() !== 'person') {
+                if (debugMode) console.log(`Cannot add child to non-person record at index ${index + 1}`);
+                return;
+            }
+            // Find insertion point after person and any spouses
+            let insertIndex = index + 1;
+            while (insertIndex < records.length && records[insertIndex].record_type.trim().toLowerCase() === 'spouse') {
+                insertIndex++;
+            }
+            const newRecord = {};
+            Object.keys(records[0]).forEach(header => {
+                newRecord[header] = header === 'record_type' ? 'person' : '';
+            });
+            records.splice(insertIndex, 0, newRecord);
+            displayRecords();
+            if (debugMode) console.log(`Added child record at index ${insertIndex + 1}`);
+        }
+
         function displayRecords() {
             const recordBody = document.getElementById('recordBody');
             recordBody.innerHTML = '';
@@ -425,7 +445,6 @@
                     upArrow.onclick = () => moveRowUp(index);
                     if (index === 0) upArrow.disabled = true;
                     reorderTd.appendChild(upArrow);
-
                     const downArrow = document.createElement('span');
                     downArrow.textContent = '↓';
                     downArrow.className = 'reorder-arrow';
@@ -453,6 +472,14 @@
                 actionTd.appendChild(editIcon);
                 actionTd.appendChild(deleteIcon);
                 actionTd.appendChild(insertIcon);
+                if (record.record_type.trim().toLowerCase() === 'person') {
+                    const childIcon = document.createElement('span');
+                    childIcon.textContent = '👶';
+                    childIcon.className = 'children-icon';
+                    childIcon.title = 'Add child';
+                    childIcon.onclick = () => addChild(index);
+                    actionTd.appendChild(childIcon);
+                }
                 tr.appendChild(actionTd);
                 table.appendChild(tr);
             });
@@ -483,7 +510,6 @@
 
         function saveEdit(index, field, value, td, originalValue) {
             const trimmedValue = value.trim();
-            // Validate date fields
             if (dateFields.includes(field) && !isValidDate(trimmedValue)) {
                 alert(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD (e.g., 2023, 2023-05, 2023-05-15).`);
                 if (debugMode) console.log(`Date validation failed for ${field}: ${trimmedValue}`);
