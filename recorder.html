@@ -40,8 +40,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.1.2</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-12 18:00:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.1.3</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 01:16:00 PDT</span></p>
     </div>
     <div class="warning">
         <p>Use a strong passphrase and store the encrypted file securely. Do not share publicly.</p>
@@ -615,10 +615,10 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'records.csv.enc';
+            a.download = 'returns.csv.enc';
             a.click();
             URL.revokeObjectURL(url);
-            if (debugMode) console.log(`Downloaded encrypted records.csv.enc, plaintext size=${csv.length} bytes`);
+            if (debugMode) console.log(`Downloaded encrypted returns.csv.enc, plaintext size=${csv.length} bytes`);
         }
     </script>
 </body>
