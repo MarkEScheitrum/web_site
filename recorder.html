@@ -58,7 +58,7 @@
         .info { margin-bottom: 10px; }
         .warning { color: red; font-weight: bold; margin-bottom: 10px; }
         .persistent-warning { color: red; font-weight: bold; margin-bottom: 10px; border: 1px solid red; padding: 10px; background-color: #ffe6e6; }
-        .action-icons { cursor: pointer; color: #007bff; margin-right: 8px; }
+        .action-icons { cursor: pointer; color: #007bff; margin-right: 8px; font-size: 1.25em; }
         .vestigial { width: 30px !important; max-width: 30px !important; min-width: 0 !important; overflow: hidden; }
         .vestigial .header-text { display: none; }
         .vestigial .cell-content { display: none; }
@@ -82,8 +82,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.2.6</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 11:43:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.2.7</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 12:01:00 PDT</span></p>
     </div>
     <div class="warning">
         <p>Use a strong passphrase and store the encrypted file securely. Do not share publicly.</p>
@@ -287,7 +287,7 @@
 
         function parseCSVFile(text) {
             const normalizedText = text.replace(/\r\n|\r\r\n|\r/g, '\n');
-            const lines = normalizedText.split('\n').filter(line => line.trim() !== '');
+            const lines = normalizedText.split('\n').filter(line => line.trim() !== '' && !line.trim().startsWith('#'));
             const headers = parseCSVLine(lines[0]);
             const records = [];
             for (let i = 1; i < lines.length; i++) {
@@ -453,7 +453,7 @@
             }
             const newRecord = {};
             Object.keys(records[0]).forEach(header => {
-                newRecord[header] = header === 'record_type' ? 'Person' : '';
+                newRecord[header] = header === 'record_type' ? 'Person' : header === 'gen' ? (parentGen + 1).toString() : '';
             });
             records.splice(insertIndex, 0, newRecord);
             highlightedRow = null;
@@ -722,9 +722,24 @@
             return field;
         }
 
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
         function downloadCSV() {
             if (records.length === 0) {
                 alert('No records to download');
+                return;
+            }
+            const recorderName = prompt('Enter your name:');
+            if (!recorderName) {
+                alert('Recorder name is required');
+                return;
+            }
+            const recorderEmail = prompt('Enter your email address:');
+            if (!recorderEmail || !isValidEmail(recorderEmail)) {
+                alert('A valid email address is required');
                 return;
             }
             const passphrase = prompt('Enter passphrase for encryption:');
@@ -733,7 +748,9 @@
                 return;
             }
             const headers = Object.keys(records[0]);
+            const currentDate = '2025-09-13 12:01:00 PDT';
             const csv = [
+                `# Recorder: ${escapeCSVField(recorderName)}, Email: ${escapeCSVField(recorderEmail)}, Created: ${currentDate}`,
                 headers.map(escapeCSVField).join(','),
                 ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
             ].join('\r\n') + '\r\n';
