@@ -74,16 +74,16 @@
             min-height: 40px;
         }
         .highlighted-row { background-color: #ffffcc !important; }
-        .greyed-out { background-color: #e0e0e0; cursor: not-allowed; }
-        .children-icon { cursor: pointer; color: #28a745; margin-right: 8px; }
-        .spouse-icon { cursor: pointer; color: #ff9900; margin-right: 8px; }
+        .greyed-out { background-color: #c0c0c0; cursor: not-allowed; }
+        .children-icon { cursor: pointer; color: #28a745; margin-right: 8px; font-size: 1.25em; }
+        .spouse-icon { cursor: pointer; color: #ff9900; margin-right: 8px; font-size: 1.25em; }
     </style>
 </head>
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.2.5</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 10:47:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.2.6</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 11:43:00 PDT</span></p>
     </div>
     <div class="warning">
         <p>Use a strong passphrase and store the encrypted file securely. Do not share publicly.</p>
@@ -453,7 +453,7 @@
             }
             const newRecord = {};
             Object.keys(records[0]).forEach(header => {
-                newRecord[header] = header === 'record_type' ? 'person' : header === 'gen' ? (parentGen + 1).toString() : header === 'parents' ? records[parentIndex].name : '';
+                newRecord[header] = header === 'record_type' ? 'Person' : '';
             });
             records.splice(insertIndex, 0, newRecord);
             highlightedRow = null;
@@ -473,7 +473,7 @@
             }
             const newRecord = {};
             Object.keys(records[0]).forEach(header => {
-                newRecord[header] = header === 'record_type' ? 'spouse' : header === 'relationship' ? 'spouse' : header === 'parents' ? (records[parentIndex].parents || records[parentIndex].name) : '';
+                newRecord[header] = header === 'record_type' ? 'Spouse' : '';
             });
             records.splice(insertIndex, 0, newRecord);
             highlightedRow = null;
@@ -537,7 +537,7 @@
                     tr.appendChild(td);
                 });
                 const actionTd = document.createElement('td');
-                if (record.record_type.trim().toLowerCase() === 'person') {
+                if (record.record_type.trim().toLowerCase() === 'person' && index !== 0) {
                     const spouseIcon = document.createElement('span');
                     spouseIcon.textContent = '💍';
                     spouseIcon.className = 'spouse-icon';
