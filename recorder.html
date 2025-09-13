@@ -60,30 +60,7 @@
         let editableRow = null;
         let vestigialColumns = new Set();
         let debugMode = false;
-        
-        // Universal wait for CryptoJS (extends your existing debug check)
-        function waitForCryptoJS(callback) {
-            if (typeof CryptoJS !== 'undefined') {
-                callback();
-            } else {
-                const checkInterval = setInterval(() => {
-                if (typeof CryptoJS !== 'undefined') {
-                    clearInterval(checkInterval);
-                    callback();
-                }
-            }, 100);
-            setTimeout(() => {
-                clearInterval(checkInterval);
-                console.error('CryptoJS failed to load after 2s—retry page load');
-                }, 2000);
-            }
-        }
 
-// Initialize on load
-waitForCryptoJS(() => {
-    initDebugMode();
-    console.log('CryptoJS ready');
-});
         // Date fields for validation
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
 
@@ -128,17 +105,6 @@ waitForCryptoJS(() => {
                 }
             }
         }
-        if (typeof CryptoJS !== 'undefined') {
-            initDebugMode();
-        } else {
-            const checkInterval = setInterval(() => {
-                if (typeof CryptoJS !== 'undefined') {
-                    clearInterval(checkInterval);
-                    initDebugMode();
-                }
-            }, 100);
-            setTimeout(() => clearInterval(checkInterval), 2000);
-        }
 
         // Clear records on page unload
         window.addEventListener('unload', () => { records = []; });
@@ -156,6 +122,30 @@ waitForCryptoJS(() => {
                 greyedOut: ['gen', 'gender']
             }
         };
+
+        // Universal wait for CryptoJS (extends your existing debug check) - REPLACED the original fallback
+        function waitForCryptoJS(callback) {
+            if (typeof CryptoJS !== 'undefined') {
+                callback();
+            } else {
+                const checkInterval = setInterval(() => {
+                    if (typeof CryptoJS !== 'undefined') {
+                        clearInterval(checkInterval);
+                        callback();
+                    }
+                }, 100);
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    console.error('CryptoJS failed to load after 2s—retry page load');
+                }, 2000);
+            }
+        }
+
+        // Initialize on load - NOW AFTER all const declarations
+        waitForCryptoJS(() => {
+            initDebugMode();
+            console.log('CryptoJS ready');
+        });
 
         function deriveKey(passphrase, salt) {
             const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
