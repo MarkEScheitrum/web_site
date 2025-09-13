@@ -41,8 +41,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.2.2</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 04:00:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.2.3</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 04:30:00 PDT</span></p>
     </div>
     <div class="warning">
         <p>Use a strong passphrase and store the encrypted file securely. Do not share publicly.</p>
@@ -68,7 +68,7 @@
         let highlightedRow = null;
         let vestigialColumns = new Set();
         let debugMode = false;
-        let renderTimeout = null;  // For debouncing re-renders
+        let renderTimeout = null;
 
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
 
@@ -139,12 +139,131 @@
             }
         }
 
-        waitForCryptoJS(() => {
-            initDebugMode();
-            console.log('CryptoJS ready');
-        });
+        function deriveKey(passphrase, salt) {
+            const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
+            return CryptoJS.PBKDF2(utf8Passphrase, salt, {
+                keySize: 8,
+                iterations: 100000,
+                hasher: CryptoJS.algo.SHA256
+            });
+        }
 
-        // ... [All other functions like deriveKey, arrayBufferToBinary, decryptFile, encryptFile, parseCSVLine, parseCSVFile, processExtractedFile remain the same as in v3.2.1] ...
+        function arrayBufferToBinary(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return binary;
+        }
+
+        function decryptFile(encryptedData, passphrase) {
+            try {
+                const binaryData = arrayBufferToBinary(encryptedData);
+                if (binaryData.length < 32) throw new Error("Data too short for salt and IV");
+                const saltBinary = binaryData.slice(0, 16);
+                const ivBinary = binaryData.slice(16, 32);
+                const ciphertextBinary = binaryData.slice(32);
+                const salt = CryptoJS.enc.Latin1.parse(saltBinary);
+                const iv = CryptoJS.enc.Latin1.parse(ivBinary);
+                const ciphertext = CryptoJS.enc.Latin1.parse(ciphertextBinary);
+                const key = deriveKey(passphrase, salt);
+                if (debugMode) {
+                    console.log(`Decryption: data length=${binaryData.length} bytes`);
+                    console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                    console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                    console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+                }
+                const decrypted = CryptoJS.AES.decrypt(
+                    { ciphertext: ciphertext },
+                    key,
+                    { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+                );
+                try {
+                    const result = decrypted.toString(CryptoJS.enc.Utf8);
+                    if (debugMode) console.log(`Decrypted data (first 100 chars): ${result.slice(0, 100)}`);
+                    return result;
+                } catch (e) {
+                    try {
+                        const result = decrypted.toString(CryptoJS.enc.Latin1);
+                        if (debugMode) console.log(`Decrypted data (first 100 chars, Latin1): ${result.slice(0, 100)}`);
+                        return result;
+                    } catch (e2) {
+                        if (debugMode) console.log(`Decryption failed: Invalid UTF-8 and Latin1, hex: ${decrypted.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+                        return { error: "Invalid UTF-8 and Latin1", decryptedHex: decrypted.toString(CryptoJS.enc.Hex) };
+                    }
+                }
+            } catch (e) {
+                if (debugMode) console.log(`Decryption error: ${e.message}`);
+                return { error: e.message, decryptedHex: null };
+            }
+        }
+
+        function encryptFile(data, passphrase) {
+            const salt = CryptoJS.lib.WordArray.random(16);
+            const iv = CryptoJS.lib.WordArray.random(16);
+            const key = deriveKey(passphrase, salt);
+            const encrypted = CryptoJS.AES.encrypt(data, key, {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            });
+            const fullBinary = salt.concat(iv).concat(encrypted.ciphertext);
+            const uint8Array = new Uint8Array(fullBinary.sigBytes);
+            for (let i = 0; i < fullBinary.sigBytes; i++) {
+                const wordIndex = Math.floor(i / 4);
+                const byteIndex = i % 4;
+                uint8Array[i] = (fullBinary.words[wordIndex] >>> (24 - byteIndex * 8)) & 0xff;
+            }
+            if (debugMode) {
+                console.log(`Encryption: plaintext=${data.length} bytes, ciphertext=${encrypted.ciphertext.sigBytes} bytes, total=${uint8Array.length} bytes`);
+                console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+                console.log(`Ciphertext (first 32 bytes, hex): ${encrypted.ciphertext.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+            }
+            return uint8Array;
+        }
+
+        function parseCSVLine(line) {
+            const fields = [];
+            let field = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                    continue;
+                }
+                if (char === ',' && !inQuotes) {
+                    fields.push(field);
+                    field = '';
+                    continue;
+                }
+                field += char;
+            }
+            fields.push(field);
+            return fields;
+        }
+
+        function parseCSVFile(text) {
+            const normalizedText = text.replace(/\r\n|\r\r\n|\r/g, '\n');
+            const lines = normalizedText.split('\n').filter(line => line.trim() !== '');
+            const headers = parseCSVLine(lines[0]);
+            const records = [];
+            for (let i = 1; i < lines.length; i++) {
+                const fields = parseCSVLine(lines[i]);
+                if (fields.length === headers.length) {
+                    const record = {};
+                    headers.forEach((header, index) => {
+                        record[header] = fields[index].trim();
+                    });
+                    records.push(record);
+                }
+            }
+            if (debugMode) console.log(`Parsed ${records.length} records`);
+            return records;
+        }
 
         function processFile() {
             const fileInput = document.getElementById('textFile');
@@ -162,6 +281,10 @@
             reader.onload = function(e) {
                 if (typeof CryptoJS === 'undefined') {
                     alert('Crypto library failed to load during file read. Please refresh and retry.');
+                    return;
+                }
+                if (typeof decryptFile === 'undefined') {
+                    alert('Decryption function not ready—please refresh and try again.');
                     return;
                 }
                 if (file.name.toLowerCase().endsWith('.zip')) {
@@ -182,7 +305,27 @@
                         });
                         if (foundFile) {
                             foundFile.entry.async('arraybuffer').then((data) => {
-                                processExtractedFile(foundFile.name, data);
+                                originalFileName = foundFile.name;
+                                if (foundFile.name.endsWith('.csv.enc')) {
+                                    const passphrase = prompt('Enter passphrase:');
+                                    if (!passphrase) {
+                                        alert('Passphrase is required for encrypted files');
+                                        return;
+                                    }
+                                    const result = decryptFile(data, passphrase);
+                                    if (typeof result === 'string') {
+                                        records = parseCSVFile(result);
+                                        debounceDisplayRecords();
+                                    } else {
+                                        alert(`Decryption failed: ${result.error}`);
+                                    }
+                                } else if (foundFile.name.endsWith('.csv')) {
+                                    const text = arrayBufferToBinary(data);
+                                    records = parseCSVFile(text);
+                                    debounceDisplayRecords();
+                                } else {
+                                    alert(`Unsupported file type in ZIP: ${foundFile.name}. Expected .csv or .csv.enc.`);
+                                }
                             }).catch((err) => {
                                 alert(`Error extracting file from ZIP: ${err.message}`);
                             });
@@ -192,25 +335,23 @@
                     }).catch((err) => {
                         alert(`Error reading ZIP: ${err.message}. Try unzipping manually.`);
                     });
-                } else {
-                    if (file.name.endsWith('.csv.enc')) {
-                        const passphrase = prompt('Enter passphrase:');
-                        if (!passphrase) {
-                            alert('Passphrase is required for encrypted files');
-                            return;
-                        }
-                        const result = decryptFile(e.target.result, passphrase);
-                        if (typeof result === 'string') {
-                            records = parseCSVFile(result);
-                            debounceDisplayRecords();
-                        } else {
-                            alert(`Decryption failed: ${result.error}`);
-                        }
-                    } else {
-                        const text = e.target.result;
-                        records = parseCSVFile(text);
-                        debounceDisplayRecords();
+                } else if (file.name.endsWith('.csv.enc')) {
+                    const passphrase = prompt('Enter passphrase:');
+                    if (!passphrase) {
+                        alert('Passphrase is required for encrypted files');
+                        return;
                     }
+                    const result = decryptFile(e.target.result, passphrase);
+                    if (typeof result === 'string') {
+                        records = parseCSVFile(result);
+                        debounceDisplayRecords();
+                    } else {
+                        alert(`Decryption failed: ${result.error}`);
+                    }
+                } else {
+                    const text = e.target.result;
+                    records = parseCSVFile(text);
+                    debounceDisplayRecords();
                 }
             };
             if (file.name.toLowerCase().endsWith('.zip') || file.name.endsWith('.csv.enc')) {
@@ -220,10 +361,9 @@
             }
         }
 
-        // Debounce re-renders to avoid violations
         function debounceDisplayRecords() {
             if (renderTimeout) clearTimeout(renderTimeout);
-            renderTimeout = setTimeout(displayRecords, 16);  // ~60fps
+            renderTimeout = setTimeout(displayRecords, 16);
         }
 
         function toggleColumn(column) {
@@ -394,7 +534,6 @@
             }
             const parentIndex = highlightedRow;
             let insertIndex = parentIndex + 1;
-            // Use requestIdleCallback for long loops to avoid violations
             function findInsertIndex() {
                 while (insertIndex < records.length && 
                        records[insertIndex].record_type === 'spouse' && 
@@ -515,6 +654,11 @@
             URL.revokeObjectURL(url);
             if (debugMode) console.log(`Downloaded encrypted ${downloadFileName}, plaintext size=${csv.length} bytes`);
         }
+
+        waitForCryptoJS(() => {
+            initDebugMode();
+            console.log('CryptoJS ready');
+        });
     </script>
 </body>
 </html>
