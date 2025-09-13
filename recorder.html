@@ -528,7 +528,7 @@
                 alert('Please highlight a person row first for Add Spouse.');
                 return;
             }
-            if (records[highlightedRow].record_type !== 'person') {
+            if (records[highlightedRow].record_type.trim().toLowerCase() !== 'person') {
                 alert('Highlighted row must be a person for Add Spouse.');
                 return;
             }
@@ -555,7 +555,7 @@
                 alert('Please highlight a person row first for Add Child.');
                 return;
             }
-            if (records[highlightedRow].record_type !== 'person') {
+            if (records[highlightedRow].record_type.trim().toLowerCase() !== 'person') {
                 alert('Highlighted row must be a person for Add Child.');
                 return;
             }
