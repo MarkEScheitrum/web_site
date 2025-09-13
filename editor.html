@@ -34,6 +34,9 @@
         }
         .editable-row { background-color: #d9edf7; }
         .greyed-out { background-color: #e0e0e0; cursor: not-allowed; }
+        th.reorder, td.reorder { width: 60px; }
+        .reorder-arrow { cursor: pointer; margin: 2px; font-size: 16px; }
+        .reorder-arrow:disabled { color: #ccc; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -341,6 +344,22 @@
             return isGreyedOut;
         }
 
+        function moveRowUp(index) {
+            if (index > 0 && records[index].record_type.trim().toLowerCase() === 'person' && records[index - 1].record_type.trim().toLowerCase() === 'person') {
+                [records[index - 1], records[index]] = [records[index], records[index - 1]];
+                displayRecords();
+                if (debugMode) console.log(`Swapped row ${index + 1} up to ${index}`);
+            }
+        }
+
+        function moveRowDown(index) {
+            if (index < records.length - 1 && records[index].record_type.trim().toLowerCase() === 'person' && records[index + 1].record_type.trim().toLowerCase() === 'person') {
+                [records[index], records[index + 1]] = [records[index + 1], records[index]];
+                displayRecords();
+                if (debugMode) console.log(`Swapped row ${index + 1} down to ${index + 2}`);
+            }
+        }
+
         function displayRecords() {
             const recordBody = document.getElementById('recordBody');
             recordBody.innerHTML = '';
@@ -363,6 +382,10 @@
                 if (vestigialColumns.has(header)) th.className += ' vestigial';
                 headerRow.appendChild(th);
             });
+            const reorderTh = document.createElement('th');
+            reorderTh.textContent = 'Reorder';
+            reorderTh.className = 'reorder';
+            headerRow.appendChild(reorderTh);
             const actionTh = document.createElement('th');
             actionTh.textContent = 'Actions';
             actionTh.style.width = '100px';
@@ -393,6 +416,24 @@
                     if (vestigialColumns.has(header)) td.className += ' vestigial';
                     tr.appendChild(td);
                 });
+                const reorderTd = document.createElement('td');
+                reorderTd.className = 'reorder';
+                if (record.record_type.trim().toLowerCase() === 'person') {
+                    const upArrow = document.createElement('span');
+                    upArrow.textContent = '↑';
+                    upArrow.className = 'reorder-arrow';
+                    upArrow.onclick = () => moveRowUp(index);
+                    if (index === 0) upArrow.disabled = true;
+                    reorderTd.appendChild(upArrow);
+
+                    const downArrow = document.createElement('span');
+                    downArrow.textContent = '↓';
+                    downArrow.className = 'reorder-arrow';
+                    downArrow.onclick = () => moveRowDown(index);
+                    if (index === records.length - 1) downArrow.disabled = true;
+                    reorderTd.appendChild(downArrow);
+                }
+                tr.appendChild(reorderTd);
                 const actionTd = document.createElement('td');
                 const editIcon = document.createElement('span');
                 editIcon.textContent = '✏️';
