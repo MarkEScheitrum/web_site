@@ -14,6 +14,7 @@
         th.gen, td.gen { width: 50px; }
         th { background-color: #f2f2f2; }
         .editable:hover { background-color: #e0e0e0; cursor: pointer; }
+        .editable-row:hover { background-color: #d9edf7; }
         button { margin: 5px; padding: 8px 16px; }
         .info { margin-bottom: 10px; }
         .warning { color: red; font-weight: bold; margin-bottom: 10px; }
@@ -33,15 +34,15 @@
             resize: none;
             min-height: 40px;
         }
-        .highlighted-row { background-color: #ffffcc !important; } /* Yellow highlight for selected row */
+        .highlighted-row { background-color: #ffffcc !important; }
         .greyed-out { background-color: #e0e0e0; cursor: not-allowed; }
     </style>
 </head>
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.2.1</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 03:15:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.2.2</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 04:00:00 PDT</span></p>
     </div>
     <div class="warning">
         <p>Use a strong passphrase and store the encrypted file securely. Do not share publicly.</p>
@@ -61,62 +62,52 @@
 
     <script>
         let records = [];
-        let originalFileName = 'records.csv.enc';  // Default; updated on load
+        let originalFileName = 'records.csv.enc';
         let editingIndex = null;
         let editingField = null;
-        let highlightedRow = null;  // Track highlighted row for actions
+        let highlightedRow = null;
         let vestigialColumns = new Set();
         let debugMode = false;
 
-        // Date fields for validation
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
 
-        // Validate date format: YYYY, YYYY-MM, or YYYY-MM-DD
         function isValidDate(dateStr) {
-            if (!dateStr || dateStr.trim() === '') return true; // Allow empty
+            if (!dateStr || dateStr.trim() === '') return true;
             const parts = dateStr.split('-');
             if (parts.length === 1) {
-                // YYYY
                 const year = parseInt(parts[0], 10);
                 return !isNaN(year) && year >= 1 && year <= 9999;
             } else if (parts.length === 2) {
-                // YYYY-MM
                 const year = parseInt(parts[0], 10);
                 const month = parseInt(parts[1], 10);
                 return !isNaN(year) && year >= 1 && year <= 9999 &&
                        !isNaN(month) && month >= 1 && month <= 12;
             } else if (parts.length === 3) {
-                // YYYY-MM-DD
-                const date = Date.parse(dateStr + 'T00:00:00'); // Append time for full parse
+                const date = Date.parse(dateStr + 'T00:00:00');
                 if (isNaN(date)) return false;
                 const parsedDate = new Date(date);
-                return parsedDate.getFullYear() == parts[0] && // Ensure no year wrap-around
+                return parsedDate.getFullYear() == parts[0] &&
                        (parsedDate.getMonth() + 1) == parts[1] &&
                        parsedDate.getDate() == parts[2];
             }
             return false;
         }
 
-        // Debug mode setup with fallback for CryptoJS loading
-        const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5'; // SHA-256 of 'MarkS-Debug_passphrase#01'
+        const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
         function initDebugMode() {
             if (window.location.search.includes('debug=1')) {
                 const debugPass = prompt('Enter debug passphrase:');
-                if (debugPass) {
-                    if (typeof CryptoJS !== 'undefined' && CryptoJS.SHA256(debugPass).toString() === debugPassphraseHash) {
-                        debugMode = true;
-                        console.log('Debug mode enabled');
-                    } else {
-                        console.log('Debug mode disabled - incorrect passphrase');
-                    }
+                if (debugPass && typeof CryptoJS !== 'undefined' && CryptoJS.SHA256(debugPass).toString() === debugPassphraseHash) {
+                    debugMode = true;
+                    console.log('Debug mode enabled');
+                } else {
+                    console.log('Debug mode disabled - incorrect passphrase');
                 }
             }
         }
 
-        // Clear records on page unload
         window.addEventListener('unload', () => { records = []; });
 
-        // Field restrictions based on record_type
         const fieldRestrictions = {
             person: {
                 editable: ['gen', 'name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service'],
@@ -130,7 +121,6 @@
             }
         };
 
-        // Universal wait for CryptoJS
         function waitForCryptoJS(callback) {
             if (typeof CryptoJS !== 'undefined') {
                 callback();
@@ -148,7 +138,6 @@
             }
         }
 
-        // Initialize on load
         waitForCryptoJS(() => {
             initDebugMode();
             console.log('CryptoJS ready');
@@ -157,7 +146,7 @@
         function deriveKey(passphrase, salt) {
             const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
             return CryptoJS.PBKDF2(utf8Passphrase, salt, {
-                keySize: 8, // 32 bytes for AES-256
+                keySize: 8,
                 iterations: 100000,
                 hasher: CryptoJS.algo.SHA256
             });
@@ -280,9 +269,8 @@
             return records;
         }
 
-        // Helper: Process extracted file data (handles CSV or CSV.enc)
         function processExtractedFile(fileName, data) {
-            originalFileName = fileName; // Track ZIP inner file
+            originalFileName = fileName;
             if (fileName.endsWith('.csv.enc')) {
                 const passphrase = prompt('Enter passphrase:');
                 if (!passphrase) {
@@ -297,7 +285,7 @@
                     alert(`Decryption failed: ${result.error}`);
                 }
             } else if (fileName.endsWith('.csv')) {
-                const text = arrayBufferToBinary(data);  // Convert if needed
+                const text = arrayBufferToBinary(data);
                 records = parseCSVFile(text);
                 displayRecords();
             } else {
@@ -312,23 +300,18 @@
                 alert('Please select a file');
                 return;
             }
-            // Guard: Ensure CryptoJS is loaded before proceeding with async file read
             if (typeof CryptoJS === 'undefined') {
                 alert('Crypto library not loaded. Please refresh the page and try again.');
                 return;
             }
-            
-            originalFileName = file.name; // Track uploaded filename
+            originalFileName = file.name;
             const reader = new FileReader();
             reader.onload = function(e) {
-                // Double-check inside onload (in case of async race condition during file read)
                 if (typeof CryptoJS === 'undefined') {
                     alert('Crypto library failed to load during file read. Please refresh and retry.');
                     return;
                 }
-                
                 if (file.name.toLowerCase().endsWith('.zip')) {
-                    // Handle ZIP: Extract using JSZip
                     if (typeof JSZip === 'undefined') {
                         alert('ZIP support requires JSZip library—please refresh the page.');
                         return;
@@ -357,7 +340,6 @@
                         alert(`Error reading ZIP: ${err.message}. Try unzipping manually.`);
                     });
                 } else {
-                    // Original handling for direct CSV/CSV.enc
                     if (file.name.endsWith('.csv.enc')) {
                         const passphrase = prompt('Enter passphrase:');
                         if (!passphrase) {
@@ -442,11 +424,12 @@
                 if (vestigialColumns.has(header)) th.className += ' vestigial';
                 headerRow.appendChild(th);
             });
-            headerRow.appendChild(document.createElement('th'));  // Empty for no Actions column
+            headerRow.appendChild(document.createElement('th'));
             table.appendChild(headerRow);
             records.forEach((record, index) => {
                 const tr = document.createElement('tr');
                 if (index === highlightedRow) tr.className = 'highlighted-row';
+                tr.className += ' editable-row';
                 headers.forEach(header => {
                     const td = document.createElement('td');
                     td.className = header;
@@ -458,29 +441,27 @@
                     const isGrey = isFieldGreyedOut(record.record_type, header);
                     if (isEditable && !vestigialColumns.has(header)) {
                         td.className += ' editable';
-                        td.onclick = (e) => {
-                            if (e.target === td && editingIndex === null) {  // Only if clicking td, not child span
+                        td.addEventListener('click', (e) => {
+                            if (editingIndex === null) {
                                 startEditing(index, header, td, cellContent.textContent);
+                                e.stopPropagation();
+                                if (debugMode) console.log(`Cell clicked: record ${index + 1}, field ${header}`);
                             }
-                        };
+                        });
                     } else if (isGrey) {
                         td.className += ' greyed-out';
                     }
                     if (vestigialColumns.has(header)) td.className += ' vestigial';
                     tr.appendChild(td);
                 });
-                // Row click for highlight (outside editable cells)
-                tr.onclick = (e) => {
-                    if (e.target.tagName !== 'TEXTAREA' && editingIndex === null) {
-                        if (highlightedRow === index) {
-                            highlightedRow = null;
-                        } else {
-                            highlightedRow = index;
-                        }
+                tr.addEventListener('click', (e) => {
+                    if (editingIndex === null && e.target.tagName !== 'TEXTAREA') {
+                        highlightedRow = (highlightedRow === index) ? null : index;
+                        if (debugMode) console.log(`Row ${highlightedRow !== null ? highlightedRow + 1 : 'none'} highlighted`);
                         displayRecords();
                     }
-                };
-                tr.appendChild(document.createElement('td'));  // Empty for alignment
+                });
+                tr.appendChild(document.createElement('td'));
                 table.appendChild(tr);
             });
             recordBody.appendChild(table);
@@ -510,7 +491,6 @@
 
         function saveEdit(index, field, value, td, originalValue) {
             const trimmedValue = value.trim();
-            // Validate date fields
             if (dateFields.includes(field) && !isValidDate(trimmedValue)) {
                 alert(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD (e.g., 2023, 2023-05, 2023-05-15).`);
                 if (debugMode) console.log(`Date validation failed for ${field}: ${trimmedValue}`);
@@ -542,14 +522,16 @@
             if (debugMode) console.log('Cancelled edit');
         }
 
-        // External Actions
         function addSpouse() {
-            if (highlightedRow === null || records[highlightedRow].record_type !== 'person') {
-                alert('Please highlight a person row first.');
+            if (highlightedRow === null) {
+                alert('Please highlight a person row first for Add Spouse.');
+                return;
+            }
+            if (records[highlightedRow].record_type !== 'person') {
+                alert('Highlighted row must be a person for Add Spouse.');
                 return;
             }
             const parentIndex = highlightedRow;
-            // Find insert position: after all current spouses (same parents, record_type='spouse')
             let insertIndex = parentIndex + 1;
             while (insertIndex < records.length && 
                    records[insertIndex].record_type === 'spouse' && 
@@ -560,20 +542,24 @@
             Object.keys(records[0]).forEach(header => {
                 newRecord[header] = header === 'record_type' ? 'spouse' : '';
             });
-            newRecord.relationship = 'spouse';  // Default
-            newRecord.parents = records[parentIndex].parents || records[parentIndex].name;  // Inherit
+            newRecord.relationship = 'spouse';
+            newRecord.parents = records[parentIndex].parents || records[parentIndex].name;
             records.splice(insertIndex, 0, newRecord);
+            highlightedRow = null;
             displayRecords();
             if (debugMode) console.log(`Added spouse after index ${insertIndex - 1}`);
         }
 
         function addChild() {
-            if (highlightedRow === null || records[highlightedRow].record_type !== 'person') {
-                alert('Please highlight a person row first.');
+            if (highlightedRow === null) {
+                alert('Please highlight a person row first for Add Child.');
+                return;
+            }
+            if (records[highlightedRow].record_type !== 'person') {
+                alert('Highlighted row must be a person for Add Child.');
                 return;
             }
             const parentIndex = highlightedRow;
-            // Find insert position: after all current children (same parents, record_type='person', gen = parent gen +1)
             let insertIndex = parentIndex + 1;
             const parentGen = parseInt(records[parentIndex].gen) || 0;
             while (insertIndex < records.length && 
@@ -586,9 +572,10 @@
             Object.keys(records[0]).forEach(header => {
                 newRecord[header] = header === 'record_type' ? 'person' : '';
             });
-            newRecord.gen = (parentGen + 1).toString();  // Auto-populate gen
-            newRecord.parents = records[parentIndex].name;  // Inherit parent name
+            newRecord.gen = (parentGen + 1).toString();
+            newRecord.parents = records[parentIndex].name;
             records.splice(insertIndex, 0, newRecord);
+            highlightedRow = null;
             displayRecords();
             if (debugMode) console.log(`Added child after index ${insertIndex - 1}`);
         }
@@ -640,11 +627,10 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            // Derive output filename: replace "records_" with "returns_" or default to "returns.csv.enc"
             let downloadFileName = 'returns.csv.enc';
-            const match = originalFileName.match(/^records_(\d{4})\.csv\.enc$/i);
+            const match = originalFileName.match(/^records_(\d{4})\.csv(\.enc)?$/i);
             if (match) {
-                downloadFileName = `returns_${match[1]}.csv.enc`;
+                downloadFileName = `returns_${match[1]}.csv${match[2] || ''}`;
             }
             a.download = downloadFileName;
             a.click();
