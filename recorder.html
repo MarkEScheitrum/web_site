@@ -5,6 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;">
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
     <style>
         .table-container { overflow-x: auto; }
         table { border-collapse: collapse; width: auto; table-layout: auto; }
@@ -39,8 +40,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.1.1</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-12 17:12:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.1.2</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-12 18:00:00 PDT</span></p>
     </div>
     <div class="warning">
         <p>Use a strong passphrase and store the encrypted file securely. Do not share publicly.</p>
@@ -273,6 +274,30 @@
             return records;
         }
 
+        // Helper: Process extracted file data (handles CSV or CSV.enc)
+        function processExtractedFile(fileName, data) {
+            if (fileName.endsWith('.csv.enc')) {
+                const passphrase = prompt('Enter passphrase:');
+                if (!passphrase) {
+                    alert('Passphrase is required for encrypted files');
+                    return;
+                }
+                const result = decryptFile(data, passphrase);
+                if (typeof result === 'string') {
+                    records = parseCSVFile(result);
+                    displayRecords();
+                } else {
+                    alert(`Decryption failed: ${result.error}`);
+                }
+            } else if (fileName.endsWith('.csv')) {
+                const text = arrayBufferToBinary(data);  // Convert if needed
+                records = parseCSVFile(text);
+                displayRecords();
+            } else {
+                alert(`Unsupported file type in ZIP: ${fileName}. Expected .csv or .csv.enc.`);
+            }
+        }
+
         function processFile() {
             const fileInput = document.getElementById('textFile');
             const file = fileInput.files[0];
@@ -294,26 +319,58 @@
                     return;
                 }
                 
-                if (file.name.endsWith('.csv.enc')) {
-                    const passphrase = prompt('Enter passphrase:');
-                    if (!passphrase) {
-                        alert('Passphrase is required for encrypted files');
+                if (file.name.toLowerCase().endsWith('.zip')) {
+                    // Handle ZIP: Extract using JSZip
+                    if (typeof JSZip === 'undefined') {
+                        alert('ZIP support requires JSZip library—please refresh the page.');
                         return;
                     }
-                    const result = decryptFile(e.target.result, passphrase);
-                    if (typeof result === 'string') {
-                        records = parseCSVFile(result);
-                        displayRecords();
-                    } else {
-                        alert(`Decryption failed: ${result.error}`);
-                    }
+                    const zip = new JSZip();
+                    zip.loadAsync(e.target.result).then((contents) => {
+                        let foundFile = null;
+                        contents.forEach((relativePath, zipEntry) => {
+                            if (zipEntry.name.endsWith('.csv') || zipEntry.name.endsWith('.csv.enc')) {
+                                if (!foundFile) {
+                                    foundFile = { name: zipEntry.name, entry: zipEntry };
+                                    if (debugMode) console.log(`Found matching file in ZIP: ${zipEntry.name}`);
+                                }
+                            }
+                        });
+                        if (foundFile) {
+                            foundFile.entry.async('arraybuffer').then((data) => {
+                                processExtractedFile(foundFile.name, data);
+                            }).catch((err) => {
+                                alert(`Error extracting file from ZIP: ${err.message}`);
+                            });
+                        } else {
+                            alert('No .csv or .csv.enc file found in ZIP. Please check contents.');
+                        }
+                    }).catch((err) => {
+                        alert(`Error reading ZIP: ${err.message}. Try unzipping manually.`);
+                    });
                 } else {
-                    const text = e.target.result;
-                    records = parseCSVFile(text);
-                    displayRecords();
+                    // Original handling for direct CSV/CSV.enc
+                    if (file.name.endsWith('.csv.enc')) {
+                        const passphrase = prompt('Enter passphrase:');
+                        if (!passphrase) {
+                            alert('Passphrase is required for encrypted files');
+                            return;
+                        }
+                        const result = decryptFile(e.target.result, passphrase);
+                        if (typeof result === 'string') {
+                            records = parseCSVFile(result);
+                            displayRecords();
+                        } else {
+                            alert(`Decryption failed: ${result.error}`);
+                        }
+                    } else {
+                        const text = e.target.result;
+                        records = parseCSVFile(text);
+                        displayRecords();
+                    }
                 }
             };
-            if (file.name.endsWith('.csv.enc')) {
+            if (file.name.toLowerCase().endsWith('.zip') || file.name.endsWith('.csv.enc')) {
                 reader.readAsArrayBuffer(file);
             } else {
                 reader.readAsText(file);
