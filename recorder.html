@@ -1,4 +1,43 @@
-<!DOCTYPE html>
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="en">
 <head>
     <title>Genealogy Record Editor</title>
@@ -37,13 +76,14 @@
         .highlighted-row { background-color: #ffffcc !important; }
         .greyed-out { background-color: #e0e0e0; cursor: not-allowed; }
         .children-icon { cursor: pointer; color: #28a745; margin-right: 8px; }
+        .spouse-icon { cursor: pointer; color: #ff9900; margin-right: 8px; }
     </style>
 </head>
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.2.4</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 10:18:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.2.5</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 10:47:00 PDT</span></p>
     </div>
     <div class="warning">
         <p>Use a strong passphrase and store the encrypted file securely. Do not share publicly.</p>
@@ -55,8 +95,6 @@
         <div id="recordBody"></div>
     </div>
     <div id="externalActions" style="margin: 10px 0;">
-        <button onclick="addSpouse()">Add Spouse</button>
-        <button onclick="addChild()">Add Child</button>
         <button onclick="deleteHighlighted()" style="color: red;">Delete Highlighted</button>
     </div>
     <button onclick="downloadCSV()">Download Encrypted Records</button>
@@ -423,6 +461,26 @@
             if (debugMode) console.log(`Added child record at index ${insertIndex + 1}`);
         }
 
+        function addSpouseAt(index) {
+            if (records[index].record_type.trim().toLowerCase() !== 'person') {
+                if (debugMode) console.log(`Cannot add spouse to non-person record at index ${index + 1}`);
+                return;
+            }
+            const parentIndex = index;
+            let insertIndex = parentIndex + 1;
+            while (insertIndex < records.length && records[insertIndex].record_type.trim().toLowerCase() === 'spouse') {
+                insertIndex++;
+            }
+            const newRecord = {};
+            Object.keys(records[0]).forEach(header => {
+                newRecord[header] = header === 'record_type' ? 'spouse' : header === 'relationship' ? 'spouse' : header === 'parents' ? (records[parentIndex].parents || records[parentIndex].name) : '';
+            });
+            records.splice(insertIndex, 0, newRecord);
+            highlightedRow = null;
+            debounceDisplayRecords();
+            if (debugMode) console.log(`Added spouse record at index ${insertIndex + 1}`);
+        }
+
         function displayRecords() {
             const recordBody = document.getElementById('recordBody');
             recordBody.innerHTML = '';
@@ -480,6 +538,12 @@
                 });
                 const actionTd = document.createElement('td');
                 if (record.record_type.trim().toLowerCase() === 'person') {
+                    const spouseIcon = document.createElement('span');
+                    spouseIcon.textContent = '💍';
+                    spouseIcon.className = 'spouse-icon';
+                    spouseIcon.title = 'Add spouse';
+                    spouseIcon.onclick = () => addSpouseAt(index);
+                    actionTd.appendChild(spouseIcon);
                     const childIcon = document.createElement('span');
                     childIcon.textContent = '👶';
                     childIcon.className = 'children-icon';
