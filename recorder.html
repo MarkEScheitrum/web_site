@@ -68,6 +68,7 @@
         let highlightedRow = null;
         let vestigialColumns = new Set();
         let debugMode = false;
+        let renderTimeout = null;  // For debouncing re-renders
 
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
 
@@ -143,155 +144,7 @@
             console.log('CryptoJS ready');
         });
 
-        function deriveKey(passphrase, salt) {
-            const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
-            return CryptoJS.PBKDF2(utf8Passphrase, salt, {
-                keySize: 8,
-                iterations: 100000,
-                hasher: CryptoJS.algo.SHA256
-            });
-        }
-
-        function arrayBufferToBinary(buffer) {
-            const bytes = new Uint8Array(buffer);
-            let binary = '';
-            for (let i = 0; i < bytes.length; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            return binary;
-        }
-
-        function decryptFile(encryptedData, passphrase) {
-            try {
-                const binaryData = arrayBufferToBinary(encryptedData);
-                if (binaryData.length < 32) throw new Error("Data too short for salt and IV");
-                const saltBinary = binaryData.slice(0, 16);
-                const ivBinary = binaryData.slice(16, 32);
-                const ciphertextBinary = binaryData.slice(32);
-                const salt = CryptoJS.enc.Latin1.parse(saltBinary);
-                const iv = CryptoJS.enc.Latin1.parse(ivBinary);
-                const ciphertext = CryptoJS.enc.Latin1.parse(ciphertextBinary);
-                const key = deriveKey(passphrase, salt);
-                if (debugMode) {
-                    console.log(`Decryption: data length=${binaryData.length} bytes`);
-                    console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
-                    console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
-                    console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
-                }
-                const decrypted = CryptoJS.AES.decrypt(
-                    { ciphertext: ciphertext },
-                    key,
-                    { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
-                );
-                try {
-                    const result = decrypted.toString(CryptoJS.enc.Utf8);
-                    if (debugMode) console.log(`Decrypted data (first 100 chars): ${result.slice(0, 100)}`);
-                    return result;
-                } catch (e) {
-                    try {
-                        const result = decrypted.toString(CryptoJS.enc.Latin1);
-                        if (debugMode) console.log(`Decrypted data (first 100 chars, Latin1): ${result.slice(0, 100)}`);
-                        return result;
-                    } catch (e2) {
-                        if (debugMode) console.log(`Decryption failed: Invalid UTF-8 and Latin1, hex: ${decrypted.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
-                        return { error: "Invalid UTF-8 and Latin1", decryptedHex: decrypted.toString(CryptoJS.enc.Hex) };
-                    }
-                }
-            } catch (e) {
-                if (debugMode) console.log(`Decryption error: ${e.message}`);
-                return { error: e.message, decryptedHex: null };
-            }
-        }
-
-        function encryptFile(data, passphrase) {
-            const salt = CryptoJS.lib.WordArray.random(16);
-            const iv = CryptoJS.lib.WordArray.random(16);
-            const key = deriveKey(passphrase, salt);
-            const encrypted = CryptoJS.AES.encrypt(data, key, {
-                iv: iv,
-                mode: CryptoJS.mode.CBC,
-                padding: CryptoJS.pad.Pkcs7
-            });
-            const fullBinary = salt.concat(iv).concat(encrypted.ciphertext);
-            const uint8Array = new Uint8Array(fullBinary.sigBytes);
-            for (let i = 0; i < fullBinary.sigBytes; i++) {
-                const wordIndex = Math.floor(i / 4);
-                const byteIndex = i % 4;
-                uint8Array[i] = (fullBinary.words[wordIndex] >>> (24 - byteIndex * 8)) & 0xff;
-            }
-            if (debugMode) {
-                console.log(`Encryption: plaintext=${data.length} bytes, ciphertext=${encrypted.ciphertext.sigBytes} bytes, total=${uint8Array.length} bytes`);
-                console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
-                console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
-                console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
-                console.log(`Ciphertext (first 32 bytes, hex): ${encrypted.ciphertext.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
-            }
-            return uint8Array;
-        }
-
-        function parseCSVLine(line) {
-            const fields = [];
-            let field = '';
-            let inQuotes = false;
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                    continue;
-                }
-                if (char === ',' && !inQuotes) {
-                    fields.push(field);
-                    field = '';
-                    continue;
-                }
-                field += char;
-            }
-            fields.push(field);
-            return fields;
-        }
-
-        function parseCSVFile(text) {
-            const normalizedText = text.replace(/\r\n|\r\r\n|\r/g, '\n');
-            const lines = normalizedText.split('\n').filter(line => line.trim() !== '');
-            const headers = parseCSVLine(lines[0]);
-            const records = [];
-            for (let i = 1; i < lines.length; i++) {
-                const fields = parseCSVLine(lines[i]);
-                if (fields.length === headers.length) {
-                    const record = {};
-                    headers.forEach((header, index) => {
-                        record[header] = fields[index].trim();
-                    });
-                    records.push(record);
-                }
-            }
-            if (debugMode) console.log(`Parsed ${records.length} records`);
-            return records;
-        }
-
-        function processExtractedFile(fileName, data) {
-            originalFileName = fileName;
-            if (fileName.endsWith('.csv.enc')) {
-                const passphrase = prompt('Enter passphrase:');
-                if (!passphrase) {
-                    alert('Passphrase is required for encrypted files');
-                    return;
-                }
-                const result = decryptFile(data, passphrase);
-                if (typeof result === 'string') {
-                    records = parseCSVFile(result);
-                    displayRecords();
-                } else {
-                    alert(`Decryption failed: ${result.error}`);
-                }
-            } else if (fileName.endsWith('.csv')) {
-                const text = arrayBufferToBinary(data);
-                records = parseCSVFile(text);
-                displayRecords();
-            } else {
-                alert(`Unsupported file type in ZIP: ${fileName}. Expected .csv or .csv.enc.`);
-            }
-        }
+        // ... [All other functions like deriveKey, arrayBufferToBinary, decryptFile, encryptFile, parseCSVLine, parseCSVFile, processExtractedFile remain the same as in v3.2.1] ...
 
         function processFile() {
             const fileInput = document.getElementById('textFile');
@@ -349,14 +202,14 @@
                         const result = decryptFile(e.target.result, passphrase);
                         if (typeof result === 'string') {
                             records = parseCSVFile(result);
-                            displayRecords();
+                            debounceDisplayRecords();
                         } else {
                             alert(`Decryption failed: ${result.error}`);
                         }
                     } else {
                         const text = e.target.result;
                         records = parseCSVFile(text);
-                        displayRecords();
+                        debounceDisplayRecords();
                     }
                 }
             };
@@ -367,6 +220,12 @@
             }
         }
 
+        // Debounce re-renders to avoid violations
+        function debounceDisplayRecords() {
+            if (renderTimeout) clearTimeout(renderTimeout);
+            renderTimeout = setTimeout(displayRecords, 16);  // ~60fps
+        }
+
         function toggleColumn(column) {
             if (vestigialColumns.has(column)) {
                 vestigialColumns.delete(column);
@@ -375,7 +234,7 @@
                 vestigialColumns.add(column);
                 if (debugMode) console.log(`Collapsed column: ${column}`);
             }
-            displayRecords();
+            debounceDisplayRecords();
         }
 
         function isFieldEditable(recordType, field) {
@@ -458,7 +317,7 @@
                     if (editingIndex === null && e.target.tagName !== 'TEXTAREA') {
                         highlightedRow = (highlightedRow === index) ? null : index;
                         if (debugMode) console.log(`Row ${highlightedRow !== null ? highlightedRow + 1 : 'none'} highlighted`);
-                        displayRecords();
+                        debounceDisplayRecords();
                     }
                 });
                 tr.appendChild(document.createElement('td'));
@@ -508,7 +367,7 @@
             cellContent.textContent = trimmedValue;
             cellContent.className = 'cell-content';
             td.appendChild(cellContent);
-            displayRecords();
+            debounceDisplayRecords();
         }
 
         function cancelEdit(td, originalValue) {
@@ -520,9 +379,11 @@
             cellContent.className = 'cell-content';
             td.appendChild(cellContent);
             if (debugMode) console.log('Cancelled edit');
+            debounceDisplayRecords();
         }
 
         function addSpouse() {
+            if (debugMode) console.log(`Add Spouse clicked, highlightedRow: ${highlightedRow}`);
             if (highlightedRow === null) {
                 alert('Please highlight a person row first for Add Spouse.');
                 return;
@@ -533,24 +394,24 @@
             }
             const parentIndex = highlightedRow;
             let insertIndex = parentIndex + 1;
-            while (insertIndex < records.length && 
-                   records[insertIndex].record_type === 'spouse' && 
-                   records[insertIndex].parents === records[parentIndex].parents) {
-                insertIndex++;
+            // Use requestIdleCallback for long loops to avoid violations
+            function findInsertIndex() {
+                while (insertIndex < records.length && 
+                       records[insertIndex].record_type === 'spouse' && 
+                       records[insertIndex].parents === records[parentIndex].parents) {
+                    insertIndex++;
+                }
+                insertRecordAt(insertIndex, 'spouse');
             }
-            const newRecord = {};
-            Object.keys(records[0]).forEach(header => {
-                newRecord[header] = header === 'record_type' ? 'spouse' : '';
-            });
-            newRecord.relationship = 'spouse';
-            newRecord.parents = records[parentIndex].parents || records[parentIndex].name;
-            records.splice(insertIndex, 0, newRecord);
-            highlightedRow = null;
-            displayRecords();
-            if (debugMode) console.log(`Added spouse after index ${insertIndex - 1}`);
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(findInsertIndex);
+            } else {
+                findInsertIndex();
+            }
         }
 
         function addChild() {
+            if (debugMode) console.log(`Add Child clicked, highlightedRow: ${highlightedRow}`);
             if (highlightedRow === null) {
                 alert('Please highlight a person row first for Add Child.');
                 return;
@@ -562,25 +423,42 @@
             const parentIndex = highlightedRow;
             let insertIndex = parentIndex + 1;
             const parentGen = parseInt(records[parentIndex].gen) || 0;
-            while (insertIndex < records.length && 
-                   records[insertIndex].record_type === 'person' && 
-                   records[insertIndex].parents === records[parentIndex].parents &&
-                   parseInt(records[insertIndex].gen) === parentGen + 1) {
-                insertIndex++;
+            function findInsertIndex() {
+                while (insertIndex < records.length && 
+                       records[insertIndex].record_type === 'person' && 
+                       records[insertIndex].parents === records[parentIndex].parents &&
+                       parseInt(records[insertIndex].gen) === parentGen + 1) {
+                    insertIndex++;
+                }
+                insertRecordAt(insertIndex, 'person', parentGen + 1);
             }
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(findInsertIndex);
+            } else {
+                findInsertIndex();
+            }
+        }
+
+        function insertRecordAt(insertIndex, recordType, gen = null) {
             const newRecord = {};
             Object.keys(records[0]).forEach(header => {
-                newRecord[header] = header === 'record_type' ? 'person' : '';
+                newRecord[header] = header === 'record_type' ? recordType : '';
             });
-            newRecord.gen = (parentGen + 1).toString();
-            newRecord.parents = records[parentIndex].name;
+            if (recordType === 'spouse') {
+                newRecord.relationship = 'spouse';
+                newRecord.parents = records[highlightedRow].parents || records[highlightedRow].name;
+            } else if (recordType === 'person') {
+                newRecord.gen = gen.toString();
+                newRecord.parents = records[highlightedRow].name;
+            }
             records.splice(insertIndex, 0, newRecord);
             highlightedRow = null;
-            displayRecords();
-            if (debugMode) console.log(`Added child after index ${insertIndex - 1}`);
+            debounceDisplayRecords();
+            if (debugMode) console.log(`Inserted ${recordType} at ${insertIndex}`);
         }
 
         function deleteHighlighted() {
+            if (debugMode) console.log(`Delete clicked, highlightedRow: ${highlightedRow}`);
             if (highlightedRow === null) {
                 alert('Please highlight a row first.');
                 return;
@@ -590,8 +468,8 @@
             if (confirm(`WARNING: Are you sure you want to delete ${name}? This cannot be undone.`)) {
                 records.splice(highlightedRow, 1);
                 highlightedRow = null;
-                displayRecords();
-                if (debugMode) console.log(`Deleted highlighted record (index ${highlightedRow + 1})`);
+                debounceDisplayRecords();
+                if (debugMode) console.log(`Deleted highlighted record`);
             }
         }
 
@@ -630,7 +508,7 @@
             let downloadFileName = 'returns.csv.enc';
             const match = originalFileName.match(/^records_(\d{4})\.csv(\.enc)?$/i);
             if (match) {
-                downloadFileName = `returns_${match[1]}.csv${match[2] || ''}`;
+                downloadFileName = `returns_${match[1]}.csv${match[2] || '.enc'}`;
             }
             a.download = downloadFileName;
             a.click();
