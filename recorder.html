@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <title>Genealogy Record Editor</title>
@@ -82,8 +43,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.2.7</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-13 12:01:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.2.8</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-14 13:51:00 PDT</span></p>
     </div>
     <div class="info">
         <p>Once you leave this page, all data is deleted. Please download any edits before closing the page.</p>
@@ -98,7 +59,46 @@
     </div>
     <button onclick="downloadCSV()">Download Encrypted Records</button>
 
-    <script>
+    <script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+
         let records = [];
         let originalFileName = 'records.csv.enc';
         let editingIndex = null;
@@ -726,6 +726,20 @@
             return emailRegex.test(email);
         }
 
+        function showPopup(message) {
+            const popup = document.createElement('div');
+            popup.style.position = 'fixed';
+            popup.style.top = '50%';
+            popup.style.left = '50%';
+            popup.style.transform = 'translate(-50%, -50%)';
+            popup.style.backgroundColor = '#fff';
+            popup.style.border = '1px solid #000';
+            popup.style.padding = '20px';
+            popup.style.zIndex = '1000';
+            popup.innerHTML = message + '<br><button onclick="this.parentElement.remove()">Close</button>';
+            document.body.appendChild(popup);
+        }
+
         function downloadCSV() {
             if (records.length === 0) {
                 alert('No records to download');
@@ -747,7 +761,7 @@
                 return;
             }
             const headers = Object.keys(records[0]);
-            const currentDate = '2025-09-13 12:01:00 PDT';
+            const currentDate = '2025-09-14 13:51:00 PDT';
             const csv = [
                 `# Recorder: ${escapeCSVField(recorderName)}, Email: ${escapeCSVField(recorderEmail)}, Created: ${currentDate}`,
                 headers.map(escapeCSVField).join(','),
@@ -755,18 +769,27 @@
             ].join('\r\n') + '\r\n';
             const encryptedData = encryptFile(csv, passphrase);
             const blob = new Blob([encryptedData], { type: 'application/octet-stream' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
             let downloadFileName = 'returns.csv.enc';
             const match = originalFileName.match(/^records_(\d{4})\.csv(\.enc)?$/i);
             if (match) {
                 downloadFileName = `returns_${match[1]}.csv${match[2] || '.enc'}`;
             }
-            a.download = downloadFileName;
-            a.click();
+            const hasEmailClient = window.navigator && typeof window.navigator.registerProtocolHandler === 'function';
+            if (hasEmailClient) {
+                // Trigger mailto with attachment
+                const url = URL.createObjectURL(blob);
+                window.location.href = `mailto:genealogy@family.com?subject=Update&body=Attached!&attachment=${url}`;
+                if (debugMode) console.log(`Triggered mailto with file: ${downloadFileName}`);
+            } else {
+                // Backup: Download + guide
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = downloadFileName;
+                link.click();
+                showPopup('File in Downloads! Open AOL Mail <a href="https://mail.aol.com">here</a>, attach, and send.');
+                if (debugMode) console.log(`Downloaded ${downloadFileName} and showed popup, plaintext size=${csv.length} bytes`);
+            }
             URL.revokeObjectURL(url);
-            if (debugMode) console.log(`Downloaded encrypted ${downloadFileName}, plaintext size=${csv.length} bytes`);
         }
 
         waitForCryptoJS(() => {
