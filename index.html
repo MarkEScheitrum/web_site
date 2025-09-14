@@ -4,10 +4,78 @@
     <meta charset="UTF-8">
     <title>Genealogy Records</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
-        h1 { color: #333; }
-        a { font-size: 18px; color: #0066cc; text-decoration: none; }
-        a:hover { text-decoration: underline; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            text-align: center;
+            position: relative; /* Ensure body is a positioning context */
+            min-height: 100vh; /* Ensure body takes full viewport height */
+        }
+        h1 {
+            color: #333;
+        }
+        a {
+            font-size: 18px;
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        #issue-submission {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 300px; /* Fixed width for form */
+            background: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #issue-submission h3 {
+            margin: 0 0 10px;
+            font-size: 16px;
+            color: #333;
+        }
+        #issue-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #issue-title, #issue-body {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-family: Arial, sans-serif;
+        }
+        #issue-body {
+            resize: vertical; /* Allow vertical resize only */
+            min-height: 80px;
+        }
+        #issue-form button {
+            padding: 8px;
+            background: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        #issue-form button:hover {
+            background: #0055aa;
+        }
+        #issue-feedback {
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            #issue-submission {
+                position: static; /* Fallback to normal flow on small screens */
+                width: 100%;
+                margin-top: 20px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -15,18 +83,46 @@
     <p>Click the link below to access the genealogy record editor:</p>
     <p><a href="recorder.html">Open Genealogy Recorder</a></p>
     <p>Upload your genealogy text file to view, add, edit, or delete records, then download the updated file to send back.</p>
-<div id="issue-submission">
-  <h3>Report an Issue</h3>
-  <form id="issue-form">
-    <input type="text" id="issue-title" placeholder="Issue Title" required>
-    <textarea id="issue-body" placeholder="Describe the issue" required></textarea>
-    <button type="submit">Submit Issue</button>
-  </form>
-  <p id="issue-feedback" style="display:none;"></p>
-</div>
+    <div id="issue-submission">
+        <h3>Report an Issue</h3>
+        <form id="issue-form">
+            <input type="text" id="issue-title" placeholder="Issue Title" required>
+            <textarea id="issue-body" placeholder="Describe the issue" required></textarea>
+            <button type="submit">Submit Issue</button>
+        </form>
+        <p id="issue-feedback" style="display:none;"></p>
+    </div>
+
+    <script>
+        document.getElementById('issue-form').addEventListener('submit', async (e) => {
+            e.preventDefault(); // Prevent page reload
+            const title = document.getElementById('issue-title').value;
+            const body = document.getElementById('issue-body').value;
+            const feedback = document.getElementById('issue-feedback');
+
+            try {
+                const response = await fetch('/.netlify/functions/submit-issue', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ title, body })
+                });
+                const result = await response.json();
+
+                feedback.style.display = 'block';
+                feedback.style.color = response.ok ? 'green' : 'red';
+                feedback.textContent = result.message;
+                if (response.ok) document.getElementById('issue-form').reset();
+            } catch (err) {
+                feedback.style.display = 'block';
+                feedback.style.color = 'red';
+                feedback.textContent = 'Network error. Please try again.';
+            }
+        });
+    </script>
 </body>
 </html>
-
 
 
 
