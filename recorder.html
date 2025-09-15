@@ -781,6 +781,7 @@
                 reader.onloadend = function() {
                     const dataUri = reader.result;
                     // Use mailto with data URI as attachment
+                    alert(`mailto URL: ${encodeURIComponent(dataUri)}`);
                     window.location.href = `mailto:genealogy@family.com?subject=Updated%20Genealogy%20Records&body=Please%20find%20the%20updated%20records%20attached.&attachment=${encodeURIComponent(dataUri)}`;
                     if (debugMode) console.log(`Triggered mailto with file: ${downloadFileName}, data URI length: ${dataUri.length}`);
                     URL.revokeObjectURL(url);
