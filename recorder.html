@@ -43,8 +43,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.2.9</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 00:15:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.2.10</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 01:15:00 PDT</span></p>
     </div>
     <div class="info">
         <p>Once you leave this page, all data is deleted. Please download any edits before closing the page.</p>
@@ -773,7 +773,7 @@
             link.href = URL.createObjectURL(blob);
             link.download = downloadFileName;
             link.click();
-            showPopup(`File saved to Downloads as "${downloadFileName}". Please open your email client (e.g., AOL Mail <a href="https://mail.aol.com">here</a>), create a new email to <strong>genealogy@family.com</strong> with subject <strong>Updated Genealogy Records</strong>, and attach the file.`);
+            showPopup(`File saved to Downloads as "${downloadFileName}". Please open your email client, create a new email to <strong>genealogy@family.com</strong> with subject <strong>Updated Genealogy Records</strong>, and attach the file.`);
             if (debugMode) console.log(`Downloaded ${downloadFileName}, plaintext size=${csv.length} bytes`);
             URL.revokeObjectURL(link.href);
         }
