@@ -43,8 +43,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.2.8</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-14 13:51:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.2.9</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 00:15:00 PDT</span></p>
     </div>
     <div class="info">
         <p>Once you leave this page, all data is deleted. Please download any edits before closing the page.</p>
@@ -63,6 +63,7 @@
         var gk_isXlsx = false;
         var gk_xlsxFileLookup = {};
         var gk_fileData = {};
+        var decryptionPassphrase = null; // Store passphrase for reuse
         function filledCell(cell) {
           return cell !== '' && cell != null;
         }
@@ -145,7 +146,10 @@
             }
         }
 
-        window.addEventListener('unload', () => { records = []; });
+        window.addEventListener('unload', () => { 
+            records = []; 
+            decryptionPassphrase = null; // Clear passphrase on unload
+        });
 
         const fieldRestrictions = {
             person: {
@@ -345,21 +349,23 @@
                             foundFile.entry.async('arraybuffer').then((data) => {
                                 originalFileName = foundFile.name;
                                 if (foundFile.name.endsWith('.csv.enc')) {
-                                    const passphrase = prompt('Enter passphrase:');
-                                    if (!passphrase) {
+                                    decryptionPassphrase = prompt('Enter passphrase:');
+                                    if (!decryptionPassphrase) {
                                         alert('Passphrase is required for encrypted files');
                                         return;
                                     }
-                                    const result = decryptFile(data, passphrase);
+                                    const result = decryptFile(data, decryptionPassphrase);
                                     if (typeof result === 'string') {
                                         records = parseCSVFile(result);
                                         debounceDisplayRecords();
                                     } else {
                                         alert(`Decryption failed: ${result.error}`);
+                                        decryptionPassphrase = null;
                                     }
                                 } else if (foundFile.name.endsWith('.csv')) {
                                     const text = arrayBufferToBinary(data);
                                     records = parseCSVFile(text);
+                                    decryptionPassphrase = null; // No passphrase for unencrypted files
                                     debounceDisplayRecords();
                                 } else {
                                     alert(`Unsupported file type in ZIP: ${foundFile.name}. Expected .csv or .csv.enc.`);
@@ -374,21 +380,23 @@
                         alert(`Error reading ZIP: ${err.message}. Try unzipping manually.`);
                     });
                 } else if (file.name.endsWith('.csv.enc')) {
-                    const passphrase = prompt('Enter passphrase:');
-                    if (!passphrase) {
+                    decryptionPassphrase = prompt('Enter passphrase:');
+                    if (!decryptionPassphrase) {
                         alert('Passphrase is required for encrypted files');
                         return;
                     }
-                    const result = decryptFile(e.target.result, passphrase);
+                    const result = decryptFile(e.target.result, decryptionPassphrase);
                     if (typeof result === 'string') {
                         records = parseCSVFile(result);
                         debounceDisplayRecords();
                     } else {
                         alert(`Decryption failed: ${result.error}`);
+                        decryptionPassphrase = null;
                     }
                 } else {
                     const text = e.target.result;
                     records = parseCSVFile(text);
+                    decryptionPassphrase = null; // No passphrase for unencrypted files
                     debounceDisplayRecords();
                 }
             };
@@ -745,29 +753,16 @@
                 alert('No records to download');
                 return;
             }
-            const recorderName = prompt('Enter your name:');
-            if (!recorderName) {
-                alert('Recorder name is required');
-                return;
-            }
-            const recorderEmail = prompt('Enter your email address:');
-            if (!recorderEmail || !isValidEmail(recorderEmail)) {
-                alert('A valid email address is required');
-                return;
-            }
-            const passphrase = prompt('Enter passphrase for encryption:');
-            if (!passphrase) {
-                alert('Passphrase is required for encryption');
+            if (decryptionPassphrase === null) {
+                alert('No passphrase available. Please load an encrypted file first.');
                 return;
             }
             const headers = Object.keys(records[0]);
-            const currentDate = '2025-09-14 13:51:00 PDT';
             const csv = [
-                `# Recorder: ${escapeCSVField(recorderName)}, Email: ${escapeCSVField(recorderEmail)}, Created: ${currentDate}`,
                 headers.map(escapeCSVField).join(','),
                 ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
             ].join('\r\n') + '\r\n';
-            const encryptedData = encryptFile(csv, passphrase);
+            const encryptedData = encryptFile(csv, decryptionPassphrase);
             const blob = new Blob([encryptedData], { type: 'application/octet-stream' });
             let downloadFileName = 'returns.csv.enc';
             const match = originalFileName.match(/^records_(\d{4})\.csv(\.enc)?$/i);
@@ -776,20 +771,30 @@
             }
             const hasEmailClient = window.navigator && typeof window.navigator.registerProtocolHandler === 'function';
             if (hasEmailClient) {
-                // Trigger mailto with attachment
                 const url = URL.createObjectURL(blob);
-                window.location.href = `mailto:genealogy@family.com?subject=Update&body=Attached!&attachment=${url}`;
-                if (debugMode) console.log(`Triggered mailto with file: ${downloadFileName}`);
+                // Create a temporary link to get the data URI for the blob
+                const tempLink = document.createElement('a');
+                tempLink.href = url;
+                tempLink.download = downloadFileName;
+                // Read the blob as a data URI
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                    const dataUri = reader.result;
+                    // Use mailto with data URI as attachment
+                    window.location.href = `mailto:genealogy@family.com?subject=Updated%20Genealogy%20Records&body=Please%20find%20the%20updated%20records%20attached.&attachment=${encodeURIComponent(dataUri)}`;
+                    if (debugMode) console.log(`Triggered mailto with file: ${downloadFileName}, data URI length: ${dataUri.length}`);
+                    URL.revokeObjectURL(url);
+                };
+                reader.readAsDataURL(blob);
             } else {
-                // Backup: Download + guide
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
                 link.download = downloadFileName;
                 link.click();
-                showPopup('File in Downloads! Open AOL Mail <a href="https://mail.aol.com">here</a>, attach, and send.');
+                showPopup('File saved to Downloads. Please open your email client (e.g., AOL Mail <a href="https://mail.aol.com">here</a>), attach the file, and send to genealogy@family.com.');
                 if (debugMode) console.log(`Downloaded ${downloadFileName} and showed popup, plaintext size=${csv.length} bytes`);
+                URL.revokeObjectURL(link.href);
             }
-            URL.revokeObjectURL(url);
         }
 
         waitForCryptoJS(() => {
