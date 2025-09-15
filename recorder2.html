@@ -1,30 +1,11 @@
-<body>
-    <h2>Genealogy Recorder2</h2>
-    <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.1</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 12:45:00 PDT</span></p>
-        <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
-    </div>
-    <div class="task-buttons">
-        <button onclick="openModal('addChild')" class="task-btn">Add Child 👶</button>
-        <button onclick="openModal('addSpouse')" class="task-btn">Add Spouse 💍</button>
-        <button onclick="openModal('updateRecord')" class="task-btn">Update Record ✏️</button>
-        <button onclick="toggleTable()" class="task-btn">View Table 📋</button>
-        <button onclick="processFile()" class="task-btn">Load File 📂</button>
-        <button onclick="downloadCSV()" class="task-btn">Download Records 🔒</button>
-    </div>
-    <input type="file" id="textFile" accept=".csv,.csv.enc,.zip" style="display: none;">
-    <div id="tableContainer" class="table-container" style="display: none;">
-        <div id="recordBody"></div>
-    </div>
-    <div id="modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <h3 id="modalTitle"></h3>
-            <form id="modalForm"></form>
-        </div>
-    </div>
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Genealogy Record Editor</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -53,6 +34,10 @@
         }
         .task-btn:hover {
             background-color: #0056b3;
+        }
+        .task-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
         .modal {
             position: fixed;
@@ -116,6 +101,7 @@
         table {
             width: 100%;
             font-size: 16px;
+            border-collapse: collapse;
         }
         th, td {
             padding: 12px;
@@ -125,6 +111,46 @@
             font-size: 24px;
             margin-right: 10px;
         }
+        .vestigial {
+            width: 30px !important;
+            max-width: 30px !important;
+            min-width: 0 !important;
+            overflow: hidden;
+        }
+        .vestigial .header-text {
+            display: none;
+        }
+        .vestigial .cell-content {
+            display: none;
+        }
+        .editable-row:hover {
+            background-color: #d9edf7;
+        }
+        .highlighted-row {
+            background-color: #ffffcc !important;
+        }
+        .greyed-out {
+            background-color: #c0c0c0;
+            cursor: not-allowed;
+        }
+        .file-input-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        .file-input-label {
+            font-size: 16px;
+            color: #333;
+        }
+        input[type="file"] {
+            font-size: 16px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            max-width: 300px;
+        }
         @media (max-width: 768px) {
             .task-btn {
                 width: 100%;
@@ -133,259 +159,52 @@
             .modal-content {
                 width: 95%;
             }
+            .file-input-container {
+                flex-direction: column;
+                gap: 10px;
+            }
+            input[type="file"] {
+                width: 100%;
+            }
         }
     </style>
+</head>
+<body>
+    <h2>Genealogy Recorder</h2>
+    <div class="info">
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.1</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 13:01:00 PDT</span></p>
+        <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
+    </div>
+    <div class="task-buttons">
+        <button onclick="openModal('addChild')" class="task-btn">Add Child 👶</button>
+        <button onclick="openModal('addSpouse')" class="task-btn">Add Spouse 💍</button>
+        <button onclick="openModal('updateRecord')" class="task-btn">Update Record ✏️</button>
+        <button onclick="toggleTable()" class="task-btn">View Table 📋</button>
+        <button onclick="triggerFileInput()" class="task-btn">Select File 📂</button>
+        <button id="loadFileBtn" class="task-btn" disabled>Load File ⏩</button>
+    </div>
+    <div class="file-input-container">
+        <input type="file" id="textFile" accept=".csv,.csv.enc,.zip" onchange="handleFileSelect()">
+        <span class="file-input-label" id="fileName">No file selected</span>
+    </div>
+    <div id="tableContainer" class="table-container" style="display: none;">
+        <div id="recordBody"></div>
+    </div>
+    <div id="modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3 id="modalTitle"></h3>
+            <form id="modalForm"></form>
+        </div>
+    </div>
+
     <script type="text/javascript">
         var gk_isXlsx = false;
         var gk_xlsxFileLookup = {};
         var gk_fileData = {};
-        var decryptionPassphrase = null; // Store passphrase for reuse
-        // Add to existing JavaScript
+        var decryptionPassphrase = null;
         let modalMode = null;
-
-        function openModal(mode) {
-            modalMode = mode;
-            const modal = document.getElementById('modal');
-            const modalTitle = document.getElementById('modalTitle');
-            const modalForm = document.getElementById('modalForm');
-            modalForm.innerHTML = '';
-            modal.style.display = 'block';
-        
-            let fields = [];
-            if (mode === 'addChild') {
-                modalTitle.textContent = 'Add Child';
-                fields = [
-                    { name: 'name', label: 'Name', type: 'text' },
-                    { name: 'gender', label: 'Gender', type: 'select', options: ['', 'Male', 'Female', 'Other'] },
-                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
-                    { name: 'parents', label: 'Parent Name', type: 'select', options: ['', ...records.filter(r => r.record_type.toLowerCase() === 'person').map(r => r.name)] }
-                ];
-            } else if (mode === 'addSpouse') {
-                modalTitle.textContent = 'Add Spouse';
-                fields = [
-                    { name: 'name', label: 'Name', type: 'text' },
-                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
-                    { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'parents', label: 'Partner Name', type: 'select', options: ['', ...records.filter(r => r.record_type.toLowerCase() === 'person').map(r => r.name)] }
-                ];
-            } else if (mode === 'updateRecord') {
-                modalTitle.textContent = 'Update Record';
-                fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type}: ${r.name}`)] },
-                    { name: 'field', label: 'Field to Update', type: 'select', options: ['', 'name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'marriage_date', 'relationship', 'divorced', 'parents'] },
-                    { name: 'value', label: 'New Value', type: 'text' }
-                ];
-            }
-        
-            fields.forEach(field => {
-                const label = document.createElement('label');
-                label.textContent = field.label;
-                modalForm.appendChild(label);
-                if (field.type === 'select') {
-                    const select = document.createElement('select');
-                    select.name = field.name;
-                    field.options.forEach(opt => {
-                        const option = document.createElement('option');
-                        option.value = opt;
-                        option.textContent = opt || '(Select)';
-                        select.appendChild(option);
-                    });
-                    modalForm.appendChild(select);
-                } else {
-                    const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
-                    input.type = field.type;
-                    input.name = field.name;
-                    modalForm.appendChild(input);
-                }
-            });
-        
-            const submitBtn = document.createElement('button');
-            submitBtn.textContent = 'Save';
-            submitBtn.onclick = () => saveModalData(mode);
-            modalForm.appendChild(submitBtn);
-        }
-        
-        function closeModal() {
-            document.getElementById('modal').style.display = 'none';
-            modalMode = null;
-            document.getElementById('modalForm').innerHTML = '';
-        }
-        
-        function saveModalData(mode) {
-            const form = document.getElementById('modalForm');
-            const data = {};
-            for (let input of form.elements) {
-                if (input.name) data[input.name] = input.value;
-            }
-        
-            if (mode === 'addChild') {
-                if (!data.name || !data.parents) {
-                    alert('Name and Parent are required.');
-                    return;
-                }
-                const parent = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
-                if (!parent) {
-                    alert('Invalid parent selected.');
-                    return;
-                }
-                const parentGen = parseInt(parent.gen) || 0;
-                const newRecord = {
-                    record_type: 'Person',
-                    gen: (parentGen + 1).toString(),
-                    name: data.name,
-                    gender: data.gender,
-                    birth_date: data.birth_date,
-                    birth_location: data.birth_location,
-                    parents: data.parents,
-                    death_date: '',
-                    death_location: '',
-                    burial_location: '',
-                    service: '',
-                    marriage_date: '',
-                    relationship: '',
-                    divorced: ''
-                };
-                if (!isValidDate(data.birth_date)) {
-                    alert('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                let insertIndex = records.indexOf(parent) + 1;
-                while (insertIndex < records.length && records[insertIndex].record_type.toLowerCase() === 'spouse') {
-                    insertIndex++;
-                }
-                records.splice(insertIndex, 0, newRecord);
-            } else if (mode === 'addSpouse') {
-                if (!data.name || !data.parents) {
-                    alert('Name and Partner are required.');
-                    return;
-                }
-                const partner = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
-                if (!partner) {
-                    alert('Invalid partner selected.');
-                    return;
-                }
-                const newRecord = {
-                    record_type: 'Spouse',
-                    gen: '',
-                    name: data.name,
-                    gender: '',
-                    birth_date: data.birth_date,
-                    birth_location: data.birth_location,
-                    parents: data.parents,
-                    death_date: '',
-                    death_location: '',
-                    burial_location: '',
-                    service: '',
-                    marriage_date: data.marriage_date,
-                    relationship: 'spouse',
-                    divorced: ''
-                };
-                if (!isValidDate(data.birth_date) || !isValidDate(data.marriage_date)) {
-                    alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                let insertIndex = records.indexOf(partner) + 1;
-                records.splice(insertIndex, 0, newRecord);
-            } else if (mode === 'updateRecord') {
-                if (!data.record || !data.field || !data.value) {
-                    alert('Please select a record, field, and enter a value.');
-                    return;
-                }
-                const [recordType, name] = data.record.split(': ');
-                const record = records.find(r => r.record_type === recordType && r.name === name);
-                if (!record) {
-                    alert('Invalid record selected.');
-                    return;
-                }
-                if (dateFields.includes(data.field) && !isValidDate(data.value)) {
-                    alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                if (isFieldEditable(recordType, data.field)) {
-                    record[data.field] = data.value;
-                } else {
-                    alert('Selected field is not editable.');
-                    return;
-                }
-            }
-        
-            closeModal();
-            debounceDisplayRecords();
-            if (debugMode) console.log(`Saved ${mode} data:`, data);
-        }
-
-        function toggleTable() {
-            const tableContainer = document.getElementById('tableContainer');
-            tableContainer.style.display = tableContainer.style.display === 'none' ? 'block' : 'none';
-        }
-        
-        // Modify displayRecords to disable table editing
-        function displayRecords() {
-            const recordBody = document.getElementById('recordBody');
-            recordBody.innerHTML = '';
-            if (records.length === 0) return;
-            const table = document.createElement('table');
-            const headerRow = document.createElement('tr');
-            const headers = Object.keys(records[0]);
-            headers.forEach(header => {
-                const th = document.createElement('th');
-                th.textContent = header;
-                if (vestigialColumns.has(header)) th.className = 'vestigial';
-                headerRow.appendChild(th);
-            });
-            table.appendChild(headerRow);
-            records.forEach((record, index) => {
-                const tr = document.createElement('tr');
-                if (index === highlightedRow) tr.className = 'highlighted-row';
-                headers.forEach(header => {
-                    const td = document.createElement('td');
-                    td.textContent = record[header] || '';
-                    if (vestigialColumns.has(header)) td.className = 'vestigial';
-                    tr.appendChild(td);
-                });
-                table.appendChild(tr);
-            });
-            recordBody.appendChild(table);
-        }
-      
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-
         let records = [];
         let originalFileName = 'records.csv.enc';
         let editingIndex = null;
@@ -394,8 +213,201 @@
         let vestigialColumns = new Set();
         let debugMode = false;
         let renderTimeout = null;
-
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
+
+        function triggerFileInput() {
+            document.getElementById('textFile').click();
+        }
+
+        function handleFileSelect() {
+            const fileInput = document.getElementById('textFile');
+            const fileNameLabel = document.getElementById('fileName');
+            const loadFileBtn = document.getElementById('loadFileBtn');
+            if (fileInput.files.length > 0) {
+                fileNameLabel.textContent = fileInput.files[0].name;
+                loadFileBtn.disabled = false;
+                if (debugMode) console.log(`File selected: ${fileInput.files[0].name}`);
+            } else {
+                fileNameLabel.textContent = 'No file selected';
+                loadFileBtn.disabled = true;
+                if (debugMode) console.log('No file selected');
+            }
+        }
+
+        function getPassphrase(callback) {
+            openModal('passphrase');
+            document.getElementById('modalTitle').textContent = 'Enter Passphrase';
+            const form = document.getElementById('modalForm');
+            form.innerHTML = `
+                <label>Passphrase</label>
+                <input type="password" name="passphrase">
+                <button type="button" onclick="submitPassphrase('${callback}')">Submit</button>
+            `;
+        }
+
+        function submitPassphrase(callback) {
+            const passphrase = document.querySelector('#modalForm input[name="passphrase"]').value;
+            if (passphrase) {
+                decryptionPassphrase = passphrase;
+                closeModal();
+                window[callback]();
+            } else {
+                alert('Passphrase is required.');
+            }
+        }
+
+        function processFile() {
+            const fileInput = document.getElementById('textFile');
+            const file = fileInput.files[0];
+            const fileNameLabel = document.getElementById('fileName');
+            const loadFileBtn = document.getElementById('loadFileBtn');
+            if (!file) {
+                fileNameLabel.textContent = 'No file selected';
+                loadFileBtn.disabled = true;
+                if (debugMode) console.log('No file selected in processFile');
+                return;
+            }
+            if (typeof CryptoJS === 'undefined') {
+                alert('Crypto library not loaded. Please refresh the page and try again.');
+                fileNameLabel.textContent = 'No file selected';
+                loadFileBtn.disabled = true;
+                return;
+            }
+            originalFileName = file.name;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (typeof CryptoJS === 'undefined') {
+                    alert('Crypto library failed to load during file read. Please refresh and retry.');
+                    fileNameLabel.textContent = 'No file selected';
+                    loadFileBtn.disabled = true;
+                    return;
+                }
+                if (typeof decryptFile === 'undefined') {
+                    alert('Decryption function not ready—please refresh and try again.');
+                    fileNameLabel.textContent = 'No file selected';
+                    loadFileBtn.disabled = true;
+                    return;
+                }
+                if (file.name.toLowerCase().endsWith('.zip')) {
+                    if (typeof JSZip === 'undefined') {
+                        alert('ZIP support requires JSZip library—please refresh the page.');
+                        fileNameLabel.textContent = 'No file selected';
+                        loadFileBtn.disabled = true;
+                        return;
+                    }
+                    const zip = new JSZip();
+                    zip.loadAsync(e.target.result).then((contents) => {
+                        let foundFile = null;
+                        contents.forEach((relativePath, zipEntry) => {
+                            if (zipEntry.name.endsWith('.csv') || zipEntry.name.endsWith('.csv.enc')) {
+                                if (!foundFile) {
+                                    foundFile = { name: zipEntry.name, entry: zipEntry };
+                                    if (debugMode) console.log(`Found matching file in ZIP: ${zipEntry.name}`);
+                                }
+                            }
+                        });
+                        if (foundFile) {
+                            foundFile.entry.async('arraybuffer').then((data) => {
+                                originalFileName = foundFile.name;
+                                if (foundFile.name.endsWith('.csv.enc')) {
+                                    getPassphrase('processZipFile');
+                                    window.processZipFile = () => {
+                                        const result = decryptFile(data, decryptionPassphrase);
+                                        if (typeof result === 'string') {
+                                            records = parseCSVFile(result);
+                                            debounceDisplayRecords();
+                                            fileNameLabel.textContent = `Loaded: ${foundFile.name}`;
+                                        } else {
+                                            alert(`Decryption failed: ${result.error}`);
+                                            decryptionPassphrase = null;
+                                            fileNameLabel.textContent = 'No file selected';
+                                            loadFileBtn.disabled = true;
+                                        }
+                                    };
+                                } else if (foundFile.name.endsWith('.csv')) {
+                                    const text = arrayBufferToBinary(data);
+                                    records = parseCSVFile(text);
+                                    decryptionPassphrase = null;
+                                    debounceDisplayRecords();
+                                    fileNameLabel.textContent = `Loaded: ${foundFile.name}`;
+                                } else {
+                                    alert(`Unsupported file type in ZIP: ${foundFile.name}. Expected .csv or .csv.enc.`);
+                                    fileNameLabel.textContent = 'No file selected';
+                                    loadFileBtn.disabled = true;
+                                }
+                            }).catch((err) => {
+                                alert(`Error extracting file from ZIP: ${err.message}`);
+                                fileNameLabel.textContent = 'No file selected';
+                                loadFileBtn.disabled = true;
+                            });
+                        } else {
+                            alert('No .csv or .csv.enc file found in ZIP. Please check contents.');
+                            fileNameLabel.textContent = 'No file selected';
+                            loadFileBtn.disabled = true;
+                        }
+                    }).catch((err) => {
+                        alert(`Error reading ZIP: ${err.message}. Try unzipping manually.`);
+                        fileNameLabel.textContent = 'No file selected';
+                        loadFileBtn.disabled = true;
+                    });
+                } else if (file.name.endsWith('.csv.enc')) {
+                    getPassphrase('processEncryptedFile');
+                    window.processEncryptedFile = () => {
+                        const result = decryptFile(e.target.result, decryptionPassphrase);
+                        if (typeof result === 'string') {
+                            records = parseCSVFile(result);
+                            debounceDisplayRecords();
+                            fileNameLabel.textContent = `Loaded: ${file.name}`;
+                        } else {
+                            alert(`Decryption failed: ${result.error}`);
+                            decryptionPassphrase = null;
+                            fileNameLabel.textContent = 'No file selected';
+                            loadFileBtn.disabled = true;
+                        }
+                    };
+                } else {
+                    const text = e.target.result;
+                    records = parseCSVFile(text);
+                    decryptionPassphrase = null;
+                    debounceDisplayRecords();
+                    fileNameLabel.textContent = `Loaded: ${file.name}`;
+                }
+            };
+            if (file.name.toLowerCase().endsWith('.zip') || file.name.endsWith('.csv.enc')) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file);
+            }
+        }
+
+        function filledCell(cell) {
+            return cell !== '' && cell != null;
+        }
+
+        function loadFileData(filename) {
+            if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+                try {
+                    var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                    var firstSheetName = workbook.SheetNames[0];
+                    var worksheet = workbook.Sheets[firstSheetName];
+                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                    var filteredData = jsonData.filter(row => row.some(filledCell));
+                    var headerRowIndex = filteredData.findIndex((row, index) =>
+                        row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                    );
+                    if (headerRowIndex === -1 || headerRowIndex > 25) {
+                        headerRowIndex = 0;
+                    }
+                    var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+                    csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                    return csv;
+                } catch (e) {
+                    console.error(e);
+                    return "";
+                }
+            }
+            return gk_fileData[filename] || "";
+        }
 
         function isValidDate(dateStr) {
             if (!dateStr || dateStr.trim() === '') return true;
@@ -422,19 +434,22 @@
         const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
         function initDebugMode() {
             if (window.location.search.includes('debug=1')) {
-                const debugPass = prompt('Enter debug passphrase:');
-                if (debugPass && typeof CryptoJS !== 'undefined' && CryptoJS.SHA256(debugPass).toString() === debugPassphraseHash) {
-                    debugMode = true;
-                    console.log('Debug mode enabled');
-                } else {
-                    console.log('Debug mode disabled - incorrect passphrase');
-                }
+                getPassphrase('enableDebugMode');
+                window.enableDebugMode = () => {
+                    if (CryptoJS.SHA256(decryptionPassphrase).toString() === debugPassphraseHash) {
+                        debugMode = true;
+                        console.log('Debug mode enabled');
+                    } else {
+                        console.log('Debug mode disabled - incorrect passphrase');
+                    }
+                    decryptionPassphrase = null;
+                };
             }
         }
 
-        window.addEventListener('unload', () => { 
-            records = []; 
-            decryptionPassphrase = null; // Clear passphrase on unload
+        window.addEventListener('unload', () => {
+            records = [];
+            decryptionPassphrase = null;
         });
 
         const fieldRestrictions = {
@@ -593,104 +608,177 @@
             return records;
         }
 
-        function processFile() {
-            const fileInput = document.getElementById('textFile');
-            const file = fileInput.files[0];
-            if (!file) {
-                alert('Please select a file');
-                return;
+        function openModal(mode) {
+            modalMode = mode;
+            const modal = document.getElementById('modal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalForm = document.getElementById('modalForm');
+            modalForm.innerHTML = '';
+            modal.style.display = 'block';
+            let fields = [];
+            if (mode === 'addChild') {
+                modalTitle.textContent = 'Add Child';
+                fields = [
+                    { name: 'name', label: 'Name', type: 'text' },
+                    { name: 'gender', label: 'Gender', type: 'select', options: ['', 'Male', 'Female', 'Other'] },
+                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
+                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
+                    { name: 'parents', label: 'Parent Name', type: 'select', options: ['', ...records.filter(r => r.record_type.toLowerCase() === 'person').map(r => r.name)] }
+                ];
+            } else if (mode === 'addSpouse') {
+                modalTitle.textContent = 'Add Spouse';
+                fields = [
+                    { name: 'name', label: 'Name', type: 'text' },
+                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
+                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
+                    { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text' },
+                    { name: 'parents', label: 'Partner Name', type: 'select', options: ['', ...records.filter(r => r.record_type.toLowerCase() === 'person').map(r => r.name)] }
+                ];
+            } else if (mode === 'updateRecord') {
+                modalTitle.textContent = 'Update Record';
+                fields = [
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type}: ${r.name}`)] },
+                    { name: 'field', label: 'Field to Update', type: 'select', options: ['', 'name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'marriage_date', 'relationship', 'divorced', 'parents'] },
+                    { name: 'value', label: 'New Value', type: 'text' }
+                ];
             }
-            if (typeof CryptoJS === 'undefined') {
-                alert('Crypto library not loaded. Please refresh the page and try again.');
-                return;
-            }
-            originalFileName = file.name;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                if (typeof CryptoJS === 'undefined') {
-                    alert('Crypto library failed to load during file read. Please refresh and retry.');
-                    return;
-                }
-                if (typeof decryptFile === 'undefined') {
-                    alert('Decryption function not ready—please refresh and try again.');
-                    return;
-                }
-                if (file.name.toLowerCase().endsWith('.zip')) {
-                    if (typeof JSZip === 'undefined') {
-                        alert('ZIP support requires JSZip library—please refresh the page.');
-                        return;
-                    }
-                    const zip = new JSZip();
-                    zip.loadAsync(e.target.result).then((contents) => {
-                        let foundFile = null;
-                        contents.forEach((relativePath, zipEntry) => {
-                            if (zipEntry.name.endsWith('.csv') || zipEntry.name.endsWith('.csv.enc')) {
-                                if (!foundFile) {
-                                    foundFile = { name: zipEntry.name, entry: zipEntry };
-                                    if (debugMode) console.log(`Found matching file in ZIP: ${zipEntry.name}`);
-                                }
-                            }
-                        });
-                        if (foundFile) {
-                            foundFile.entry.async('arraybuffer').then((data) => {
-                                originalFileName = foundFile.name;
-                                if (foundFile.name.endsWith('.csv.enc')) {
-                                    decryptionPassphrase = prompt('Enter passphrase:');
-                                    if (!decryptionPassphrase) {
-                                        alert('Passphrase is required for encrypted files');
-                                        return;
-                                    }
-                                    const result = decryptFile(data, decryptionPassphrase);
-                                    if (typeof result === 'string') {
-                                        records = parseCSVFile(result);
-                                        debounceDisplayRecords();
-                                    } else {
-                                        alert(`Decryption failed: ${result.error}`);
-                                        decryptionPassphrase = null;
-                                    }
-                                } else if (foundFile.name.endsWith('.csv')) {
-                                    const text = arrayBufferToBinary(data);
-                                    records = parseCSVFile(text);
-                                    decryptionPassphrase = null; // No passphrase for unencrypted files
-                                    debounceDisplayRecords();
-                                } else {
-                                    alert(`Unsupported file type in ZIP: ${foundFile.name}. Expected .csv or .csv.enc.`);
-                                }
-                            }).catch((err) => {
-                                alert(`Error extracting file from ZIP: ${err.message}`);
-                            });
-                        } else {
-                            alert('No .csv or .csv.enc file found in ZIP. Please check contents.');
-                        }
-                    }).catch((err) => {
-                        alert(`Error reading ZIP: ${err.message}. Try unzipping manually.`);
+            fields.forEach(field => {
+                const label = document.createElement('label');
+                label.textContent = field.label;
+                modalForm.appendChild(label);
+                if (field.type === 'select') {
+                    const select = document.createElement('select');
+                    select.name = field.name;
+                    field.options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.textContent = opt || '(Select)';
+                        select.appendChild(option);
                     });
-                } else if (file.name.endsWith('.csv.enc')) {
-                    decryptionPassphrase = prompt('Enter passphrase:');
-                    if (!decryptionPassphrase) {
-                        alert('Passphrase is required for encrypted files');
-                        return;
-                    }
-                    const result = decryptFile(e.target.result, decryptionPassphrase);
-                    if (typeof result === 'string') {
-                        records = parseCSVFile(result);
-                        debounceDisplayRecords();
-                    } else {
-                        alert(`Decryption failed: ${result.error}`);
-                        decryptionPassphrase = null;
-                    }
+                    modalForm.appendChild(select);
                 } else {
-                    const text = e.target.result;
-                    records = parseCSVFile(text);
-                    decryptionPassphrase = null; // No passphrase for unencrypted files
-                    debounceDisplayRecords();
+                    const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
+                    input.type = field.type;
+                    input.name = field.name;
+                    modalForm.appendChild(input);
                 }
-            };
-            if (file.name.toLowerCase().endsWith('.zip') || file.name.endsWith('.csv.enc')) {
-                reader.readAsArrayBuffer(file);
-            } else {
-                reader.readAsText(file);
+            });
+            const submitBtn = document.createElement('button');
+            submitBtn.textContent = 'Save';
+            submitBtn.onclick = () => saveModalData(mode);
+            modalForm.appendChild(submitBtn);
+        }
+
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+            modalMode = null;
+            document.getElementById('modalForm').innerHTML = '';
+        }
+
+        function saveModalData(mode) {
+            const form = document.getElementById('modalForm');
+            const data = {};
+            for (let input of form.elements) {
+                if (input.name) data[input.name] = input.value;
             }
+            if (mode === 'addChild') {
+                if (!data.name || !data.parents) {
+                    alert('Name and Parent are required.');
+                    return;
+                }
+                const parent = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
+                if (!parent) {
+                    alert('Invalid parent selected.');
+                    return;
+                }
+                const parentGen = parseInt(parent.gen) || 0;
+                const newRecord = {
+                    record_type: 'Person',
+                    gen: (parentGen + 1).toString(),
+                    name: data.name,
+                    gender: data.gender,
+                    birth_date: data.birth_date,
+                    birth_location: data.birth_location,
+                    parents: data.parents,
+                    death_date: '',
+                    death_location: '',
+                    burial_location: '',
+                    service: '',
+                    marriage_date: '',
+                    relationship: '',
+                    divorced: ''
+                };
+                if (!isValidDate(data.birth_date)) {
+                    alert('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                    return;
+                }
+                let insertIndex = records.indexOf(parent) + 1;
+                while (insertIndex < records.length && records[insertIndex].record_type.toLowerCase() === 'spouse') {
+                    insertIndex++;
+                }
+                records.splice(insertIndex, 0, newRecord);
+            } else if (mode === 'addSpouse') {
+                if (!data.name || !data.parents) {
+                    alert('Name and Partner are required.');
+                    return;
+                }
+                const partner = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
+                if (!partner) {
+                    alert('Invalid partner selected.');
+                    return;
+                }
+                const newRecord = {
+                    record_type: 'Spouse',
+                    gen: '',
+                    name: data.name,
+                    gender: '',
+                    birth_date: data.birth_date,
+                    birth_location: data.birth_location,
+                    parents: data.parents,
+                    death_date: '',
+                    death_location: '',
+                    burial_location: '',
+                    service: '',
+                    marriage_date: data.marriage_date,
+                    relationship: 'spouse',
+                    divorced: ''
+                };
+                if (!isValidDate(data.birth_date) || !isValidDate(data.marriage_date)) {
+                    alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                    return;
+                }
+                let insertIndex = records.indexOf(partner) + 1;
+                records.splice(insertIndex, 0, newRecord);
+            } else if (mode === 'updateRecord') {
+                if (!data.record || !data.field || !data.value) {
+                    alert('Please select a record, field, and enter a value.');
+                    return;
+                }
+                const [recordType, name] = data.record.split(': ');
+                const record = records.find(r => r.record_type === recordType && r.name === name);
+                if (!record) {
+                    alert('Invalid record selected.');
+                    return;
+                }
+                if (dateFields.includes(data.field) && !isValidDate(data.value)) {
+                    alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                    return;
+                }
+                if (isFieldEditable(recordType, data.field)) {
+                    record[data.field] = data.value;
+                } else {
+                    alert('Selected field is not editable.');
+                    return;
+                }
+            }
+            closeModal();
+            debounceDisplayRecords();
+            if (debugMode) console.log(`Saved ${mode} data:`, data);
+        }
+
+        function toggleTable() {
+            const tableContainer = document.getElementById('tableContainer');
+            tableContainer.style.display = tableContainer.style.display === 'none' ? 'block' : 'none';
         }
 
         function debounceDisplayRecords() {
@@ -1054,25 +1142,17 @@
             if (match) {
                 downloadFileName = `returns_${match[1]}.csv.enc`;
             }
-
-            // Download the encrypted file
             const encryptedBlob = new Blob([encryptedData], { type: 'application/octet-stream' });
             const encryptedLink = document.createElement('a');
             encryptedLink.href = URL.createObjectURL(encryptedBlob);
             encryptedLink.download = downloadFileName;
-
-            // Email body with instructions
             const emailBody = `Please attach the file "${downloadFileName}" from your Downloads folder and send.\n\nSteps:\n1. Find "${downloadFileName}" in your Downloads folder (Windows: C:\\Users\\YourName\\Downloads, macOS: ~/Downloads).\n2. Attach it to this email using the "Attach File" or drag-and-drop option.\n3. Click Send to submit your updated genealogy records.`;
-
-            // Trigger download and open mailto link
             setTimeout(() => {
                 encryptedLink.click();
                 URL.revokeObjectURL(encryptedLink.href);
                 const mailtoLink = `mailto:genealogy@family.com?subject=${encodeURIComponent('Updated Genealogy Records')}&body=${encodeURIComponent(emailBody)}`;
                 window.location.href = mailtoLink;
             }, 100);
-
-            // Show popup with brief instructions
             showPopup(`
                 Downloaded "${downloadFileName}" to your Downloads folder.<br><br>
                 Your email client should have opened with a new email to <strong>genealogy@family.com</strong>.<br>
@@ -1094,3 +1174,4 @@
         });
     </script>
 </body>
+</html>
