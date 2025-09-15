@@ -149,8 +149,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.4</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 13:43:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.5</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 13:54:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -600,7 +600,7 @@
             if (mode === 'addChild') {
                 modalTitle.textContent = 'Add Child';
                 fields = [
-                    { name: 'name', label: 'Name', type: 'text' },
+                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off' },
                     { name: 'gender', label: 'Gender', type: 'select', options: ['', 'Male', 'Female', 'Other'] },
                     { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
@@ -609,7 +609,7 @@
             } else if (mode === 'addSpouse') {
                 modalTitle.textContent = 'Add Spouse';
                 fields = [
-                    { name: 'name', label: 'Name', type: 'text' },
+                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off' },
                     { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
                     { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text' },
@@ -641,6 +641,9 @@
                     const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
                     input.type = field.type;
                     input.name = field.name;
+                    if (field.autocomplete) {
+                        input.setAttribute('autocomplete', field.autocomplete);
+                    }
                     modalForm.appendChild(input);
                 }
             });
@@ -759,7 +762,12 @@
 
         function toggleTable() {
             const tableContainer = document.getElementById('tableContainer');
-            tableContainer.style.display = tableContainer.style.display === 'none' ? 'block' : 'none';
+            const isHidden = tableContainer.style.display === 'none';
+            tableContainer.style.display = isHidden ? 'block' : 'none';
+            if (isHidden && records.length > 0) {
+                debounceDisplayRecords();
+            }
+            if (debugMode) console.log(`Table toggled: ${isHidden ? 'shown' : 'hidden'}`);
         }
 
         function debounceDisplayRecords() {
@@ -802,51 +810,13 @@
             return isGreyedOut;
         }
 
-        function addChildAt(index) {
-            if (records[index].record_type.trim().toLowerCase() !== 'person') {
-                if (debugMode) console.log(`Cannot add child to non-person record at index ${index + 1}`);
-                return;
-            }
-            const parentIndex = index;
-            let insertIndex = parentIndex + 1;
-            const parentGen = parseInt(records[parentIndex].gen) || 0;
-            while (insertIndex < records.length && records[insertIndex].record_type.trim().toLowerCase() === 'spouse') {
-                insertIndex++;
-            }
-            const newRecord = {};
-            Object.keys(records[0]).forEach(header => {
-                newRecord[header] = header === 'record_type' ? 'Person' : header === 'gen' ? (parentGen + 1).toString() : '';
-            });
-            records.splice(insertIndex, 0, newRecord);
-            highlightedRow = null;
-            debounceDisplayRecords();
-            if (debugMode) console.log(`Added child record at index ${insertIndex + 1}`);
-        }
-
-        function addSpouseAt(index) {
-            if (records[index].record_type.trim().toLowerCase() !== 'person') {
-                if (debugMode) console.log(`Cannot add spouse to non-person record at index ${index + 1}`);
-                return;
-            }
-            const parentIndex = index;
-            let insertIndex = parentIndex + 1;
-            while (insertIndex < records.length && records[insertIndex].record_type.trim().toLowerCase() === 'spouse') {
-                insertIndex++;
-            }
-            const newRecord = {};
-            Object.keys(records[0]).forEach(header => {
-                newRecord[header] = header === 'record_type' ? 'Spouse' : '';
-            });
-            records.splice(insertIndex, 0, newRecord);
-            highlightedRow = null;
-            debounceDisplayRecords();
-            if (debugMode) console.log(`Added spouse record at index ${insertIndex + 1}`);
-        }
-
         function displayRecords() {
             const recordBody = document.getElementById('recordBody');
             recordBody.innerHTML = '';
-            if (records.length === 0) return;
+            if (records.length === 0) {
+                if (debugMode) console.log('No records to display');
+                return;
+            }
             const table = document.createElement('table');
             const headerRow = document.createElement('tr');
             const headers = Object.keys(records[0]);
@@ -921,9 +891,51 @@
                     }
                 });
                 tr.appendChild(actionTd);
-                table.appendChild(table);
+                table.appendChild(tr);
             });
             recordBody.appendChild(table);
+            if (debugMode) console.log(`Displayed ${records.length} records`);
+        }
+
+        function addChildAt(index) {
+            if (records[index].record_type.trim().toLowerCase() !== 'person') {
+                if (debugMode) console.log(`Cannot add child to non-person record at index ${index + 1}`);
+                return;
+            }
+            const parentIndex = index;
+            let insertIndex = parentIndex + 1;
+            const parentGen = parseInt(records[parentIndex].gen) || 0;
+            while (insertIndex < records.length && records[insertIndex].record_type.trim().toLowerCase() === 'spouse') {
+                insertIndex++;
+            }
+            const newRecord = {};
+            Object.keys(records[0]).forEach(header => {
+                newRecord[header] = header === 'record_type' ? 'Person' : header === 'gen' ? (parentGen + 1).toString() : '';
+            });
+            records.splice(insertIndex, 0, newRecord);
+            highlightedRow = null;
+            debounceDisplayRecords();
+            if (debugMode) console.log(`Added child record at index ${insertIndex + 1}`);
+        }
+
+        function addSpouseAt(index) {
+            if (records[index].record_type.trim().toLowerCase() !== 'person') {
+                if (debugMode) console.log(`Cannot add spouse to non-person record at index ${index + 1}`);
+                return;
+            }
+            const parentIndex = index;
+            let insertIndex = parentIndex + 1;
+            while (insertIndex < records.length && records[insertIndex].record_type.trim().toLowerCase() === 'spouse') {
+                insertIndex++;
+            }
+            const newRecord = {};
+            Object.keys(records[0]).forEach(header => {
+                newRecord[header] = header === 'record_type' ? 'Spouse' : '';
+            });
+            records.splice(insertIndex, 0, newRecord);
+            highlightedRow = null;
+            debounceDisplayRecords();
+            if (debugMode) console.log(`Added spouse record at index ${insertIndex + 1}`);
         }
 
         function startEditing(index, field, td, currentValue) {
