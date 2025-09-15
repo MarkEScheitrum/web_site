@@ -35,9 +35,11 @@
         .task-btn:hover {
             background-color: #0056b3;
         }
-        .task-btn:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
+        .file-status {
+            font-size: 16px;
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
         }
         .modal {
             position: fixed;
@@ -133,24 +135,6 @@
             background-color: #c0c0c0;
             cursor: not-allowed;
         }
-        .file-input-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            justify-content: center;
-            margin-bottom: 10px;
-        }
-        .file-input-label {
-            font-size: 16px;
-            color: #333;
-        }
-        input[type="file"] {
-            font-size: 16px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            max-width: 300px;
-        }
         @media (max-width: 768px) {
             .task-btn {
                 width: 100%;
@@ -159,21 +143,14 @@
             .modal-content {
                 width: 95%;
             }
-            .file-input-container {
-                flex-direction: column;
-                gap: 10px;
-            }
-            input[type="file"] {
-                width: 100%;
-            }
         }
     </style>
 </head>
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.1</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 13:01:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.4</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 13:43:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -181,13 +158,12 @@
         <button onclick="openModal('addSpouse')" class="task-btn">Add Spouse 💍</button>
         <button onclick="openModal('updateRecord')" class="task-btn">Update Record ✏️</button>
         <button onclick="toggleTable()" class="task-btn">View Table 📋</button>
-        <button onclick="triggerFileInput()" class="task-btn">Select File 📂</button>
-        <button id="loadFileBtn" class="task-btn" disabled>Load File ⏩</button>
+        <button onclick="selectAndLoadFile()" class="task-btn">Select/Load File 📂</button>
     </div>
-    <div class="file-input-container">
-        <input type="file" id="textFile" accept=".csv,.csv.enc,.zip" onchange="handleFileSelect()">
-        <span class="file-input-label" id="fileName">No file selected</span>
+    <div class="file-status">
+        <span id="fileStatus">No file selected</span>
     </div>
+    <input type="file" id="textFile" accept=".csv,.csv.enc,.zip" style="display: none;" onchange="handleFileSelect()">
     <div id="tableContainer" class="table-container" style="display: none;">
         <div id="recordBody"></div>
     </div>
@@ -215,28 +191,26 @@
         let renderTimeout = null;
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
 
-        function triggerFileInput() {
+        function selectAndLoadFile() {
             document.getElementById('textFile').click();
         }
 
         function handleFileSelect() {
             const fileInput = document.getElementById('textFile');
-            const fileNameLabel = document.getElementById('fileName');
-            const loadFileBtn = document.getElementById('loadFileBtn');
+            const fileStatus = document.getElementById('fileStatus');
             if (fileInput.files.length > 0) {
-                fileNameLabel.textContent = fileInput.files[0].name;
-                loadFileBtn.disabled = false;
+                fileStatus.textContent = `Selected: ${fileInput.files[0].name}`;
                 if (debugMode) console.log(`File selected: ${fileInput.files[0].name}`);
+                processFile();
             } else {
-                fileNameLabel.textContent = 'No file selected';
-                loadFileBtn.disabled = true;
+                fileStatus.textContent = 'No file selected';
                 if (debugMode) console.log('No file selected');
             }
         }
 
-        function getPassphrase(callback) {
+        function getPassphrase(callback, fileName) {
             openModal('passphrase');
-            document.getElementById('modalTitle').textContent = 'Enter Passphrase';
+            document.getElementById('modalTitle').textContent = `Enter Passphrase for ${fileName || 'file'}`;
             const form = document.getElementById('modalForm');
             form.innerHTML = `
                 <label>Passphrase</label>
@@ -253,46 +227,48 @@
                 window[callback]();
             } else {
                 alert('Passphrase is required.');
+                document.getElementById('fileStatus').textContent = 'No file selected';
+                document.getElementById('textFile').value = '';
             }
         }
 
         function processFile() {
             const fileInput = document.getElementById('textFile');
             const file = fileInput.files[0];
-            const fileNameLabel = document.getElementById('fileName');
-            const loadFileBtn = document.getElementById('loadFileBtn');
+            const fileStatus = document.getElementById('fileStatus');
             if (!file) {
-                fileNameLabel.textContent = 'No file selected';
-                loadFileBtn.disabled = true;
+                fileStatus.textContent = 'No file selected';
+                alert('No file selected. Please try again.');
                 if (debugMode) console.log('No file selected in processFile');
                 return;
             }
             if (typeof CryptoJS === 'undefined') {
+                fileStatus.textContent = 'No file selected';
                 alert('Crypto library not loaded. Please refresh the page and try again.');
-                fileNameLabel.textContent = 'No file selected';
-                loadFileBtn.disabled = true;
+                fileInput.value = '';
                 return;
             }
             originalFileName = file.name;
+            if (debugMode) console.log(`Processing file: ${file.name}`);
             const reader = new FileReader();
             reader.onload = function(e) {
                 if (typeof CryptoJS === 'undefined') {
+                    fileStatus.textContent = 'No file selected';
                     alert('Crypto library failed to load during file read. Please refresh and retry.');
-                    fileNameLabel.textContent = 'No file selected';
-                    loadFileBtn.disabled = true;
+                    fileInput.value = '';
                     return;
                 }
                 if (typeof decryptFile === 'undefined') {
+                    fileStatus.textContent = 'No file selected';
                     alert('Decryption function not ready—please refresh and try again.');
-                    fileNameLabel.textContent = 'No file selected';
-                    loadFileBtn.disabled = true;
+                    fileInput.value = '';
                     return;
                 }
                 if (file.name.toLowerCase().endsWith('.zip')) {
                     if (typeof JSZip === 'undefined') {
+                        fileStatus.textContent = 'No file selected';
                         alert('ZIP support requires JSZip library—please refresh the page.');
-                        fileNameLabel.textContent = 'No file selected';
-                        loadFileBtn.disabled = true;
+                        fileInput.value = '';
                         return;
                     }
                     const zip = new JSZip();
@@ -310,18 +286,19 @@
                             foundFile.entry.async('arraybuffer').then((data) => {
                                 originalFileName = foundFile.name;
                                 if (foundFile.name.endsWith('.csv.enc')) {
-                                    getPassphrase('processZipFile');
+                                    getPassphrase('processZipFile', foundFile.name);
                                     window.processZipFile = () => {
                                         const result = decryptFile(data, decryptionPassphrase);
                                         if (typeof result === 'string') {
                                             records = parseCSVFile(result);
                                             debounceDisplayRecords();
-                                            fileNameLabel.textContent = `Loaded: ${foundFile.name}`;
+                                            fileStatus.textContent = `Loaded: ${foundFile.name}`;
+                                            alert(`Successfully loaded: ${foundFile.name}`);
                                         } else {
+                                            fileStatus.textContent = 'No file selected';
                                             alert(`Decryption failed: ${result.error}`);
                                             decryptionPassphrase = null;
-                                            fileNameLabel.textContent = 'No file selected';
-                                            loadFileBtn.disabled = true;
+                                            fileInput.value = '';
                                         }
                                     };
                                 } else if (foundFile.name.endsWith('.csv')) {
@@ -329,40 +306,42 @@
                                     records = parseCSVFile(text);
                                     decryptionPassphrase = null;
                                     debounceDisplayRecords();
-                                    fileNameLabel.textContent = `Loaded: ${foundFile.name}`;
+                                    fileStatus.textContent = `Loaded: ${foundFile.name}`;
+                                    alert(`Successfully loaded: ${foundFile.name}`);
                                 } else {
+                                    fileStatus.textContent = 'No file selected';
                                     alert(`Unsupported file type in ZIP: ${foundFile.name}. Expected .csv or .csv.enc.`);
-                                    fileNameLabel.textContent = 'No file selected';
-                                    loadFileBtn.disabled = true;
+                                    fileInput.value = '';
                                 }
                             }).catch((err) => {
+                                fileStatus.textContent = 'No file selected';
                                 alert(`Error extracting file from ZIP: ${err.message}`);
-                                fileNameLabel.textContent = 'No file selected';
-                                loadFileBtn.disabled = true;
+                                fileInput.value = '';
                             });
                         } else {
+                            fileStatus.textContent = 'No file selected';
                             alert('No .csv or .csv.enc file found in ZIP. Please check contents.');
-                            fileNameLabel.textContent = 'No file selected';
-                            loadFileBtn.disabled = true;
+                            fileInput.value = '';
                         }
                     }).catch((err) => {
+                        fileStatus.textContent = 'No file selected';
                         alert(`Error reading ZIP: ${err.message}. Try unzipping manually.`);
-                        fileNameLabel.textContent = 'No file selected';
-                        loadFileBtn.disabled = true;
+                        fileInput.value = '';
                     });
                 } else if (file.name.endsWith('.csv.enc')) {
-                    getPassphrase('processEncryptedFile');
+                    getPassphrase('processEncryptedFile', file.name);
                     window.processEncryptedFile = () => {
                         const result = decryptFile(e.target.result, decryptionPassphrase);
                         if (typeof result === 'string') {
                             records = parseCSVFile(result);
                             debounceDisplayRecords();
-                            fileNameLabel.textContent = `Loaded: ${file.name}`;
+                            fileStatus.textContent = `Loaded: ${file.name}`;
+                            alert(`Successfully loaded: ${file.name}`);
                         } else {
+                            fileStatus.textContent = 'No file selected';
                             alert(`Decryption failed: ${result.error}`);
                             decryptionPassphrase = null;
-                            fileNameLabel.textContent = 'No file selected';
-                            loadFileBtn.disabled = true;
+                            fileInput.value = '';
                         }
                     };
                 } else {
@@ -370,7 +349,8 @@
                     records = parseCSVFile(text);
                     decryptionPassphrase = null;
                     debounceDisplayRecords();
-                    fileNameLabel.textContent = `Loaded: ${file.name}`;
+                    fileStatus.textContent = `Loaded: ${file.name}`;
+                    alert(`Successfully loaded: ${file.name}`);
                 }
             };
             if (file.name.toLowerCase().endsWith('.zip') || file.name.endsWith('.csv.enc')) {
@@ -434,7 +414,7 @@
         const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
         function initDebugMode() {
             if (window.location.search.includes('debug=1')) {
-                getPassphrase('enableDebugMode');
+                getPassphrase('enableDebugMode', 'debug mode');
                 window.enableDebugMode = () => {
                     if (CryptoJS.SHA256(decryptionPassphrase).toString() === debugPassphraseHash) {
                         debugMode = true;
@@ -450,6 +430,7 @@
         window.addEventListener('unload', () => {
             records = [];
             decryptionPassphrase = null;
+            document.getElementById('fileStatus').textContent = 'No file selected';
         });
 
         const fieldRestrictions = {
@@ -940,7 +921,7 @@
                     }
                 });
                 tr.appendChild(actionTd);
-                table.appendChild(tr);
+                table.appendChild(table);
             });
             recordBody.appendChild(table);
         }
