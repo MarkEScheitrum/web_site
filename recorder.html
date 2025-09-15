@@ -43,8 +43,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.2.10</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 01:15:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.2.11</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 01:30:00 PDT</span></p>
     </div>
     <div class="info">
         <p>Once you leave this page, all data is deleted. Please download any edits before closing the page.</p>
@@ -748,6 +748,15 @@
             document.body.appendChild(popup);
         }
 
+        // Helper function to convert Uint8Array to base64
+        function uint8ArrayToBase64(uint8Array) {
+            let binary = '';
+            for (let i = 0; i < uint8Array.length; i++) {
+                binary += String.fromCharCode(uint8Array[i]);
+            }
+            return btoa(binary);
+        }
+
         function downloadCSV() {
             if (records.length === 0) {
                 alert('No records to download');
@@ -763,19 +772,46 @@
                 ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
             ].join('\r\n') + '\r\n';
             const encryptedData = encryptFile(csv, decryptionPassphrase);
-            const blob = new Blob([encryptedData], { type: 'application/octet-stream' });
             let downloadFileName = 'returns.csv.enc';
             const match = originalFileName.match(/^records_(\d{4})\.csv(\.enc)?$/i);
             if (match) {
                 downloadFileName = `returns_${match[1]}.csv.enc`;
             }
+
+            // Create EML content
+            const boundary = 'boundary_' + Date.now();
+            const base64Attachment = uint8ArrayToBase64(encryptedData);
+            const emlContent = [
+                `To: genealogy@family.com`,
+                `Subject: Updated Genealogy Records`,
+                `X-Unsent: 1`,
+                `Content-Type: multipart/mixed; boundary="${boundary}"`,
+                '',
+                `--${boundary}`,
+                'Content-Type: text/plain; charset=UTF-8',
+                '',
+                'Please find the updated genealogy records attached.',
+                '',
+                `--${boundary}`,
+                `Content-Type: application/octet-stream; name="${downloadFileName}"`,
+                'Content-Transfer-Encoding: base64',
+                `Content-Disposition: attachment; filename="${downloadFileName}"`,
+                '',
+                base64Attachment,
+                `--${boundary}--`
+            ].join('\r\n');
+
+            const emlBlob = new Blob([emlContent], { type: 'message/rfc822' });
             const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = downloadFileName;
+            link.href = URL.createObjectURL(emlBlob);
+            link.download = 'message.eml';
             link.click();
-            showPopup(`File saved to Downloads as "${downloadFileName}". Please open your email client, create a new email to <strong>genealogy@family.com</strong> with subject <strong>Updated Genealogy Records</strong>, and attach the file.`);
-            if (debugMode) console.log(`Downloaded ${downloadFileName}, plaintext size=${csv.length} bytes`);
             URL.revokeObjectURL(link.href);
+
+            showPopup(`Downloaded "message.eml" to your Downloads folder. Double-click the file to open it in your default email client (e.g., Outlook), where the encrypted records will be pre-attached. Review and send to genealogy@family.com.`);
+            if (debugMode) {
+                console.log(`Generated EML with attachment: ${downloadFileName}, size=${encryptedData.length} bytes`);
+            }
         }
 
         waitForCryptoJS(() => {
