@@ -149,8 +149,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.7</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 14:28:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.8</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 14:40:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -613,7 +613,8 @@
                     { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
                     { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'parents', label: 'Partner Name', type: 'select', options: ['', ...records.filter(r => r.record_type.toLowerCase() === 'person').map(r => r.name)] }
+                    { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' },
+                    { name: 'partner', label: 'Partner Name for Insertion', type: 'select', options: ['', ...records.filter(r => r.record_type.toLowerCase() === 'person').map(r => r.name)] }
                 ];
             } else if (mode === 'updateRecord') {
                 modalTitle.textContent = 'Update Record';
@@ -702,11 +703,11 @@
                 }
                 records.splice(insertIndex, 0, newRecord);
             } else if (mode === 'addSpouse') {
-                if (!data.name || !data.parents) {
-                    alert('Name and Partner are required.');
+                if (!data.name || !data.partner) {
+                    alert('Name and Partner Name for Insertion are required.');
                     return;
                 }
-                const partner = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
+                const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
                 if (!partner) {
                     alert('Invalid partner selected.');
                     return;
@@ -718,7 +719,7 @@
                     gender: '',
                     birth_date: data.birth_date,
                     birth_location: data.birth_location,
-                    parents: data.parents,
+                    parents: data.parents || '',
                     death_date: '',
                     death_location: '',
                     burial_location: '',
