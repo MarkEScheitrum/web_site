@@ -767,35 +767,15 @@
             let downloadFileName = 'returns.csv.enc';
             const match = originalFileName.match(/^records_(\d{4})\.csv(\.enc)?$/i);
             if (match) {
-                downloadFileName = `returns_${match[1]}.csv${match[2] || '.enc'}`;
+                downloadFileName = `returns_${match[1]}.csv.enc`;
             }
-            const hasEmailClient = window.navigator && typeof window.navigator.registerProtocolHandler === 'function';
-            if (hasEmailClient) {
-                const url = URL.createObjectURL(blob);
-                // Create a temporary link to get the data URI for the blob
-                const tempLink = document.createElement('a');
-                tempLink.href = url;
-                tempLink.download = downloadFileName;
-                // Read the blob as a data URI
-                const reader = new FileReader();
-                reader.onloadend = function() {
-                    const dataUri = reader.result;
-                    // Use mailto with data URI as attachment
-                    alert(`mailto URL: ${encodeURIComponent(dataUri)}`);
-                    window.location.href = `mailto:genealogy@family.com?subject=Updated%20Genealogy%20Records&body=Please%20find%20the%20updated%20records%20attached.&attachment=${encodeURIComponent(dataUri)}`;
-                    if (debugMode) console.log(`Triggered mailto with file: ${downloadFileName}, data URI length: ${dataUri.length}`);
-                    URL.revokeObjectURL(url);
-                };
-                reader.readAsDataURL(blob);
-            } else {
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = downloadFileName;
-                link.click();
-                showPopup('File saved to Downloads. Please open your email client (e.g., AOL Mail <a href="https://mail.aol.com">here</a>), attach the file, and send to genealogy@family.com.');
-                if (debugMode) console.log(`Downloaded ${downloadFileName} and showed popup, plaintext size=${csv.length} bytes`);
-                URL.revokeObjectURL(link.href);
-            }
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = downloadFileName;
+            link.click();
+            showPopup(`File saved to Downloads as "${downloadFileName}". Please open your email client (e.g., AOL Mail <a href="https://mail.aol.com">here</a>), create a new email to <strong>genealogy@family.com</strong> with subject <strong>Updated Genealogy Records</strong>, and attach the file.`);
+            if (debugMode) console.log(`Downloaded ${downloadFileName}, plaintext size=${csv.length} bytes`);
+            URL.revokeObjectURL(link.href);
         }
 
         waitForCryptoJS(() => {
