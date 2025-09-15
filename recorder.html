@@ -43,8 +43,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">3.2.11</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 01:30:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">3.2.10</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 01:47:00 PDT</span></p>
     </div>
     <div class="info">
         <p>Once you leave this page, all data is deleted. Please download any edits before closing the page.</p>
@@ -778,6 +778,12 @@
                 downloadFileName = `returns_${match[1]}.csv.enc`;
             }
 
+            // Download the raw encrypted file as a fallback
+            const encryptedBlob = new Blob([encryptedData], { type: 'application/octet-stream' });
+            const encryptedLink = document.createElement('a');
+            encryptedLink.href = URL.createObjectURL(encryptedBlob);
+            encryptedLink.download = downloadFileName;
+
             // Create EML content
             const boundary = 'boundary_' + Date.now();
             const base64Attachment = uint8ArrayToBase64(encryptedData);
@@ -802,15 +808,33 @@
             ].join('\r\n');
 
             const emlBlob = new Blob([emlContent], { type: 'message/rfc822' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(emlBlob);
-            link.download = 'message.eml';
-            link.click();
-            URL.revokeObjectURL(link.href);
+            const emlLink = document.createElement('a');
+            emlLink.href = URL.createObjectURL(emlBlob);
+            emlLink.download = 'message.eml';
 
-            showPopup(`Downloaded "message.eml" to your Downloads folder. Double-click the file to open it in your default email client (e.g., Outlook), where the encrypted records will be pre-attached. Review and send to genealogy@family.com.`);
+            // Trigger downloads with a slight delay to ensure completion
+            setTimeout(() => {
+                encryptedLink.click();
+                URL.revokeObjectURL(encryptedLink.href);
+                setTimeout(() => {
+                    emlLink.click();
+                    URL.revokeObjectURL(emlLink.href);
+                }, 100);
+            }, 100);
+
+            // Enhanced popup with detailed instructions
+            showPopup(`
+                Downloaded "message.eml" and "${downloadFileName}" to your Downloads folder.<br><br>
+                <strong>Preferred Method:</strong> Double-click "message.eml" to open it in your email client (e.g., Outlook, Thunderbird). The email will have the recipient (genealogy@family.com), subject, and attachment pre-filled. Review and click Send.<br><br>
+                <strong>If "message.eml" opens in a text editor or doesn't work:</strong><br>
+                1. Open your email client (e.g., <a href="https://mail.aol.com">AOL Mail</a>, <a href="https://outlook.live.com">Outlook</a>, or Thunderbird).<br>
+                2. Create a new email to <strong>genealogy@family.com</strong> with subject <strong>Updated Genealogy Records</strong>.<br>
+                3. Attach "${downloadFileName}" from your Downloads folder and send.<br><br>
+                <strong>Setting an Email Client:</strong> If double-clicking "message.eml" opens a text editor, set your email client as the default for .eml files. On Windows, right-click "message.eml", choose "Open with", select your email client (e.g., Outlook), and check "Always use this app". See <a href="https://support.microsoft.com/en-us/office/change-the-program-that-opens-email-files-8e3e7e4e-47e1-4e1b-8a2e-3e6e91f7e5f0">Outlook setup</a> or <a href="https://support.mozilla.org/en-US/kb/change-program-used-open-email-links">Thunderbird setup</a>.
+            `);
             if (debugMode) {
-                console.log(`Generated EML with attachment: ${downloadFileName}, size=${encryptedData.length} bytes`);
+                console.log(`Generated EML with attachment: ${downloadFileName}, eml size=${emlContent.length} bytes, encrypted size=${encryptedData.length} bytes`);
+                console.log(`Triggered downloads for message.eml and ${downloadFileName}`);
             }
         }
 
