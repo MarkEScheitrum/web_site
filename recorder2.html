@@ -114,7 +114,7 @@
         th, td {
             padding: 8px;
             border: 1px solid #ccc;
-            white-space: nowrap;
+            white-space: normal;
             box-sizing: border-box;
         }
         th.record_type, td.record_type {
@@ -125,6 +125,10 @@
         }
         th.gender, td.gender {
             width: 40px;
+        }
+        th.record_type.vestigial, td.record_type.vestigial,
+        th.gen.vestigial, td.gen.vestigial {
+            width: inherit !important;
         }
         .action-icons {
             font-size: 24px;
@@ -166,8 +170,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.11</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 16:58:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.12</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 17:12:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -313,7 +317,6 @@
                                             enableButtonsAfterLoad();
                                             debounceDisplayRecords();
                                             fileStatus.textContent = `Loaded: ${foundFile.name}`;
-                                            alert(`Successfully loaded: ${foundFile.name}`);
                                         } else {
                                             fileStatus.textContent = 'No file selected';
                                             alert(`Decryption failed: ${result.error}`);
@@ -328,7 +331,6 @@
                                     enableButtonsAfterLoad();
                                     debounceDisplayRecords();
                                     fileStatus.textContent = `Loaded: ${foundFile.name}`;
-                                    alert(`Successfully loaded: ${foundFile.name}`);
                                 } else {
                                     fileStatus.textContent = 'No file selected';
                                     alert(`Unsupported file type in ZIP: ${foundFile.name}. Expected .csv or .csv.enc.`);
@@ -358,7 +360,6 @@
                             enableButtonsAfterLoad();
                             debounceDisplayRecords();
                             fileStatus.textContent = `Loaded: ${file.name}`;
-                            alert(`Successfully loaded: ${file.name}`);
                         } else {
                             fileStatus.textContent = 'No file selected';
                             alert(`Decryption failed: ${result.error}`);
@@ -373,7 +374,6 @@
                     enableButtonsAfterLoad();
                     debounceDisplayRecords();
                     fileStatus.textContent = `Loaded: ${file.name}`;
-                    alert(`Successfully loaded: ${file.name}`);
                 }
             };
             if (file.name.toLowerCase().endsWith('.zip') || file.name.endsWith('.csv.enc')) {
@@ -894,16 +894,18 @@
             headers.forEach(header => {
                 const th = document.createElement('th');
                 th.className = header;
-                const toggleButton = document.createElement('span');
-                toggleButton.textContent = vestigialColumns.has(header) ? '👁️‍🗨️' : '👁️';
-                toggleButton.className = 'action-icons';
-                toggleButton.onclick = () => toggleColumn(header);
-                th.appendChild(toggleButton);
+                if (header !== 'record_type' && header !== 'gen') {
+                    const toggleButton = document.createElement('span');
+                    toggleButton.textContent = vestigialColumns.has(header) ? '👁️‍🗨️' : '👁️';
+                    toggleButton.className = 'action-icons';
+                    toggleButton.onclick = () => toggleColumn(header);
+                    th.appendChild(toggleButton);
+                }
                 const headerText = document.createElement('span');
-                headerText.textContent = header === 'record_type' ? ' record' : header === 'gender' ? ' gen' : ' ' + header;
+                headerText.textContent = header === 'record_type' ? 'record' : header === 'gender' ? 'gen' : header;
                 headerText.className = 'header-text';
                 th.appendChild(headerText);
-                if (vestigialColumns.has(header)) th.className += ' vestigial';
+                if (vestigialColumns.has(header) && header !== 'record_type' && header !== 'gen') th.className += ' vestigial';
                 headerRow.appendChild(th);
             });
             table.appendChild(headerRow);
@@ -932,7 +934,7 @@
                     } else if (isGrey) {
                         td.className += ' greyed-out';
                     }
-                    if (vestigialColumns.has(header)) td.className += ' vestigial';
+                    if (vestigialColumns.has(header) && header !== 'record_type' && header !== 'gen') td.className += ' vestigial';
                     tr.appendChild(td);
                 });
                 tr.addEventListener('click', (e) => {
