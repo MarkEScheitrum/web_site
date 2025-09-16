@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -176,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.15.1</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-16 11:57:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.15.2</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-16 12:14:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -654,7 +653,7 @@
                     { name: 'gender', label: 'Sex', type: 'select', options: ['', 'Male', 'Female', 'Other'] },
                     { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
-                    { name: 'parents', label: 'Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
+                    { name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
                 ];
             } else if (mode === 'addSpouse') {
                 modalTitle.textContent = 'Add Partner';
