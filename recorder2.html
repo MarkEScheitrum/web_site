@@ -104,15 +104,27 @@
         }
         .table-container {
             margin-top: 20px;
+            overflow-x: auto;
         }
         table {
             width: 100%;
-            font-size: 16px;
+            font-size: 14px;
             border-collapse: collapse;
         }
         th, td {
-            padding: 12px;
+            padding: 8px;
             border: 1px solid #ccc;
+            white-space: nowrap;
+            box-sizing: border-box;
+        }
+        th.record_type, td.record_type {
+            width: 60px;
+        }
+        th.gen, td.gen {
+            width: 40px;
+        }
+        th.gender, td.gender {
+            width: 40px;
         }
         .action-icons {
             font-size: 24px;
@@ -154,8 +166,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.9</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 15:07:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.11</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 16:58:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -819,141 +831,6 @@
             if (debugMode) console.log(`Saved ${mode} data:`, data);
         }
 
-        function closeModal() {
-            document.getElementById('modal').style.display = 'none';
-            modalMode = null;
-            document.getElementById('modalForm').innerHTML = '';
-        }
-
-        function saveModalData(mode) {
-            const form = document.getElementById('modalForm');
-            const data = {};
-            for (let input of form.elements) {
-                if (input.name) data[input.name] = input.value;
-            }
-            if (mode === 'addChild') {
-                if (!data.name || !data.parents) {
-                    alert('Name and Parent are required.');
-                    return;
-                }
-                const parent = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
-                if (!parent) {
-                    alert('Invalid parent selected.');
-                    return;
-                }
-                const parentGen = parseInt(parent.gen) || 0;
-                const newRecord = {
-                    record_type: 'Person',
-                    gen: (parentGen + 1).toString(),
-                    name: data.name,
-                    gender: data.gender,
-                    birth_date: data.birth_date,
-                    birth_location: data.birth_location,
-                    parents: '',
-                    death_date: '',
-                    death_location: '',
-                    burial_location: '',
-                    service: '',
-                    marriage_date: '',
-                    relationship: '',
-                    divorced: ''
-                };
-                if (!isValidDate(data.birth_date)) {
-                    alert('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                let insertIndex = records.indexOf(parent) + 1;
-                while (insertIndex < records.length && records[insertIndex].record_type.toLowerCase() === 'spouse') {
-                    insertIndex++;
-                }
-                records.splice(insertIndex, 0, newRecord);
-            } else if (mode === 'addSpouse') {
-                if (!data.name || !data.partner) {
-                    alert('Name and Partner Name for Insertion are required.');
-                    return;
-                }
-                const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
-                if (!partner) {
-                    alert('Invalid partner selected.');
-                    return;
-                }
-                const newRecord = {
-                    record_type: 'Spouse',
-                    gen: '',
-                    name: data.name,
-                    gender: '',
-                    birth_date: data.birth_date,
-                    birth_location: data.birth_location,
-                    parents: data.parents || '',
-                    death_date: '',
-                    death_location: '',
-                    burial_location: '',
-                    service: '',
-                    marriage_date: data.marriage_date,
-                    relationship: 'spouse',
-                    divorced: ''
-                };
-                if (!isValidDate(data.birth_date) || !isValidDate(data.marriage_date)) {
-                    alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                let insertIndex = records.indexOf(partner) + 1;
-                records.splice(insertIndex, 0, newRecord);
-            } else if (mode === 'updateRecord') {
-                if (!data.record || !data.field || !data.value) {
-                    alert('Please select a record, field, and enter a value.');
-                    return;
-                }
-                const [recordType, name] = data.record.split(': ');
-                const record = records.find(r => r.record_type === recordType && r.name === name);
-                if (!record) {
-                    alert('Invalid record selected.');
-                    return;
-                }
-                if (dateFields.includes(data.field) && !isValidDate(data.value)) {
-                    alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                if (isFieldEditable(recordType, data.field)) {
-                    record[data.field] = data.value;
-                } else {
-                    alert('Selected field is not editable.');
-                    return;
-                }
-            } else if (mode === 'recordDeathBurial') {
-                if (!data.record) {
-                    alert('Please select a record.');
-                    return;
-                }
-                const [recordType, name] = data.record.split(': ');
-                const record = records.find(r => r.record_type === recordType && r.name === name);
-                if (!record) {
-                    alert('Invalid record selected.');
-                    return;
-                }
-                if (data.death_date && !isValidDate(data.death_date)) {
-                    alert('Invalid death date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                if (data.death_date && isFieldEditable(recordType, 'death_date')) {
-                    record.death_date = data.death_date;
-                }
-                if (data.death_location && isFieldEditable(recordType, 'death_location')) {
-                    record.death_location = data.death_location;
-                }
-                if (data.burial_location && isFieldEditable(recordType, 'burial_location')) {
-                    record.burial_location = data.burial_location;
-                }
-                if (!data.death_date && !data.death_location && !data.burial_location) {
-                    alert('At least one field (Death Date, Death Location, or Burial Location) must be provided.');
-                    return;
-                }
-            }
-            closeModal();
-            debounceDisplayRecords();
-            if (debugMode) console.log(`Saved ${mode} data:`, data);
-        }
-
         function toggleTable() {
             const tableContainer = document.getElementById('tableContainer');
             const isHidden = tableContainer.style.display === 'none';
@@ -1023,7 +900,7 @@
                 toggleButton.onclick = () => toggleColumn(header);
                 th.appendChild(toggleButton);
                 const headerText = document.createElement('span');
-                headerText.textContent = ` ${header}`;
+                headerText.textContent = header === 'record_type' ? ' record' : header === 'gender' ? ' gen' : ' ' + header;
                 headerText.className = 'header-text';
                 th.appendChild(headerText);
                 if (vestigialColumns.has(header)) th.className += ' vestigial';
@@ -1038,7 +915,7 @@
                     const td = document.createElement('td');
                     td.className = header;
                     const cellContent = document.createElement('span');
-                    cellContent.textContent = record[header] || '';
+                    cellContent.textContent = header === 'gender' ? (record[header] === 'Male' ? 'M' : record[header] === 'Female' ? 'F' : record[header] || '') : record[header] || '';
                     cellContent.className = 'cell-content';
                     td.appendChild(cellContent);
                     const isEditable = isFieldEditable(record.record_type, header);
