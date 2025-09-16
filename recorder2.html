@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -175,12 +176,12 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.14.5</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-15 19:31:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.15</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-16 11:33:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
         <button onclick="openModal('addChild')" class="task-btn disabled-btn" id="addChildBtn">Add Child 👶</button>
-        <button onclick="openModal('addSpouse')" class="task-btn disabled-btn" id="addSpouseBtn">Add Spouse 💍</button>
+        <button onclick="openModal('addSpouse')" class="task-btn disabled-btn" id="addSpouseBtn">Add Partner 💍</button>
         <button onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn">Update Record ✏️</button>
         <button onclick="openModal('recordDeathBurial')" class="task-btn disabled-btn" id="recordDeathBurialBtn">Record Death/Burial ⚰️</button>
         <button onclick="toggleTable()" class="task-btn disabled-btn" id="viewTableBtn">View Table 📋</button>
@@ -656,7 +657,7 @@
                     { name: 'parents', label: 'Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
                 ];
             } else if (mode === 'addSpouse') {
-                modalTitle.textContent = 'Add Spouse';
+                modalTitle.textContent = 'Add Partner';
                 // Exclude first Person and any Spouses until the next Person
                 const selectablePeople = records.filter((r, index) => {
                     if (index === 0 && r.record_type.toLowerCase() === 'person') return false;
@@ -673,19 +674,19 @@
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
                     { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' },
-                    { name: 'partner', label: 'Partner Name for Insertion', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
+                    { name: 'partner', label: 'Partner Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
                 ];
             } else if (mode === 'updateRecord') {
                 modalTitle.textContent = 'Update Record';
                 fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type}: ${r.name}`)] },
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)] },
                     { name: 'field', label: 'Field to Update', type: 'select', options: ['', 'name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'marriage_date', 'relationship', 'divorced', 'parents'] },
                     { name: 'value', label: 'New Value', type: 'text' }
                 ];
             } else if (mode === 'recordDeathBurial') {
                 modalTitle.textContent = 'Record Death/Burial';
                 fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type}: ${r.name}`)] },
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)] },
                     { name: 'death_date', label: 'Death Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'death_location', label: 'Death Location', type: 'text' },
                     { name: 'burial_location', label: 'Burial Location', type: 'text' }
@@ -771,7 +772,7 @@
                 records.splice(insertIndex, 0, newRecord);
             } else if (mode === 'addSpouse') {
                 if (!data.name || !data.partner) {
-                    alert('Name and Partner Name for Insertion are required.');
+                    alert('Name and Partner Name are required.');
                     return;
                 }
                 const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
@@ -807,7 +808,7 @@
                     return;
                 }
                 const [recordType, name] = data.record.split(': ');
-                const record = records.find(r => r.record_type === recordType && r.name === name);
+                const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
                 if (!record) {
                     alert('Invalid record selected.');
                     return;
@@ -816,7 +817,7 @@
                     alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
                     return;
                 }
-                if (isFieldEditable(recordType, data.field)) {
+                if (isFieldEditable(record.record_type, data.field)) {
                     record[data.field] = data.value;
                 } else {
                     alert('Selected field is not editable.');
@@ -828,7 +829,7 @@
                     return;
                 }
                 const [recordType, name] = data.record.split(': ');
-                const record = records.find(r => r.record_type === recordType && r.name === name);
+                const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
                 if (!record) {
                     alert('Invalid record selected.');
                     return;
@@ -837,13 +838,13 @@
                     alert('Invalid death date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
                     return;
                 }
-                if (data.death_date && isFieldEditable(recordType, 'death_date')) {
+                if (data.death_date && isFieldEditable(record.record_type, 'death_date')) {
                     record.death_date = data.death_date;
                 }
-                if (data.death_location && isFieldEditable(recordType, 'death_location')) {
+                if (data.death_location && isFieldEditable(record.record_type, 'death_location')) {
                     record.death_location = data.death_location;
                 }
-                if (data.burial_location && isFieldEditable(recordType, 'burial_location')) {
+                if (data.burial_location && isFieldEditable(record.record_type, 'burial_location')) {
                     record.burial_location = data.burial_location;
                 }
                 if (!data.death_date && !data.death_location && !data.burial_location) {
@@ -942,7 +943,10 @@
                     const td = document.createElement('td');
                     td.className = header;
                     const cellContent = document.createElement('span');
-                    cellContent.textContent = header === 'gender' ? (record[header] === 'Male' ? 'M' : record[header] === 'Female' ? 'F' : record[header] || '') : record[header] || '';
+                    const displayValue = header === 'record_type' && record[header].toLowerCase() === 'spouse' ? 'Partner' : 
+                                        header === 'gender' ? (record[header] === 'Male' ? 'M' : record[header] === 'Female' ? 'F' : record[header] || '') : 
+                                        record[header] || '';
+                    cellContent.textContent = displayValue;
                     cellContent.className = 'cell-content';
                     td.appendChild(cellContent);
                     const isEditable = isFieldEditable(record.record_type, header);
@@ -1115,3 +1119,4 @@
     </script>
 </body>
 </html>
+```
