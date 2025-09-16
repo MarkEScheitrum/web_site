@@ -175,8 +175,8 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.13</span></p>
-        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 17:27:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.14</span></p>
+        <p><strong>Last Updated:</strong> <span id="pageDate">2025-09-15 18:45:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -547,6 +547,7 @@
                     if (debugMode) console.log(`Decrypted data (first 100 chars): ${result.slice(0, 100)}`);
                     return result;
                 } catch (e) {
+                    if (debugMode) console.log(`UTF-8 decode failed: ${e.message}, trying Latin1`);
                     try {
                         const result = decrypted.toString(CryptoJS.enc.Latin1);
                         if (debugMode) console.log(`Decrypted data (first 100 chars, Latin1): ${result.slice(0, 100)}`);
