@@ -8,8 +8,8 @@
             font-family: Arial, sans-serif;
             margin: 40px;
             text-align: center;
-            position: relative; /* Ensure body is a positioning context */
-            min-height: 100vh; /* Ensure body takes full viewport height */
+            position: relative;
+            min-height: 100vh;
         }
         h1 {
             color: #333;
@@ -26,7 +26,7 @@
             position: absolute;
             bottom: 20px;
             right: 20px;
-            width: 300px; /* Fixed width for form */
+            width: 300px;
             background: #f9f9f9;
             padding: 15px;
             border: 1px solid #ccc;
@@ -50,7 +50,7 @@
             font-family: Arial, sans-serif;
         }
         #issue-body {
-            resize: vertical; /* Allow vertical resize only */
+            resize: vertical;
             min-height: 80px;
         }
         #issue-form button {
@@ -68,10 +68,9 @@
             font-size: 14px;
             margin-top: 10px;
         }
-        /* Responsive adjustments */
         @media (max-width: 600px) {
             #issue-submission {
-                position: static; /* Fallback to normal flow on small screens */
+                position: static;
                 width: 100%;
                 margin-top: 20px;
             }
@@ -94,39 +93,27 @@
     </div>
 
     <script>
-        document.getElementById('issue-form').addEventListener('submit', async (e) => {
-            e.preventDefault(); // Prevent page reload
+        document.getElementById('issue-form').addEventListener('submit', (e) => {
+            e.preventDefault();
             const title = document.getElementById('issue-title').value;
             const body = document.getElementById('issue-body').value;
             const feedback = document.getElementById('issue-feedback');
 
             try {
-                const response = await fetch('/.netlify/functions/submit-issue', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ title, body })
-                });
-                const result = await response.json();
+                const mailtoLink = `mailto:markscheitrum@aol.com?subject=${encodeURIComponent('Genealogy Recorder Issue: ' + title)}&body=${encodeURIComponent(body + '\n\nSent from Genealogy Recorder index.html')}`;
+                window.location.href = mailtoLink;
 
                 feedback.style.display = 'block';
-                feedback.style.color = response.ok ? 'green' : 'red';
-                feedback.textContent = result.message;
-                if (response.ok) document.getElementById('issue-form').reset();
+                feedback.style.color = 'green';
+                feedback.textContent = 'Your email client should have opened. Please attach any relevant files and send. If no email opened, manually email markscheitrum@aol.com with the issue details.';
+                document.getElementById('issue-form').reset();
             } catch (err) {
                 feedback.style.display = 'block';
                 feedback.style.color = 'red';
-                feedback.textContent = 'Network error. Please try again.';
+                feedback.textContent = 'Failed to open email client. Please manually email markscheitrum@aol.com with the issue title and description.';
+                console.error('Mailto error:', err);
             }
         });
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
