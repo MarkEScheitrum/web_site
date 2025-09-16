@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.15.2</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-16 12:14:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.15.3</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-16 12:52:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -1104,16 +1104,16 @@
             setTimeout(() => {
                 encryptedLink.click();
                 URL.revokeObjectURL(encryptedLink.href);
-                const mailtoLink = `mailto:genealogy@family.com?subject=${encodeURIComponent('Updated Genealogy Records')}&body=${encodeURIComponent(emailBody)}`;
+                const mailtoLink = `mailto:markscheitrum@aol.com?subject=${encodeURIComponent('Updated Genealogy Records')}&body=${encodeURIComponent(emailBody)}`;
                 window.location.href = mailtoLink;
             }, 100);
             showPopup(`
                 Downloaded "${downloadFileName}" to your Downloads folder.<br><br>
-                Your email client should have opened with a new email to <strong>genealogy@family.com</strong>.<br>
+                Your email client should have opened with a new email to <strong>markscheitrum@aol.com</strong>.<br>
                 Follow the instructions in the email to attach "${downloadFileName}" and send.<br><br>
                 <strong>If the email didn't open:</strong><br>
                 1. Open your email client (e.g., <a href="https://mail.aol.com">AOL Mail</a>, <a href="https://outlook.live.com">Outlook</a>, or Thunderbird).<br>
-                2. Create a new email to <strong>genealogy@family.com</strong> with subject <strong>Updated Genealogy Records</strong>.<br>
+                2. Create a new email to <strong>markscheitrum@aol.com</strong> with subject <strong>Updated Genealogy Records</strong>.<br>
                 3. Attach "${downloadFileName}" from your Downloads folder and send.
             `);
             if (debugMode) {
