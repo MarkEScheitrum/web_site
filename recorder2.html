@@ -23,7 +23,7 @@
         }
         .task-btn {
             font-size: 20px;
-            padding: 8px `16px;
+            padding: 8px 16px;
             border-radius: 8px;
             background-color: #007bff;
             color: white;
@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.14.4  <Strong>Last Updated:</strong> <span id="pageDate">2025-09-15 19:15:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.14.5</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-15 19:31:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -638,22 +638,42 @@
             let fields = [];
             if (mode === 'addChild') {
                 modalTitle.textContent = 'Add Child';
+                // Exclude first Person and any Spouses until the next Person
+                const selectablePeople = records.filter((r, index) => {
+                    if (index === 0 && r.record_type.toLowerCase() === 'person') return false;
+                    if (r.record_type.toLowerCase() === 'spouse') {
+                        let nextPersonIndex = records.findIndex((rec, i) => i > index && rec.record_type.toLowerCase() === 'person');
+                        if (nextPersonIndex === -1) nextPersonIndex = records.length;
+                        return index > 0 && index < nextPersonIndex && records[0].record_type.toLowerCase() === 'person';
+                    }
+                    return true;
+                }).filter(r => r.record_type.toLowerCase() === 'person');
                 fields = [
                     { name: 'name', label: 'Name', type: 'text', autocomplete: 'off' },
                     { name: 'gender', label: 'Sex', type: 'select', options: ['', 'Male', 'Female', 'Other'] },
                     { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
-                    { name: 'parents', label: 'Parent Name', type: 'select', options: ['', ...records.filter(r => r.record_type.toLowerCase() === 'person').map(r => r.name)] }
+                    { name: 'parents', label: 'Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
                 ];
             } else if (mode === 'addSpouse') {
                 modalTitle.textContent = 'Add Spouse';
+                // Exclude first Person and any Spouses until the next Person
+                const selectablePeople = records.filter((r, index) => {
+                    if (index === 0 && r.record_type.toLowerCase() === 'person') return false;
+                    if (r.record_type.toLowerCase() === 'spouse') {
+                        let nextPersonIndex = records.findIndex((rec, i) => i > index && rec.record_type.toLowerCase() === 'person');
+                        if (nextPersonIndex === -1) nextPersonIndex = records.length;
+                        return index > 0 && index < nextPersonIndex && records[0].record_type.toLowerCase() === 'person';
+                    }
+                    return true;
+                }).filter(r => r.record_type.toLowerCase() === 'person');
                 fields = [
                     { name: 'name', label: 'Name', type: 'text', autocomplete: 'off' },
                     { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
                     { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' },
-                    { name: 'partner', label: 'Partner Name for Insertion', type: 'select', options: ['', ...records.filter(r => r.record_type.toLowerCase() === 'person').map(r => r.name)] }
+                    { name: 'partner', label: 'Partner Name for Insertion', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
                 ];
             } else if (mode === 'updateRecord') {
                 modalTitle.textContent = 'Update Record';
