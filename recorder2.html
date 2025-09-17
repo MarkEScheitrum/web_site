@@ -654,7 +654,7 @@
                 }).filter(r => r.record_type.toLowerCase() === 'person');
                 fields = [
                     { name: 'name', label: 'Name', type: 'text', autocomplete: 'off' },
-                    { name: 'gender', label: 'Sex', type: 'select', options: ['', 'Male', 'Female', 'Other'] },
+                    { name: 'gender', label: 'Sex', type: 'select', options: ['', 'Male', 'Female'] },
                     { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
                     { name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
@@ -951,8 +951,8 @@
                     td.className = header;
                     const cellContent = document.createElement('span');
                     const displayValue = header === 'record_type' && record[header].toLowerCase() === 'spouse' ? 'Partner' : 
-                                        header === 'gender' ? (record[header] === 'Male' ? 'M' : record[header] === 'Female' ? 'F' : record[header] || '') : 
-                                        record[header] || '';
+                     header === 'gender' ? (record[header] || '') : 
+                     record[header] || '';
                     cellContent.textContent = displayValue;
                     cellContent.className = 'cell-content';
                     td.appendChild(cellContent);
