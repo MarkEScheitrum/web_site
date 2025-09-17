@@ -68,11 +68,41 @@
             font-size: 14px;
             margin-top: 10px;
         }
+        .photo-frame {
+            display: inline-block;
+            margin: 20px;
+            padding: 10px;
+            background: #f9f9f9;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .photo-frame img {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 3px;
+        }
+        .photo-frame p {
+            margin: 10px 0 0;
+            font-size: 14px;
+            color: #333;
+        }
         @media (max-width: 600px) {
             #issue-submission {
                 position: static;
                 width: 100%;
                 margin-top: 20px;
+            }
+            .photo-frame {
+                margin: 10px;
+            }
+            .photo-frame img {
+                max-width: 150px;
+                max-height: 150px;
+            }
+            .photo-frame p {
+                font-size: 12px;
             }
         }
     </style>
@@ -82,6 +112,14 @@
     <p>Click the link below to access the genealogy record editor:</p>
     <p><a href="recorder2.html">Open Genealogy Recorder</a></p>
     <p>Upload your genealogy text file to view, add, edit, or delete records, then download the updated file to send back.</p>
+    <div class="photo-frame">
+        <img src="images/family1.jpg" alt="Family Photo 1">
+        <p>Family Photo 1</p>
+    </div>
+    <div class="photo-frame">
+        <img src="images/family2.jpg" alt="Family Photo 2">
+        <p>Family Photo 2</p>
+    </div>
     <div id="issue-submission">
         <h3>Report an Issue</h3>
         <form id="issue-form">
