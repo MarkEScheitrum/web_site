@@ -478,9 +478,9 @@
 
         const fieldRestrictions = {
             person: {
-                editable: ['gen', 'name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service'],
+                editable: ['name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service'],
                 uneditable: ['record_type'],
-                greyedOut: ['marriage_date', 'relationship', 'divorced', 'parents']
+                greyedOut: ['gen', 'marriage_date', 'relationship', 'divorced', 'parents']
             },
             spouse: {
                 editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents'],
@@ -683,7 +683,7 @@
                 modalTitle.textContent = 'Update Record';
                 fields = [
                     { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)] },
-                    { name: 'field', label: 'Field to Update', type: 'select', options: ['', 'name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'marriage_date', 'relationship', 'divorced', 'parents'] },
+                    { name: 'field', label: 'Field to Update', type: 'select', options: [''] },
                     { name: 'value', label: 'New Value', type: 'text' }
                 ];
             } else if (mode === 'recordDeathBurial') {
@@ -723,6 +723,31 @@
             submitBtn.textContent = 'Save';
             submitBtn.onclick = () => saveModalData(mode);
             modalForm.appendChild(submitBtn);
+            if (mode === 'updateRecord') {
+                const recordSelect = modalForm.querySelector('select[name="record"]');
+                const fieldSelect = modalForm.querySelector('select[name="field"]');
+                recordSelect.addEventListener('change', () => {
+                    const selectedRecord = recordSelect.value;
+                    if (!selectedRecord) {
+                        fieldSelect.innerHTML = '<option value=""></option>';
+                        return;
+                    }
+                    const [recordType, name] = selectedRecord.split(': ');
+                    const cleanType = recordType.toLowerCase() === 'partner' ? 'spouse' : 'person';
+                    const editableFields = [...fieldRestrictions[cleanType].editable];
+                    fieldSelect.innerHTML = '';
+                    const emptyOption = document.createElement('option');
+                    emptyOption.value = '';
+                    fieldSelect.appendChild(emptyOption);
+                    editableFields.forEach(f => {
+                        const option = document.createElement('option');
+                        option.value = f;
+                        option.textContent = f;
+                        fieldSelect.appendChild(option);
+                    });
+                    fieldSelect.value = '';
+                });
+            }
         }
 
         function closeModal() {
@@ -828,7 +853,6 @@
                     record[data.field] = data.value;
                 } else {
                     alert('Selected field is not editable.');
-                    return;
                 }
             } else if (mode === 'recordDeathBurial') {
                 if (!data.record) {
