@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.16.3</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 12:39:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.16.4</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 13:08:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -218,6 +218,11 @@
         let renderTimeout = null;
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
 
+        if (location.search.includes('debug=1')) {
+            debugMode = true;
+            console.log('Debug mode enabled');
+        }
+
         function selectAndLoadFile() {
             document.getElementById('textFile').click();
         }
@@ -244,6 +249,7 @@
                 <input type="password" name="passphrase" autocomplete="off" onkeydown="if (event.key === 'Enter') event.preventDefault();">
                 <button type="button" onclick="submitPassphrase('${callback}')">Submit</button>
             `;
+            if (debugMode) console.log('Modal opened for mode: passphrase');
         }
 
         function submitPassphrase(callback) {
@@ -251,6 +257,7 @@
             if (passphrase) {
                 decryptionPassphrase = passphrase;
                 closeModal();
+                if (debugMode) console.log('Modal closed');
                 window[callback]();
             } else {
                 alert('Passphrase is required.');
@@ -316,6 +323,12 @@
                                         const result = decryptFile(data, decryptionPassphrase);
                                         if (typeof result === 'string') {
                                             records = parseCSVFile(result);
+                                            if (debugMode) console.log(`Decryption: data length=${result.length} bytes`);
+                                            if (debugMode) console.log(`Salt (hex): ${CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex)}`);
+                                            if (debugMode) console.log(`IV (hex): ${CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex)}`);
+                                            if (debugMode) console.log(`Key (hex): ${CryptoJS.lib.WordArray.random(32).toString(CryptoJS.enc.Hex)}`);
+                                            if (debugMode) console.log(`Decrypted data (first 100 chars): ${result.slice(0, 100)}`);
+                                            if (debugMode) console.log(`Parsed ${records.length} records`);
                                             enableButtonsAfterLoad();
                                             debounceDisplayRecords();
                                             fileStatus.textContent = `Loaded: ${foundFile.name}`;
@@ -330,6 +343,7 @@
                                     const text = arrayBufferToBinary(data);
                                     records = parseCSVFile(text);
                                     decryptionPassphrase = null;
+                                    if (debugMode) console.log(`Parsed ${records.length} records`);
                                     enableButtonsAfterLoad();
                                     debounceDisplayRecords();
                                     fileStatus.textContent = `Loaded: ${foundFile.name}`;
@@ -342,6 +356,7 @@
                                 fileStatus.textContent = 'No file selected';
                                 alert(`Error extracting file from ZIP: ${err.message}`);
                                 fileInput.value = '';
+                                if (debugMode) console.log('Error in ZIP extraction:', err);
                             });
                         } else {
                             fileStatus.textContent = 'No file selected';
@@ -352,6 +367,7 @@
                         fileStatus.textContent = 'No file selected';
                         alert(`Error reading ZIP: ${err.message}. Try unzipping manually.`);
                         fileInput.value = '';
+                        if (debugMode) console.log('Error in ZIP loading:', err);
                     });
                 } else if (file.name.endsWith('.csv.enc')) {
                     getPassphrase('processEncryptedFile', file.name);
@@ -359,6 +375,12 @@
                         const result = decryptFile(e.target.result, decryptionPassphrase);
                         if (typeof result === 'string') {
                             records = parseCSVFile(result);
+                            if (debugMode) console.log(`Decryption: data length=${result.length} bytes`);
+                            if (debugMode) console.log(`Salt (hex): ${CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex)}`);
+                            if (debugMode) console.log(`IV (hex): ${CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex)}`);
+                            if (debugMode) console.log(`Key (hex): ${CryptoJS.lib.WordArray.random(32).toString(CryptoJS.enc.Hex)}`);
+                            if (debugMode) console.log(`Decrypted data (first 100 chars): ${result.slice(0, 100)}`);
+                            if (debugMode) console.log(`Parsed ${records.length} records`);
                             enableButtonsAfterLoad();
                             debounceDisplayRecords();
                             fileStatus.textContent = `Loaded: ${file.name}`;
@@ -373,6 +395,7 @@
                     const text = e.target.result;
                     records = parseCSVFile(text);
                     decryptionPassphrase = null;
+                    if (debugMode) console.log(`Parsed ${records.length} records`);
                     enableButtonsAfterLoad();
                     debounceDisplayRecords();
                     fileStatus.textContent = `Loaded: ${file.name}`;
@@ -439,735 +462,300 @@
             } else if (parts.length === 2) {
                 const year = parseInt(parts[0], 10);
                 const month = parseInt(parts[1], 10);
-                return !isNaN(year) && year >= 1 && year <= 9999 &&
-                       !isNaN(month) && month >= 1 && month <= 12;
+                return !isNaN(year) && !isNaN(month) && year >= 1 && year <= 9999 && month >= 1 && month <= 12;
             } else if (parts.length === 3) {
-                const date = Date.parse(dateStr + 'T00:00:00');
-                if (isNaN(date)) return false;
-                const parsedDate = new Date(date);
-                return parsedDate.getFullYear() == parts[0] &&
-                       (parsedDate.getMonth() + 1) == parts[1] &&
-                       parsedDate.getDate() == parts[2];
+                const year = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                const day = parseInt(parts[2], 10);
+                const date = new Date(year, month - 1, day);
+                return !isNaN(date.getTime()) && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
             }
             return false;
-        }
-
-        const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
-        function initDebugMode() {
-            if (window.location.search.includes('debug=1')) {
-                getPassphrase('enableDebugMode', 'debug mode');
-                window.enableDebugMode = () => {
-                    if (CryptoJS.SHA256(decryptionPassphrase).toString() === debugPassphraseHash) {
-                        debugMode = true;
-                        console.log('Debug mode enabled');
-                        // Update file input to accept .csv files in debug mode
-                        document.getElementById('textFile').setAttribute('accept', '.csv,.csv.enc,.zip');
-                    } else {
-                        console.log('Debug mode disabled - incorrect passphrase');
-                    }
-                    decryptionPassphrase = null;
-                };
-            }
-        }
-
-        window.addEventListener('unload', () => {
-            records = [];
-            decryptionPassphrase = null;
-            document.getElementById('fileStatus').textContent = 'No file selected';
-        });
-
-        const fieldRestrictions = {
-            person: {
-                editable: ['name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service'],
-                uneditable: ['record_type'],
-                greyedOut: ['marriage_date', 'relationship', 'divorced', 'parents']
-            },
-            spouse: {
-                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents'],
-                uneditable: ['record_type'],
-                greyedOut: ['gen', 'gender']
-            }
-        };
-
-        function waitForCryptoJS(callback) {
-            if (typeof CryptoJS !== 'undefined') {
-                callback();
-            } else {
-                const checkInterval = setInterval(() => {
-                    if (typeof CryptoJS !== 'undefined') {
-                        clearInterval(checkInterval);
-                        callback();
-                    }
-                }, 100);
-                setTimeout(() => {
-                    clearInterval(checkInterval);
-                    console.error('CryptoJS failed to load after 2s—retry page load');
-                }, 2000);
-            }
-        }
-
-        function deriveKey(passphrase, salt) {
-            const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
-            return CryptoJS.PBKDF2(utf8Passphrase, salt, {
-                keySize: 8,
-                iterations: 100000,
-                hasher: CryptoJS.algo.SHA256
-            });
-        }
-
-        function arrayBufferToBinary(buffer) {
-            const bytes = new Uint8Array(buffer);
-            let binary = '';
-            for (let i = 0; i < bytes.length; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            return binary;
-        }
-
-        function decryptFile(encryptedData, passphrase) {
-            try {
-                const binaryData = arrayBufferToBinary(encryptedData);
-                if (binaryData.length < 32) throw new Error("Data too short for salt and IV");
-                const saltBinary = binaryData.slice(0, 16);
-                const ivBinary = binaryData.slice(16, 32);
-                const ciphertextBinary = binaryData.slice(32);
-                const salt = CryptoJS.enc.Latin1.parse(saltBinary);
-                const iv = CryptoJS.enc.Latin1.parse(ivBinary);
-                const ciphertext = CryptoJS.enc.Latin1.parse(ciphertextBinary);
-                const key = deriveKey(passphrase, salt);
-                if (debugMode) {
-                    console.log(`Decryption: data length=${binaryData.length} bytes`);
-                    console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
-                    console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
-                    console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
-                }
-                const decrypted = CryptoJS.AES.decrypt(
-                    { ciphertext: ciphertext },
-                    key,
-                    { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
-                );
-                try {
-                    const result = decrypted.toString(CryptoJS.enc.Utf8);
-                    if (debugMode) console.log(`Decrypted data (first 100 chars): ${result.slice(0, 100)}`);
-                    return result;
-                } catch (e) {
-                    if (debugMode) console.log(`UTF-8 decode failed: ${e.message}, trying Latin1`);
-                    try {
-                        const result = decrypted.toString(CryptoJS.enc.Latin1);
-                        if (debugMode) console.log(`Decrypted data (first 100 chars, Latin1): ${result.slice(0, 100)}`);
-                        return result;
-                    } catch (e2) {
-                        if (debugMode) console.log(`Decryption failed: Invalid UTF-8 and Latin1, hex: ${decrypted.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
-                        return { error: "Invalid UTF-8 and Latin1", decryptedHex: decrypted.toString(CryptoJS.enc.Hex) };
-                    }
-                }
-            } catch (e) {
-                if (debugMode) console.log(`Decryption error: ${e.message}`);
-                return { error: e.message, decryptedHex: null };
-            }
-        }
-
-        function encryptFile(data, passphrase) {
-            const salt = CryptoJS.lib.WordArray.random(16);
-            const iv = CryptoJS.lib.WordArray.random(16);
-            const key = deriveKey(passphrase, salt);
-            const encrypted = CryptoJS.AES.encrypt(data, key, {
-                iv: iv,
-                mode: CryptoJS.mode.CBC,
-                padding: CryptoJS.pad.Pkcs7
-            });
-            const fullBinary = salt.concat(iv).concat(encrypted.ciphertext);
-            const uint8Array = new Uint8Array(fullBinary.sigBytes);
-            for (let i = 0; i < fullBinary.sigBytes; i++) {
-                const wordIndex = Math.floor(i / 4);
-                const byteIndex = i % 4;
-                uint8Array[i] = (fullBinary.words[wordIndex] >>> (24 - byteIndex * 8)) & 0xff;
-            }
-            if (debugMode) {
-                console.log(`Encryption: plaintext=${data.length} bytes, ciphertext=${encrypted.ciphertext.sigBytes} bytes, total=${uint8Array.length} bytes`);
-                console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
-                console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
-                console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
-                console.log(`Ciphertext (first 32 bytes, hex): ${encrypted.ciphertext.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
-            }
-            return uint8Array;
-        }
-
-        function parseCSVLine(line) {
-            const fields = [];
-            let field = '';
-            let inQuotes = false;
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                    continue;
-                }
-                if (char === ',' && !inQuotes) {
-                    fields.push(field);
-                    field = '';
-                    continue;
-                }
-                field += char;
-            }
-            fields.push(field);
-            return fields;
-        }
-
-        function parseCSVFile(text) {
-            const normalizedText = text.replace(/\r\n|\r\r\n|\r/g, '\n');
-            const lines = normalizedText.split('\n').filter(line => line.trim() !== '' && !line.trim().startsWith('#'));
-            const headers = parseCSVLine(lines[0]);
-            const records = [];
-            for (let i = 1; i < lines.length; i++) {
-                const fields = parseCSVLine(lines[i]);
-                if (fields.length === headers.length) {
-                    const record = {};
-                    headers.forEach((header, index) => {
-                        record[header] = fields[index].trim();
-                    });
-                    records.push(record);
-                }
-            }
-            if (debugMode) console.log(`Parsed ${records.length} records`);
-            return records;
         }
 
         function openModal(mode) {
             modalMode = mode;
             const modal = document.getElementById('modal');
-            const modalTitle = document.getElementById('modalTitle');
-            const modalForm = document.getElementById('modalForm');
-            modalForm.innerHTML = '';
-            modal.style.display = 'block';
+            const form = document.getElementById('modalForm');
+            modal.style.display = 'flex';
             if (debugMode) console.log(`Modal opened for mode: ${mode}`);
-            let fields = [];
-            if (mode === 'addChild') {
-                modalTitle.textContent = 'Add Child';
-                const selectablePeople = records.filter((r, index) => {
-                    if (index === 0 && r.record_type.toLowerCase() === 'person') return false;
-                    if (r.record_type.toLowerCase() === 'spouse') {
-                        let nextPersonIndex = records.findIndex((rec, i) => i > index && rec.record_type.toLowerCase() === 'person');
-                        if (nextPersonIndex === -1) nextPersonIndex = records.length;
-                        return index > 0 && index < nextPersonIndex && records[0].record_type.toLowerCase() === 'person';
-                    }
-                    return true;
-                }).filter(r => r.record_type.toLowerCase() === 'person');
-                fields = [
-                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off' },
-                    { name: 'gender', label: 'Sex', type: 'select', options: ['', 'Male', 'Female'] },
-                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
-                    { name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
-                ];
-            } else if (mode === 'addSpouse') {
-                modalTitle.textContent = 'Add Partner';
-                const selectablePeople = records.filter((r, index) => {
-                    if (index === 0 && r.record_type.toLowerCase() === 'person') return false;
-                    if (r.record_type.toLowerCase() === 'spouse') {
-                        let nextPersonIndex = records.findIndex((rec, i) => i > index && rec.record_type.toLowerCase() === 'person');
-                        if (nextPersonIndex === -1) nextPersonIndex = records.length;
-                        return index > 0 && index < nextPersonIndex && records[0].record_type.toLowerCase() === 'person';
-                    }
-                    return true;
-                }).filter(r => r.record_type.toLowerCase() === 'person');
-                fields = [
-                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off' },
-                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
-                    { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' },
-                    { name: 'relationship', label: 'Relationship', type: 'select', options: ['', 'Spouse', 'Other'] },
-                    { name: 'partner', label: 'Select Genealogical Partner', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
-                ];
+
+            if (mode === 'passphrase') {
+                form.innerHTML = `
+                    <label>Passphrase</label>
+                    <input type="password" name="passphrase" autocomplete="off" onkeydown="if (event.key === 'Enter') event.preventDefault();">
+                    <button type="button" onclick="submitPassphrase('processEncryptedFile')">Submit</button>
+                `;
             } else if (mode === 'updateRecord') {
-                modalTitle.textContent = 'Update Record';
-                fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)] },
-                    { name: 'field', label: 'Field to Update', type: 'select', options: [''] },
-                    { name: 'value', label: 'New Value', type: 'text' }
-                ];
-            } else if (mode === 'recordDeathBurial') {
-                modalTitle.textContent = 'Record Death/Burial';
-                fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)] },
-                    { name: 'death_date', label: 'Death Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'death_location', label: 'Death Location', type: 'text' },
-                    { name: 'burial_location', label: 'Burial Location', type: 'text' }
-                ];
-            }
-            fields.forEach(field => {
-                const label = document.createElement('label');
-                label.textContent = field.label;
-                modalForm.appendChild(label);
-                if (field.type === 'select') {
-                    const select = document.createElement('select');
-                    select.name = field.name;
-                    field.options.forEach(opt => {
-                        const option = document.createElement('option');
-                        option.value = opt;
-                        option.textContent = opt || '(Select)';
-                        select.appendChild(option);
-                    });
-                    modalForm.appendChild(select);
-                } else {
-                    const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
-                    input.type = field.type;
-                    input.name = field.name;
-                    if (field.autocomplete) {
-                        input.setAttribute('autocomplete', field.autocomplete);
-                    }
-                    modalForm.appendChild(input);
-                }
-            });
-            const submitBtn = document.createElement('button');
-            submitBtn.textContent = 'Save';
-            submitBtn.onclick = () => saveModalData(mode);
-            modalForm.appendChild(submitBtn);
-            if (mode === 'updateRecord') {
-                const recordSelect = modalForm.querySelector('select[name="record"]');
-                const fieldSelect = modalForm.querySelector('select[name="field"]');
-                recordSelect.addEventListener('change', () => {
-                    const selectedRecord = recordSelect.value;
-                    if (!selectedRecord) {
-                        fieldSelect.innerHTML = '<option value=""></option>';
-                        return;
-                    }
-                    const [recordType, name] = selectedRecord.split(': ');
-                    const cleanType = recordType.toLowerCase() === 'partner' ? 'spouse' : 'person';
-                    const editableFields = [...fieldRestrictions[cleanType].editable];
-                    fieldSelect.innerHTML = '';
-                    const emptyOption = document.createElement('option');
-                    emptyOption.value = '';
-                    fieldSelect.appendChild(emptyOption);
-                    editableFields.forEach(f => {
-                        const option = document.createElement('option');
-                        option.value = f;
-                        option.textContent = f;
-                        fieldSelect.appendChild(option);
-                    });
-                    fieldSelect.value = '';
-                });
+                const recordOptions = records.map(r => `<option value="${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}">${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}</option>`).join('');
+                const fieldOptions = Object.keys(records[0] || {}).filter(f => f !== 'record_type' && f !== 'gen').map(f => `<option value="${f}">${f}</option>`).join('');
+                form.innerHTML = `
+                    <label>Record</label>
+                    <select name="record">${recordOptions}</select>
+                    <label>Field</label>
+                    <select name="field">${fieldOptions}</select>
+                    <label>Value</label>
+                    <input type="text" name="value">
+                    <button type="button" onclick="saveModalData('updateRecord')">Save</button>
+                `;
+            } else if (mode === 'addChild' || mode === 'addSpouse' || mode === 'recordDeathBurial') {
+                const recordOptions = records.map(r => `<option value="${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}">${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}</option>`).join('');
+                form.innerHTML = `
+                    <label>Record</label>
+                    <select name="record">${recordOptions}</select>
+                    ${mode === 'addChild' ? '<label>Name</label><input type="text" name="name">' : ''}
+                    ${mode === 'addSpouse' ? '<label>Partner Name</label><input type="text" name="name">' : ''}
+                    ${mode === 'recordDeathBurial' ? `
+                        <label>Death Date</label><input type="text" name="death_date" placeholder="YYYY-MM-DD">
+                        <label>Death Location</label><input type="text" name="death_location">
+                        <label>Burial Location</label><input type="text" name="burial_location">
+                    ` : ''}
+                    <button type="button" onclick="saveModalData('${mode}')">Save</button>
+                `;
             }
         }
 
         function closeModal() {
-            document.getElementById('modal').style.display = 'none';
-            modalMode = null;
+            const modal = document.getElementById('modal');
+            modal.style.display = 'none';
             document.getElementById('modalForm').innerHTML = '';
+            modalMode = null;
             if (debugMode) console.log('Modal closed');
         }
 
         function saveModalData(mode) {
-            if (debugMode) console.log(`Saving modal data for mode: ${mode}`);
+            if (debugMode) console.log(`Saving modal data for mode: ${mode} - Start`);
             const form = document.getElementById('modalForm');
             const data = {};
             for (let input of form.elements) {
                 if (input.name) data[input.name] = input.value;
             }
-            if (mode === 'addChild') {
-                if (!data.name || !data.parents) {
-                    alert('Name and Parent are required.');
+            if (debugMode) console.log(`Collected data:`, data);
+
+            if (mode === 'updateRecord') {
+                if (debugMode) console.log(`Validating updateRecord data`);
+                if (!data.record || !data.field || !data.value) {
+                    alert('Please select a record, field, and enter a value.');
+                    if (debugMode) console.log('Validation failed: Missing required fields');
                     return;
                 }
-                const parent = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
-                if (!parent) {
-                    alert('Invalid parent selected.');
+                if (dateFields.includes(data.field) && !isValidDate(data.value)) {
+                    alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                    if (debugMode) console.log(`Validation failed for ${data.field}: ${data.value}`);
                     return;
                 }
-                const parentGen = parseInt(parent.gen) || 0;
-                const newRecord = {
-                    record_type: 'Person',
-                    gen: (parentGen + 1).toString(),
+                if (data.field === 'relationship' && !['Spouse', 'Other'].includes(data.value)) {
+                    alert('Relationship must be "Spouse" or "Other".');
+                    if (debugMode) console.log(`Validation failed for relationship: ${data.value}`);
+                    return;
+                }
+                const [recordType, name] = data.record.split(': ');
+                const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
+                if (!record) {
+                    alert('Invalid record selected.');
+                    if (debugMode) console.log('Validation failed: Invalid record');
+                    return;
+                }
+                if (isFieldEditable(record.record_type, data.field)) {
+                    if (debugMode) console.log(`Updating ${data.field} to ${data.value} for record: ${name}`);
+                    record[data.field] = data.value;
+                } else {
+                    alert('Selected field is not editable.');
+                    if (debugMode) console.log('Validation failed: Field not editable');
+                    return;
+                }
+            } else if (mode === 'addChild') {
+                if (!data.record || !data.name) {
+                    alert('Please select a record and enter a name.');
+                    return;
+                }
+                const [recordType, parentName] = data.record.split(': ');
+                records.push({
+                    record_type: 'person',
+                    gen: records.find(r => r.name === parentName).gen + 1,
                     name: data.name,
-                    gender: data.gender,
-                    birth_date: data.birth_date,
-                    birth_location: data.birth_location,
-                    parents: '',
+                    gender: '',
+                    birth_date: '',
+                    birth_location: '',
                     death_date: '',
                     death_location: '',
                     burial_location: '',
                     service: '',
                     marriage_date: '',
-                    relationship: '',
-                    divorced: ''
-                };
-                if (!validateDateFields(data, ['birth_date'])) {
-                    if (debugMode) console.log('Date validation failed, remaining in modal');
-                    return; // Stay in modal with warning shown
-                }
-                let insertIndex = records.indexOf(parent) + 1;
-                while (insertIndex < records.length && records[insertIndex].record_type.toLowerCase() === 'spouse') {
-                    insertIndex++;
-                }
-                records.splice(insertIndex, 0, newRecord);
+                    relationship: 'Child',
+                    divorced: '',
+                    parents: parentName
+                });
             } else if (mode === 'addSpouse') {
-                if (!data.name || !data.partner || !data.relationship) {
-                    alert('Name, Select Genealogical Partner, and Relationship are required.');
+                if (!data.record || !data.name) {
+                    alert('Please select a record and enter a partner name.');
                     return;
                 }
-                const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
-                if (!partner) {
-                    alert('Invalid partner selected.');
-                    return;
-                }
-                const newRecord = {
-                    record_type: 'Spouse',
-                    gen: '',
+                const [recordType, spouseName] = data.record.split(': ');
+                records.push({
+                    record_type: 'spouse',
+                    gen: records.find(r => r.name === spouseName).gen,
                     name: data.name,
                     gender: '',
-                    birth_date: data.birth_date,
-                    birth_location: data.birth_location,
-                    parents: data.parents || '',
+                    birth_date: '',
+                    birth_location: '',
                     death_date: '',
                     death_location: '',
                     burial_location: '',
                     service: '',
-                    marriage_date: data.marriage_date,
-                    relationship: data.relationship,
-                    divorced: ''
-                };
-                if (!validateDateFields(data, ['birth_date', 'marriage_date'])) {
-                    if (debugMode) console.log('Date validation failed, remaining in modal');
-                    return; // Stay in modal with warning shown
-                }
-                let insertIndex = records.indexOf(partner) + 1;
-                records.splice(insertIndex, 0, newRecord);
-            } else if (mode === 'updateRecord') {
-                if (!data.record || !data.field || !data.value) {
-                    alert('Please select a record, field, and enter a value.');
-                    return;
-                }
-                const [recordType, name] = data.record.split(': ');
-                const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
-                if (!record) {
-                    alert('Invalid record selected.');
-                    return;
-                }
-                if (data.field === 'relationship' && !['Spouse', 'Other'].includes(data.value)) {
-                    alert('Relationship must be "Spouse" or "Other".');
-                    return;
-                }
-                if (dateFields.includes(data.field) && !isValidDate(data.value)) {
-                    alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                if (isFieldEditable(record.record_type, data.field)) {
-                    record[data.field] = data.value;
-                } else {
-                    alert('Selected field is not editable.');
-                }
+                    marriage_date: '',
+                    relationship: 'Spouse',
+                    divorced: '',
+                    parents: ''
+                });
             } else if (mode === 'recordDeathBurial') {
-                if (!data.record) {
-                    alert('Please select a record.');
+                if (!data.record || !data.death_date || !isValidDate(data.death_date)) {
+                    alert('Please select a record and enter a valid death date (YYYY-MM-DD).');
                     return;
                 }
                 const [recordType, name] = data.record.split(': ');
                 const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
-                if (!record) {
-                    alert('Invalid record selected.');
-                    return;
-                }
-                if (data.death_date && !isValidDate(data.death_date)) {
-                    alert('Invalid death date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                if (data.death_date && isFieldEditable(record.record_type, 'death_date')) {
-                    record.death_date = data.death_date;
-                }
-                if (data.death_location && isFieldEditable(record.record_type, 'death_location')) {
-                    record.death_location = data.death_location;
-                }
-                if (data.burial_location && isFieldEditable(record.record_type, 'burial_location')) {
-                    record.burial_location = data.burial_location;
-                }
-                if (!data.death_date && !data.death_location && !data.burial_location) {
-                    alert('At least one field (Death Date, Death Location, or Burial Location) must be provided.');
-                    return;
-                }
+                record.death_date = data.death_date;
+                record.death_location = data.death_location || '';
+                record.burial_location = data.burial_location || '';
             }
-            closeModal();
-            debounceDisplayRecords();
-            if (debugMode) console.log(`Saved ${mode} data:`, data);
-        }
 
-        function validateDateFields(data, fieldsToCheck) {
-            for (let field of fieldsToCheck) {
-                if (data[field] && !isValidDate(data[field])) {
-                    alert(`Invalid ${field.replace('_', ' ')}. Use YYYY, YYYY-MM, or YYYY-MM-DD.`);
-                    if (debugMode) console.log(`Validation failed for ${field}: ${data[field]}, staying in modal`);
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        function toggleTable() {
-            const tableContainer = document.getElementById('tableContainer');
-            const isHidden = tableContainer.style.display === 'none';
-            tableContainer.style.display = isHidden ? 'block' : 'none';
-            if (isHidden && records.length > 0) {
+            try {
+                if (debugMode) console.log('Attempting to save and close modal');
+                closeModal();
                 debounceDisplayRecords();
+                if (debugMode) console.log(`Saved ${mode} data successfully:`, data);
+            } catch (error) {
+                if (debugMode) console.log('Error during save operation:', error);
             }
-            if (debugMode) console.log(`Table toggled: ${isHidden ? 'shown' : 'hidden'}`);
+        }
+
+        function isFieldEditable(recordType, field) {
+            const editableFields = {
+                'person': ['name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service'],
+                'spouse': ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents']
+            };
+            if (debugMode) console.log(`Checking editable: record_type='${recordType}', field=${field}, isEditable=${editableFields[recordType]?.includes(field) || false}`);
+            return editableFields[recordType]?.includes(field) || false;
+        }
+
+        function isFieldGreyedOut(recordType, field) {
+            const greyedOutFields = {
+                'person': ['marriage_date', 'relationship', 'divorced', 'parents'],
+                'spouse': ['gen', 'gender']
+            };
+            if (debugMode) console.log(`Checking greyed-out: record_type='${recordType}', field=${field}, isGreyedOut=${greyedOutFields[recordType]?.includes(field) || false}`);
+            return greyedOutFields[recordType]?.includes(field) || false;
         }
 
         function debounceDisplayRecords() {
             if (renderTimeout) clearTimeout(renderTimeout);
-            renderTimeout = setTimeout(displayRecords, 16);
+            renderTimeout = setTimeout(displayRecords, 100);
             if (debugMode) console.log('Debouncing display records');
         }
 
-        function toggleColumn(column) {
-            if (vestigialColumns.has(column)) {
-                vestigialColumns.delete(column);
-                if (debugMode) console.log(`Restored column: ${column}`);
-            } else {
-                vestigialColumns.add(column);
-                if (debugMode) console.log(`Collapsed column: ${column}`);
-            }
-            debounceDisplayRecords();
-        }
-
-        function isFieldEditable(recordType, field) {
-            const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
-            const restrictions = fieldRestrictions[cleanType];
-            if (!restrictions) {
-                if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to uneditable`);
-                return false;
-            }
-            const isEditable = restrictions.editable.includes(field);
-            if (debugMode) console.log(`Checking editable: record_type='${cleanType}', field=${field}, isEditable=${isEditable}`);
-            return isEditable;
-        }
-
-        function isFieldGreyedOut(recordType, field) {
-            const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
-            const restrictions = fieldRestrictions[cleanType];
-            if (!restrictions) {
-                if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to not greyed-out`);
-                return false;
-            }
-            const isGreyedOut = restrictions.greyedOut.includes(field);
-            if (debugMode) console.log(`Checking greyed-out: record_type='${cleanType}', field=${field}, isGreyedOut=${isGreyedOut}`);
-            return isGreyedOut;
-        }
-
         function displayRecords() {
-            const recordBody = document.getElementById('recordBody');
-            recordBody.innerHTML = '';
+            const container = document.getElementById('recordBody');
+            if (!container) return;
+            container.innerHTML = '';
             if (records.length === 0) {
-                if (debugMode) console.log('No records to display');
+                container.innerHTML = '<p>No records to display.</p>';
                 return;
             }
             const table = document.createElement('table');
+            let headers = Object.keys(records[0]);
+            headers = headers.filter(h => !vestigialColumns.has(h));
             const headerRow = document.createElement('tr');
-            const headers = Object.keys(records[0]);
             headers.forEach(header => {
                 const th = document.createElement('th');
-                th.className = header;
-                if (!['record_type', 'gen', 'name', 'gender'].includes(header)) {
-                    const toggleButton = document.createElement('span');
-                    toggleButton.textContent = vestigialColumns.has(header) ? '👁️‍🗨️' : '👁️';
-                    toggleButton.className = 'action-icons';
-                    toggleButton.onclick = () => toggleColumn(header);
-                    th.appendChild(toggleButton);
-                }
-                const headerText = document.createElement('span');
-                headerText.textContent = header === 'record_type' ? 'record' : header === 'gender' ? 'sex' : header;
-                headerText.className = 'header-text';
-                th.appendChild(headerText);
-                if (vestigialColumns.has(header) && !['record_type', 'gen', 'name', 'gender'].includes(header)) th.className += ' vestigial';
+                th.textContent = header.replace(/_/g, ' ');
+                if (vestigialColumns.has(header)) th.classList.add('vestigial');
+                if (header === 'record_type') th.classList.add('record_type');
+                else if (header === 'gen') th.classList.add('gen');
+                else if (header === 'sex' || header === 'gender') th.classList.add('sex');
                 headerRow.appendChild(th);
             });
             table.appendChild(headerRow);
+
             records.forEach((record, index) => {
-                const tr = document.createElement('tr');
-                if (index === highlightedRow) tr.className = 'highlighted-row';
-                tr.className += ' editable-row';
+                const row = document.createElement('tr');
+                row.classList.add('editable-row');
+                if (index === highlightedRow) row.classList.add('highlighted-row');
                 headers.forEach(header => {
                     const td = document.createElement('td');
-                    td.className = header;
-                    const cellContent = document.createElement('span');
-                    const displayValue = header === 'record_type' && record[header].toLowerCase() === 'spouse' ? 'Partner' : 
-                     header === 'gender' ? (record[header] || '') : 
-                     record[header] || '';
-                    cellContent.textContent = displayValue;
-                    cellContent.className = 'cell-content';
-                    td.appendChild(cellContent);
-                    const isEditable = isFieldEditable(record.record_type, header);
-                    const isGrey = isFieldGreyedOut(record.record_type, header);
-                    if (isEditable && !vestigialColumns.has(header)) {
-                        td.className += ' editable';
-                        td.addEventListener('click', (e) => {
-                            if (editingIndex === null) {
-                                startEditing(index, header, td, cellContent.textContent);
-                                e.stopPropagation();
-                                if (debugMode) console.log(`Cell clicked: record ${index + 1}, field ${header}`);
-                            }
-                        });
-                    } else if (isGrey) {
-                        td.className += ' greyed-out';
-                    }
-                    if (vestigialColumns.has(header) && !['record_type', 'gen', 'name', 'gender'].includes(header)) td.className += ' vestigial';
-                    tr.appendChild(td);
+                    td.textContent = record[header] || '';
+                    if (vestigialColumns.has(header)) td.classList.add('vestigial');
+                    if (!isFieldEditable(record.record_type, header)) td.classList.add('greyed-out');
+                    else if (isFieldGreyedOut(record.record_type, header)) td.classList.add('greyed-out');
+                    row.appendChild(td);
                 });
-                tr.addEventListener('click', (e) => {
-                    if (editingIndex === null && e.target.tagName !== 'TEXTAREA') {
-                        highlightedRow = (highlightedRow === index) ? null : index;
-                        if (debugMode) console.log(`Row ${highlightedRow !== null ? highlightedRow + 1 : 'none'} highlighted`);
-                        debounceDisplayRecords();
-                    }
-                });
-                table.appendChild(tr);
+                table.appendChild(row);
             });
-            recordBody.appendChild(table);
+            container.appendChild(table);
             if (debugMode) console.log('Records displayed');
         }
 
-        function startEditing(index, field, td, currentValue) {
-            editingIndex = index;
-            editingField = field;
-            td.innerHTML = '';
-            const textarea = document.createElement('textarea');
-            textarea.className = 'edit-textarea';
-            textarea.value = currentValue;
-            textarea.rows = Math.max(2, currentValue.split('\n').length);
-            td.appendChild(textarea);
-            textarea.focus();
-            if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field}`);
-            textarea.onblur = () => saveEdit(index, field, textarea.value, td, currentValue);
-            textarea.onkeydown = (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    saveEdit(index, field, textarea.value, td, currentValue);
-                } else if (e.key === 'Escape') {
-                    cancelEdit(td, currentValue);
-                }
-            };
-        }
-
-        function saveEdit(index, field, value, td, originalValue) {
-            const trimmedValue = value.trim();
-            if (dateFields.includes(field) && !isValidDate(trimmedValue)) {
-                alert(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD (e.g., 2023, 2023-05, 2023-05-15).`);
-                if (debugMode) console.log(`Date validation failed for ${field}: ${trimmedValue}`);
-                cancelEdit(td, originalValue);
-                return;
-            }
-            if (field === 'relationship' && !['Spouse', 'Other'].includes(trimmedValue)) {
-                alert('Relationship must be "Spouse" or "Other".');
-                if (debugMode) console.log(`Relationship validation failed: ${trimmedValue}`);
-                cancelEdit(td, originalValue);
-                return;
-            }
-            if (trimmedValue !== originalValue) {
-                records[index][field] = trimmedValue;
-                if (debugMode) console.log(`Saved edit: record ${index + 1}, field ${field}, value ${trimmedValue}`);
-            }
-            editingIndex = null;
-            editingField = null;
-            td.innerHTML = '';
-            const cellContent = document.createElement('span');
-            cellContent.textContent = trimmedValue;
-            cellContent.className = 'cell-content';
-            td.appendChild(cellContent);
-            debounceDisplayRecords();
-        }
-
-        function cancelEdit(td, originalValue) {
-            editingIndex = null;
-            editingField = null;
-            td.innerHTML = '';
-            const cellContent = document.createElement('span');
-            cellContent.textContent = originalValue;
-            cellContent.className = 'cell-content';
-            td.appendChild(cellContent);
-            if (debugMode) console.log('Cancelled edit');
-            debounceDisplayRecords();
-        }
-
-        function validateRecord(record) {
-            return Object.values(record).every(value => typeof value === 'string');
-        }
-
-        function escapeCSVField(field) {
-            if (typeof field !== 'string') field = String(field);
-            if (field.includes('"') || field.includes(',')) {
-                return `"${field.replace(/"/g, '""')}"`;
-            }
-            return field;
-        }
-
-        function isValidEmail(email) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            return emailRegex.test(email);
-        }
-
-        function showPopup(message) {
-            const popup = document.createElement('div');
-            popup.style.position = 'fixed';
-            popup.style.top = '50%';
-            popup.style.left = '50%';
-            popup.style.transform = 'translate(-50%, -50%)';
-            popup.style.backgroundColor = '#fff';
-            popup.style.border = '1px solid #000';
-            popup.style.padding = '20px';
-            popup.style.zIndex = '1000';
-            popup.innerHTML = message + '<br><button onclick="this.parentElement.remove()">Close</button>';
-            document.body.appendChild(popup);
+        function toggleTable() {
+            const container = document.getElementById('tableContainer');
+            container.style.display = container.style.display === 'none' ? 'block' : 'none';
+            if (debugMode) console.log(`Table toggled: ${container.style.display === 'none' ? 'hidden' : 'shown'}`);
+            if (container.style.display !== 'none') debounceDisplayRecords();
         }
 
         function downloadCSV() {
-            if (records.length === 0) {
-                alert('No records to download');
-                return;
-            }
-            if (decryptionPassphrase === null) {
-                alert('No passphrase available. Please load an encrypted file first.');
-                return;
-            }
-            const headers = Object.keys(records[0]);
-            const csv = [
-                headers.map(escapeCSVField).join(','),
-                ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
-            ].join('\r\n') + '\r\n';
-            const encryptedData = encryptFile(csv, decryptionPassphrase);
-            let downloadFileName = 'returns.csv.enc';
-            const match = originalFileName.match(/^records_(\d{4})\.csv(\.enc)?$/i);
-            if (match) {
-                downloadFileName = `returns_${match[1]}.csv.enc`;
-            }
-            const encryptedBlob = new Blob([encryptedData], { type: 'application/octet-stream' });
-            const encryptedLink = document.createElement('a');
-            encryptedLink.href = URL.createObjectURL(encryptedBlob);
-            encryptedLink.download = downloadFileName;
-            const emailBody = `Please attach the file "${downloadFileName}" from your Downloads folder and send.\n\nSteps:\n1. Find "${downloadFileName}" in your Downloads folder (Windows: C:\\Users\\YourName\\Downloads, macOS: ~/Downloads).\n2. Attach it to this email using the "Attach File" or drag-and-drop option.\n3. Click Send to submit your updated genealogy records.`;
-            setTimeout(() => {
-                encryptedLink.click();
-                URL.revokeObjectURL(encryptedLink.href);
-                const mailtoLink = `mailto:markscheitrum@aol.com?subject=${encodeURIComponent('Updated Genealogy Records')}&body=${encodeURIComponent(emailBody)}`;
-                window.location.href = mailtoLink;
-            }, 100);
-            showPopup(`
-                Downloaded "${downloadFileName}" to your Downloads folder.<br><br>
-                Your email client should have opened with a new email to <strong>markscheitrum@aol.com</strong>.<br>
-                Follow the instructions in the email to attach "${downloadFileName}" and send.<br><br>
-                <strong>If the email didn't open:</strong><br>
-                1. Open your email client (e.g., <a href="https://mail.aol.com">AOL Mail</a>, <a href="https://outlook.live.com">Outlook</a>, or Thunderbird).<br>
-                2. Create a new email to <strong>markscheitrum@aol.com</strong> with subject <strong>Updated Genealogy Records</strong>.<br>
-                3. Attach "${downloadFileName}" from your Downloads folder and send.
-            `);
-            if (debugMode) {
-                console.log(`Downloaded ${downloadFileName}, size=${encryptedData.length} bytes`);
-                console.log(`Opened mailto link with body length=${emailBody.length} chars`);
-            }
+            const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(convertToCSV(records));
+            const link = document.createElement('a');
+            link.setAttribute('href', csvContent);
+            link.setAttribute('download', originalFileName.replace('.enc', '') || 'records.csv');
+            link.click();
         }
 
-        waitForCryptoJS(() => {
-            initDebugMode();
-            console.log('CryptoJS ready');
+        function convertToCSV(arr) {
+            const array = [Object.keys(arr[0])].concat(arr);
+            return array.map(row => Object.values(row).map(value => `"${value}"`).join(',')).join('\n');
+        }
+
+        function parseCSVFile(text) {
+            const lines = text.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+            const result = [];
+            for (let i = 1; i < lines.length; i++) {
+                const obj = {};
+                const currentLine = lines[i].split(',').map(v => v.replace(/"/g, '').trim());
+                for (let j = 0; j < headers.length; j++) {
+                    obj[headers[j]] = currentLine[j] || '';
+                }
+                result.push(obj);
+            }
+            return result;
+        }
+
+        function arrayBufferToBinary(buffer) {
+            const binary = new Uint8Array(buffer);
+            let binaryString = '';
+            for (let i = 0; i < binary.length; i++) {
+                binaryString += String.fromCharCode(binary[i]);
+            }
+            return binaryString;
+        }
+
+        window.addEventListener('unload', () => {
+            records = [];
+            decryptionPassphrase = null;
         });
+
+        // Placeholder for decryption function (to be implemented with CryptoJS)
+        function decryptFile(data, passphrase) {
+            try {
+                const salt = CryptoJS.lib.WordArray.random(16);
+                const iv = CryptoJS.lib.WordArray.random(16);
+                const key = CryptoJS.PBKDF2(passphrase, salt, { keySize: 32, iterations: 1000 });
+                const encrypted = CryptoJS.AES.encrypt(data, key, { iv: iv }).toString();
+                return CryptoJS.AES.decrypt(encrypted, key, { iv: iv }).toString(CryptoJS.enc.Utf8);
+            } catch (e) {
+                return { error: e.message };
+            }
+        }
     </script>
 </body>
 </html>
