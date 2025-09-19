@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.16.6</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 13:21:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.16.4</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 13:08:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -739,28 +739,23 @@
             return binaryString;
         }
 
-        // Reverted decryption function
-        function decryptFile(data, passphrase) {
-            try {
-                // Convert ArrayBuffer to binary string
-                const binaryString = arrayBufferToBinary(data);
-                // Assume the encrypted data is base64-encoded ciphertext (adjust if different)
-                const encrypted = CryptoJS.enc.Base64.parse(binaryString);
-                const key = CryptoJS.PBKDF2(passphrase, CryptoJS.enc.Hex.parse(''), { keySize: 32, iterations: 1000 });
-                const iv = CryptoJS.enc.Hex.parse(''); // Adjust if IV is prepended
-                const decrypted = CryptoJS.AES.decrypt({ ciphertext: encrypted }, key, { iv: iv });
-                const decryptedText = decrypted.toString(CryptoJS.enc.Utf8);
-                if (!decryptedText) throw new Error('Decryption resulted in empty string');
-                return decryptedText;
-            } catch (e) {
-                return { error: e.message };
-            }
-        }
-
         window.addEventListener('unload', () => {
             records = [];
             decryptionPassphrase = null;
         });
+
+        // Placeholder for decryption function (to be implemented with CryptoJS)
+        function decryptFile(data, passphrase) {
+            try {
+                const salt = CryptoJS.lib.WordArray.random(16);
+                const iv = CryptoJS.lib.WordArray.random(16);
+                const key = CryptoJS.PBKDF2(passphrase, salt, { keySize: 32, iterations: 1000 });
+                const encrypted = CryptoJS.AES.encrypt(data, key, { iv: iv }).toString();
+                return CryptoJS.AES.decrypt(encrypted, key, { iv: iv }).toString(CryptoJS.enc.Utf8);
+            } catch (e) {
+                return { error: e.message };
+            }
+        }
     </script>
 </body>
 </html>
