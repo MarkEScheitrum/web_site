@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.16.2</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 10:53:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.16.3</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 12:39:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -241,7 +241,7 @@
             const form = document.getElementById('modalForm');
             form.innerHTML = `
                 <label>Passphrase</label>
-                <input type="password" name="passphrase" onkeydown="if (event.key === 'Enter') event.preventDefault();">
+                <input type="password" name="passphrase" autocomplete="off" onkeydown="if (event.key === 'Enter') event.preventDefault();">
                 <button type="button" onclick="submitPassphrase('${callback}')">Submit</button>
             `;
         }
@@ -640,6 +640,7 @@
             const modalForm = document.getElementById('modalForm');
             modalForm.innerHTML = '';
             modal.style.display = 'block';
+            if (debugMode) console.log(`Modal opened for mode: ${mode}`);
             let fields = [];
             if (mode === 'addChild') {
                 modalTitle.textContent = 'Add Child';
@@ -758,6 +759,7 @@
         }
 
         function saveModalData(mode) {
+            if (debugMode) console.log(`Saving modal data for mode: ${mode}`);
             const form = document.getElementById('modalForm');
             const data = {};
             for (let input of form.elements) {
