@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.16.2</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 10:35:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.16.2</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 10:53:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -754,6 +754,7 @@
             document.getElementById('modal').style.display = 'none';
             modalMode = null;
             document.getElementById('modalForm').innerHTML = '';
+            if (debugMode) console.log('Modal closed');
         }
 
         function saveModalData(mode) {
@@ -790,6 +791,7 @@
                     divorced: ''
                 };
                 if (!validateDateFields(data, ['birth_date'])) {
+                    if (debugMode) console.log('Date validation failed, remaining in modal');
                     return; // Stay in modal with warning shown
                 }
                 let insertIndex = records.indexOf(parent) + 1;
@@ -824,6 +826,7 @@
                     divorced: ''
                 };
                 if (!validateDateFields(data, ['birth_date', 'marriage_date'])) {
+                    if (debugMode) console.log('Date validation failed, remaining in modal');
                     return; // Stay in modal with warning shown
                 }
                 let insertIndex = records.indexOf(partner) + 1;
@@ -890,6 +893,7 @@
             for (let field of fieldsToCheck) {
                 if (data[field] && !isValidDate(data[field])) {
                     alert(`Invalid ${field.replace('_', ' ')}. Use YYYY, YYYY-MM, or YYYY-MM-DD.`);
+                    if (debugMode) console.log(`Validation failed for ${field}: ${data[field]}, staying in modal`);
                     return false;
                 }
             }
@@ -909,6 +913,7 @@
         function debounceDisplayRecords() {
             if (renderTimeout) clearTimeout(renderTimeout);
             renderTimeout = setTimeout(displayRecords, 16);
+            if (debugMode) console.log('Debouncing display records');
         }
 
         function toggleColumn(column) {
@@ -1015,7 +1020,7 @@
                 table.appendChild(tr);
             });
             recordBody.appendChild(table);
-            if (debugMode) console.log(`Displayed ${records.length} records`);
+            if (debugMode) console.log('Records displayed');
         }
 
         function startEditing(index, field, td, currentValue) {
