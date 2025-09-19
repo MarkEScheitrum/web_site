@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.16.1</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 15:47:23 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.16.2</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 10:35:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -789,9 +789,8 @@
                     relationship: '',
                     divorced: ''
                 };
-                if (!isValidDate(data.birth_date)) {
-                    alert('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
+                if (!validateDateFields(data, ['birth_date'])) {
+                    return; // Stay in modal with warning shown
                 }
                 let insertIndex = records.indexOf(parent) + 1;
                 while (insertIndex < records.length && records[insertIndex].record_type.toLowerCase() === 'spouse') {
@@ -824,9 +823,8 @@
                     relationship: data.relationship,
                     divorced: ''
                 };
-                if (!isValidDate(data.birth_date) || !isValidDate(data.marriage_date)) {
-                    alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
+                if (!validateDateFields(data, ['birth_date', 'marriage_date'])) {
+                    return; // Stay in modal with warning shown
                 }
                 let insertIndex = records.indexOf(partner) + 1;
                 records.splice(insertIndex, 0, newRecord);
@@ -886,6 +884,16 @@
             closeModal();
             debounceDisplayRecords();
             if (debugMode) console.log(`Saved ${mode} data:`, data);
+        }
+
+        function validateDateFields(data, fieldsToCheck) {
+            for (let field of fieldsToCheck) {
+                if (data[field] && !isValidDate(data[field])) {
+                    alert(`Invalid ${field.replace('_', ' ')}. Use YYYY, YYYY-MM, or YYYY-MM-DD.`);
+                    return false;
+                }
+            }
+            return true;
         }
 
         function toggleTable() {
