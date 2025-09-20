@@ -5,7 +5,6 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;">
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
-    <!-- Only pako for decompression - pure JS ZIP parsing below -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js" crossorigin="anonymous"></script>
     <style>
         body {
@@ -176,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.19</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 16:15:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.20</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 16:45:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -219,6 +218,23 @@
         let renderTimeout = null;
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
 
+        // Prevent navigation on form submission
+        window.addEventListener('beforeunload', function(e) {
+            if (modalMode) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }
+        });
+
+        // Suppress extension errors
+        window.addEventListener('error', function(e) {
+            if (e.message && e.message.includes('runtime.lastError')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
         function selectAndLoadFile() {
             document.getElementById('textFile').click();
         }
@@ -237,12 +253,12 @@
         }
 
         function getPassphrase(callback, fileName) {
-            openModal('passphrase');
+            safeOpenModal('passphrase');
             document.getElementById('modalTitle').textContent = `Enter Passphrase for ${fileName || 'file'}`;
             const form = document.getElementById('modalForm');
             form.innerHTML = `
                 <label>Passphrase</label>
-                <input type="password" name="passphrase" onkeydown="if (event.key === 'Enter') event.preventDefault();">
+                <input type="password" name="passphrase" onkeydown="if (event.key === 'Enter') { event.preventDefault(); submitPassphrase('${callback}'); }">
                 <button type="button" onclick="submitPassphrase('${callback}')">Submit</button>
             `;
         }
@@ -251,13 +267,67 @@
             const passphrase = document.querySelector('#modalForm input[name="passphrase"]').value;
             if (passphrase) {
                 decryptionPassphrase = passphrase;
-                closeModal();
-                window[callback]();
+                safeCloseModal();
+                // Ensure callback exists before calling
+                if (window[callback]) {
+                    window[callback]();
+                } else {
+                    if (debugMode) console.log(`Callback ${callback} not found`);
+                }
             } else {
-                alert('Passphrase is required.');
+                safeShowError('Passphrase is required.');
                 document.getElementById('fileStatus').textContent = 'No file selected';
                 document.getElementById('textFile').value = '';
             }
+        }
+
+        // Safe modal operations that prevent navigation
+        function safeOpenModal(mode) {
+            // Clear any URL parameters that might cause navigation
+            if (window.location.search && !window.location.search.includes('debug=1')) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            modalMode = mode;
+            const modal = document.getElementById('modal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalForm = document.getElementById('modalForm');
+            modalForm.innerHTML = '';
+            modal.style.display = 'block';
+            modalForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            });
+            // Prevent form submission from navigating
+            modalForm.onsubmit = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            };
+        }
+
+        function safeCloseModal() {
+            const modal = document.getElementById('modal');
+            modal.style.display = 'none';
+            modalMode = null;
+            document.getElementById('modalForm').innerHTML = '';
+        }
+
+        function safeShowError(message) {
+            // Use a custom error display instead of alert to prevent focus loss
+            if (debugMode) console.error(`Validation Error: ${message}`);
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = `
+                position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; 
+                padding: 15px; border-radius: 5px; z-index: 2000; max-width: 300px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 14px;
+            `;
+            errorDiv.innerHTML = `
+                <strong>Error</strong><br>${message}
+                <button onclick="this.parentElement.remove()" style="margin-left: 10px; background: none; border: none; color: white; cursor: pointer; float: right;">&times;</button>
+            `;
+            document.body.appendChild(errorDiv);
+            setTimeout(() => errorDiv.remove(), 5000);
         }
 
         // Pure JavaScript ZIP parser - no external dependencies except pako
@@ -300,21 +370,12 @@
                     continue;
                 }
                 
-                const versionMadeBy = view.getUint16(cdPos + 4, true);
-                const versionNeeded = view.getUint16(cdPos + 6, true);
-                const flags = view.getUint16(cdPos + 8, true);
                 const compressionMethod = view.getUint16(cdPos + 10, true);
-                const lastModTime = view.getUint16(cdPos + 12, true);
-                const lastModDate = view.getUint16(cdPos + 14, true);
-                const crc32 = view.getUint32(cdPos + 16, true);
                 const compressedSize = view.getUint32(cdPos + 20, true);
                 const uncompressedSize = view.getUint32(cdPos + 24, true);
                 const fileNameLength = view.getUint16(cdPos + 28, true);
                 const extraFieldLength = view.getUint16(cdPos + 30, true);
                 const fileCommentLength = view.getUint16(cdPos + 32, true);
-                const diskNumberStart = view.getUint16(cdPos + 34, true);
-                const internalFileAttr = view.getUint16(cdPos + 36, true);
-                const externalFileAttr = view.getUint32(cdPos + 38, true);
                 const localHeaderOffset = view.getUint32(cdPos + 42, true);
                 
                 const fileNameStart = cdPos + 46;
@@ -331,12 +392,6 @@
                     const lfhSig = view.getUint32(lfhOffset, true);
                     
                     if (lfhSig === 0x04034b50) { // Local File Header
-                        const lfhVersion = view.getUint16(lfhOffset + 4, true);
-                        const lfhFlags = view.getUint16(lfhOffset + 6, true);
-                        const lfhMethod = view.getUint16(lfhOffset + 8, true);
-                        const lfhTime = view.getUint16(lfhOffset + 10, true);
-                        const lfhDate = view.getUint16(lfhOffset + 12, true);
-                        const lfhCrc32 = view.getUint32(lfhOffset + 14, true);
                         const lfhCompSize = view.getUint32(lfhOffset + 18, true);
                         const lfhUncompSize = view.getUint32(lfhOffset + 22, true);
                         const lfhNameLen = view.getUint16(lfhOffset + 26, true);
@@ -356,7 +411,7 @@
                             name: fileName,
                             data: fileData,
                             uncompressedSize: lfhUncompSize,
-                            compressionMethod: lfhMethod,
+                            compressionMethod: view.getUint16(lfhOffset + 8, true),
                             localOffset: lfhOffset
                         };
                         
@@ -440,14 +495,14 @@
                                 document.getElementById('fileStatus').textContent = `Loaded: ${foundFile.name} (from ZIP)`;
                             } else {
                                 document.getElementById('fileStatus').textContent = 'No file selected';
-                                alert(`Decryption failed: ${result.error}`);
+                                safeShowError(`Decryption failed: ${result.error}`);
                                 decryptionPassphrase = null;
                                 document.getElementById('textFile').value = '';
                             }
                         } catch (decryptError) {
                             if (debugMode) console.log('Decryption error in ZIP processing:', decryptError);
                             document.getElementById('fileStatus').textContent = 'No file selected';
-                            alert(`Error decrypting file from ZIP: ${decryptError.message}`);
+                            safeShowError(`Error decrypting file from ZIP: ${decryptError.message}`);
                             document.getElementById('textFile').value = '';
                         }
                     };
@@ -465,7 +520,7 @@
             } catch (zipError) {
                 if (debugMode) console.log('ZIP processing error:', zipError);
                 document.getElementById('fileStatus').textContent = 'No file selected';
-                alert(`Error processing ZIP file: ${zipError.message}\n\nTry unzipping manually and loading the .csv.enc file directly.`);
+                safeShowError(`Error processing ZIP file: ${zipError.message}\n\nTry unzipping manually and loading the .csv.enc file directly.`);
                 document.getElementById('textFile').value = '';
             }
         }
@@ -476,13 +531,13 @@
             const fileStatus = document.getElementById('fileStatus');
             if (!file) {
                 fileStatus.textContent = 'No file selected';
-                alert('No file selected. Please try again.');
+                safeShowError('No file selected. Please try again.');
                 if (debugMode) console.log('No file selected in processFile');
                 return;
             }
             if (typeof CryptoJS === 'undefined') {
                 fileStatus.textContent = 'No file selected';
-                alert('Crypto library not loaded. Please refresh the page and try again.');
+                safeShowError('Crypto library not loaded. Please refresh the page and try again.');
                 fileInput.value = '';
                 return;
             }
@@ -492,13 +547,13 @@
             reader.onload = function(e) {
                 if (typeof CryptoJS === 'undefined') {
                     fileStatus.textContent = 'No file selected';
-                    alert('Crypto library failed to load during file read. Please refresh and retry.');
+                    safeShowError('Crypto library failed to load during file read. Please refresh and retry.');
                     fileInput.value = '';
                     return;
                 }
                 if (typeof decryptFile === 'undefined') {
                     fileStatus.textContent = 'No file selected';
-                    alert('Decryption function not ready—please refresh and try again.');
+                    safeShowError('Decryption function not ready—please refresh and try again.');
                     fileInput.value = '';
                     return;
                 }
@@ -511,7 +566,7 @@
                     } catch (initError) {
                         if (debugMode) console.log('ZIP processing initialization error:', initError);
                         fileStatus.textContent = 'No file selected';
-                        alert(`ZIP processing failed: ${initError.message}\n\nPlease try unzipping the file manually and loading the .csv.enc file directly.`);
+                        safeShowError(`ZIP processing failed: ${initError.message}\n\nPlease try unzipping the file manually and loading the .csv.enc file directly.`);
                         fileInput.value = '';
                     }
                 } else if (file.name.endsWith('.csv.enc')) {
@@ -525,7 +580,7 @@
                             fileStatus.textContent = `Loaded: ${file.name}`;
                         } else {
                             fileStatus.textContent = 'No file selected';
-                            alert(`Decryption failed: ${result.error}`);
+                            safeShowError(`Decryption failed: ${result.error}`);
                             decryptionPassphrase = null;
                             fileInput.value = '';
                         }
@@ -539,7 +594,7 @@
                     fileStatus.textContent = `Loaded: ${file.name}`;
                 } else {
                     fileStatus.textContent = 'No file selected';
-                    alert(`Unsupported file type: ${file.name}. Expected .csv.enc${debugMode ? ' or .csv' : ''}.`);
+                    safeShowError(`Unsupported file type: ${file.name}. Expected .csv.enc${debugMode ? ' or .csv' : ''}.`);
                     fileInput.value = '';
                     return;
                 }
@@ -796,12 +851,9 @@
         }
 
         function openModal(mode) {
-            modalMode = mode;
-            const modal = document.getElementById('modal');
+            safeOpenModal(mode);
             const modalTitle = document.getElementById('modalTitle');
             const modalForm = document.getElementById('modalForm');
-            modalForm.innerHTML = '';
-            modal.style.display = 'block';
             let fields = [];
             if (mode === 'addChild') {
                 modalTitle.textContent = 'Add Child';
@@ -815,11 +867,11 @@
                     return true;
                 }).filter(r => r.record_type.toLowerCase() === 'person');
                 fields = [
-                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off' },
+                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true },
                     { name: 'gender', label: 'Sex', type: 'select', options: ['', 'Male', 'Female'] },
                     { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
-                    { name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
+                    { name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true }
                 ];
             } else if (mode === 'addSpouse') {
                 modalTitle.textContent = 'Add Partner';
@@ -833,25 +885,25 @@
                     return true;
                 }).filter(r => r.record_type.toLowerCase() === 'person');
                 fields = [
-                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off' },
+                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true },
                     { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
                     { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' },
-                    { name: 'relationship', label: 'Relationship', type: 'select', options: ['', 'Spouse', 'Other'] },
-                    { name: 'partner', label: 'Select Genealogical Partner', type: 'select', options: ['', ...selectablePeople.map(r => r.name)] }
+                    { name: 'relationship', label: 'Relationship', type: 'select', options: ['', 'Spouse', 'Other'], required: true },
+                    { name: 'partner', label: 'Select Genealogical Partner', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true }
                 ];
             } else if (mode === 'updateRecord') {
                 modalTitle.textContent = 'Update Record';
                 fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)] },
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
                     { name: 'field', label: 'Field to Update', type: 'select', options: [''] },
-                    { name: 'value', label: 'New Value', type: 'text' }
+                    { name: 'value', label: 'New Value', type: 'text', required: true }
                 ];
             } else if (mode === 'recordDeathBurial') {
                 modalTitle.textContent = 'Record Death/Burial';
                 fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)] },
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
                     { name: 'death_date', label: 'Death Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'death_location', label: 'Death Location', type: 'text' },
                     { name: 'burial_location', label: 'Burial Location', type: 'text' }
@@ -860,10 +912,14 @@
             fields.forEach(field => {
                 const label = document.createElement('label');
                 label.textContent = field.label;
+                if (field.required) {
+                    label.innerHTML += ' <span style="color: red;">*</span>';
+                }
                 modalForm.appendChild(label);
                 if (field.type === 'select') {
                     const select = document.createElement('select');
                     select.name = field.name;
+                    if (field.required) select.required = true;
                     field.options.forEach(opt => {
                         const option = document.createElement('option');
                         option.value = opt;
@@ -875,6 +931,7 @@
                     const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
                     input.type = field.type;
                     input.name = field.name;
+                    if (field.required) input.required = true;
                     if (field.autocomplete) {
                         input.setAttribute('autocomplete', field.autocomplete);
                     }
@@ -882,8 +939,15 @@
                 }
             });
             const submitBtn = document.createElement('button');
+            submitBtn.type = 'button'; // Explicitly prevent form submission
             submitBtn.textContent = 'Save';
-            submitBtn.onclick = () => saveModalData(mode);
+            submitBtn.onclick = () => {
+                // Prevent double-click
+                if (submitBtn.disabled) return;
+                submitBtn.disabled = true;
+                setTimeout(() => submitBtn.disabled = false, 1000);
+                saveModalData(mode);
+            };
             modalForm.appendChild(submitBtn);
             if (mode === 'updateRecord') {
                 const recordSelect = modalForm.querySelector('select[name="record"]');
@@ -913,141 +977,168 @@
         }
 
         function closeModal() {
-            document.getElementById('modal').style.display = 'none';
-            modalMode = null;
-            document.getElementById('modalForm').innerHTML = '';
+            safeCloseModal();
         }
 
         function saveModalData(mode) {
-            const form = document.getElementById('modalForm');
-            const data = {};
-            for (let input of form.elements) {
-                if (input.name) data[input.name] = input.value;
+            try {
+                const form = document.getElementById('modalForm');
+                const data = {};
+                let hasErrors = false;
+                
+                // Collect form data safely
+                for (let input of form.elements) {
+                    if (input.name && input.type !== 'button') {
+                        data[input.name] = input.value || '';
+                    }
+                }
+                
+                if (debugMode) console.log(`Processing ${mode} with data:`, data);
+                
+                if (mode === 'addChild') {
+                    if (!data.name || !data.parents) {
+                        safeShowError('Name and Parent are required.');
+                        return;
+                    }
+                    const parent = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
+                    if (!parent) {
+                        safeShowError('Invalid parent selected.');
+                        return;
+                    }
+                    const parentGen = parseInt(parent.gen) || 0;
+                    const newRecord = {
+                        record_type: 'Person',
+                        gen: (parentGen + 1).toString(),
+                        name: data.name,
+                        gender: data.gender || '',
+                        birth_date: data.birth_date || '',
+                        birth_location: data.birth_location || '',
+                        parents: '',
+                        death_date: '',
+                        death_location: '',
+                        burial_location: '',
+                        service: '',
+                        marriage_date: '',
+                        relationship: '',
+                        divorced: ''
+                    };
+                    if (data.birth_date && !isValidDate(data.birth_date)) {
+                        safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+                    let insertIndex = records.indexOf(parent) + 1;
+                    while (insertIndex < records.length && records[insertIndex].record_type.toLowerCase() === 'spouse') {
+                        insertIndex++;
+                    }
+                    records.splice(insertIndex, 0, newRecord);
+                    if (debugMode) console.log('Added child record:', newRecord);
+                } else if (mode === 'addSpouse') {
+                    if (!data.name || !data.partner || !data.relationship) {
+                        safeShowError('Name, Select Genealogical Partner, and Relationship are required.');
+                        return;
+                    }
+                    const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
+                    if (!partner) {
+                        safeShowError('Invalid partner selected.');
+                        return;
+                    }
+                    const newRecord = {
+                        record_type: 'Spouse',
+                        gen: '',
+                        name: data.name,
+                        gender: '',
+                        birth_date: data.birth_date || '',
+                        birth_location: data.birth_location || '',
+                        parents: data.parents || '',
+                        death_date: '',
+                        death_location: '',
+                        burial_location: '',
+                        service: '',
+                        marriage_date: data.marriage_date || '',
+                        relationship: data.relationship,
+                        divorced: ''
+                    };
+                    if (data.birth_date && !isValidDate(data.birth_date)) {
+                        safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+                    if (data.marriage_date && !isValidDate(data.marriage_date)) {
+                        safeShowError('Invalid marriage date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+                    let insertIndex = records.indexOf(partner) + 1;
+                    records.splice(insertIndex, 0, newRecord);
+                    if (debugMode) console.log('Added spouse record:', newRecord);
+                } else if (mode === 'updateRecord') {
+                    if (!data.record || !data.field || !data.value) {
+                        safeShowError('Please select a record, field, and enter a value.');
+                        return;
+                    }
+                    const [recordType, name] = data.record.split(': ');
+                    const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
+                    if (!record) {
+                        safeShowError('Invalid record selected.');
+                        return;
+                    }
+                    if (data.field === 'relationship' && !['Spouse', 'Other'].includes(data.value)) {
+                        safeShowError('Relationship must be "Spouse" or "Other".');
+                        return;
+                    }
+                    if (dateFields.includes(data.field) && data.value && !isValidDate(data.value)) {
+                        safeShowError('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+                    if (isFieldEditable(record.record_type, data.field)) {
+                        const oldValue = record[data.field];
+                        record[data.field] = data.value;
+                        if (debugMode) console.log(`Updated ${data.field} from "${oldValue}" to "${data.value}" for ${name}`);
+                    } else {
+                        safeShowError('Selected field is not editable.');
+                        return;
+                    }
+                } else if (mode === 'recordDeathBurial') {
+                    if (!data.record) {
+                        safeShowError('Please select a record.');
+                        return;
+                    }
+                    const [recordType, name] = data.record.split(': ');
+                    const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
+                    if (!record) {
+                        safeShowError('Invalid record selected.');
+                        return;
+                    }
+                    if (data.death_date && !isValidDate(data.death_date)) {
+                        safeShowError('Invalid death date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+                    let updated = false;
+                    if (data.death_date && isFieldEditable(record.record_type, 'death_date')) {
+                        record.death_date = data.death_date;
+                        updated = true;
+                    }
+                    if (data.death_location && isFieldEditable(record.record_type, 'death_location')) {
+                        record.death_location = data.death_location;
+                        updated = true;
+                    }
+                    if (data.burial_location && isFieldEditable(record.record_type, 'burial_location')) {
+                        record.burial_location = data.burial_location;
+                        updated = true;
+                    }
+                    if (!updated) {
+                        safeShowError('At least one field (Death Date, Death Location, or Burial Location) must be provided and editable.');
+                        return;
+                    }
+                    if (debugMode) console.log(`Updated death/burial info for ${name}`);
+                }
+                
+                safeCloseModal();
+                debounceDisplayRecords();
+                if (debugMode) console.log(`Successfully saved ${mode} data:`, data);
+                
+            } catch (error) {
+                if (debugMode) console.error(`Error in saveModalData(${mode}):`, error);
+                safeShowError(`An unexpected error occurred: ${error.message}`);
             }
-            if (mode === 'addChild') {
-                if (!data.name || !data.parents) {
-                    alert('Name and Parent are required.');
-                    return;
-                }
-                const parent = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
-                if (!parent) {
-                    alert('Invalid parent selected.');
-                    return;
-                }
-                const parentGen = parseInt(parent.gen) || 0;
-                const newRecord = {
-                    record_type: 'Person',
-                    gen: (parentGen + 1).toString(),
-                    name: data.name,
-                    gender: data.gender,
-                    birth_date: data.birth_date,
-                    birth_location: data.birth_location,
-                    parents: '',
-                    death_date: '',
-                    death_location: '',
-                    burial_location: '',
-                    service: '',
-                    marriage_date: '',
-                    relationship: '',
-                    divorced: ''
-                };
-                if (!isValidDate(data.birth_date)) {
-                    alert('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                let insertIndex = records.indexOf(parent) + 1;
-                while (insertIndex < records.length && records[insertIndex].record_type.toLowerCase() === 'spouse') {
-                    insertIndex++;
-                }
-                records.splice(insertIndex, 0, newRecord);
-            } else if (mode === 'addSpouse') {
-                if (!data.name || !data.partner || !data.relationship) {
-                    alert('Name, Select Genealogical Partner, and Relationship are required.');
-                    return;
-                }
-                const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
-                if (!partner) {
-                    alert('Invalid partner selected.');
-                    return;
-                }
-                const newRecord = {
-                    record_type: 'Spouse',
-                    gen: '',
-                    name: data.name,
-                    gender: '',
-                    birth_date: data.birth_date,
-                    birth_location: data.birth_location,
-                    parents: data.parents || '',
-                    death_date: '',
-                    death_location: '',
-                    burial_location: '',
-                    service: '',
-                    marriage_date: data.marriage_date,
-                    relationship: data.relationship,
-                    divorced: ''
-                };
-                if (!isValidDate(data.birth_date) || !isValidDate(data.marriage_date)) {
-                    alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                let insertIndex = records.indexOf(partner) + 1;
-                records.splice(insertIndex, 0, newRecord);
-            } else if (mode === 'updateRecord') {
-                if (!data.record || !data.field || !data.value) {
-                    alert('Please select a record, field, and enter a value.');
-                    return;
-                }
-                const [recordType, name] = data.record.split(': ');
-                const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
-                if (!record) {
-                    alert('Invalid record selected.');
-                    return;
-                }
-                if (data.field === 'relationship' && !['Spouse', 'Other'].includes(data.value)) {
-                    alert('Relationship must be "Spouse" or "Other".');
-                    return;
-                }
-                if (dateFields.includes(data.field) && !isValidDate(data.value)) {
-                    alert('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                if (isFieldEditable(record.record_type, data.field)) {
-                    record[data.field] = data.value;
-                } else {
-                    alert('Selected field is not editable.');
-                }
-            } else if (mode === 'recordDeathBurial') {
-                if (!data.record) {
-                    alert('Please select a record.');
-                    return;
-                }
-                const [recordType, name] = data.record.split(': ');
-                const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
-                if (!record) {
-                    alert('Invalid record selected.');
-                    return;
-                }
-                if (data.death_date && !isValidDate(data.death_date)) {
-                    alert('Invalid death date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                    return;
-                }
-                if (data.death_date && isFieldEditable(record.record_type, 'death_date')) {
-                    record.death_date = data.death_date;
-                }
-                if (data.death_location && isFieldEditable(record.record_type, 'death_location')) {
-                    record.death_location = data.death_location;
-                }
-                if (data.burial_location && isFieldEditable(record.record_type, 'burial_location')) {
-                    record.burial_location = data.burial_location;
-                }
-                if (!data.death_date && !data.death_location && !data.burial_location) {
-                    alert('At least one field (Death Date, Death Location, or Burial Location) must be provided.');
-                    return;
-                }
-            }
-            closeModal();
-            debounceDisplayRecords();
-            if (debugMode) console.log(`Saved ${mode} data:`, data);
         }
 
         function toggleTable() {
@@ -1197,13 +1288,13 @@
         function saveEdit(index, field, value, td, originalValue) {
             const trimmedValue = value.trim();
             if (dateFields.includes(field) && !isValidDate(trimmedValue)) {
-                alert(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD (e.g., 2023, 2023-05, 2023-05-15).`);
+                safeShowError(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD (e.g., 2023, 2023-05, 2023-05-15).`);
                 if (debugMode) console.log(`Date validation failed for ${field}: ${trimmedValue}`);
                 cancelEdit(td, originalValue);
                 return;
             }
             if (field === 'relationship' && !['Spouse', 'Other'].includes(trimmedValue)) {
-                alert('Relationship must be "Spouse" or "Other".');
+                safeShowError('Relationship must be "Spouse" or "Other".');
                 if (debugMode) console.log(`Relationship validation failed: ${trimmedValue}`);
                 cancelEdit(td, originalValue);
                 return;
@@ -1267,11 +1358,11 @@
 
         function downloadCSV() {
             if (records.length === 0) {
-                alert('No records to download');
+                safeShowError('No records to download');
                 return;
             }
             if (decryptionPassphrase === null) {
-                alert('No passphrase available. Please load an encrypted file first.');
+                safeShowError('No passphrase available. Please load an encrypted file first.');
                 return;
             }
             const headers = Object.keys(records[0]);
