@@ -5,8 +5,7 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;">
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
-<!-- Use this more stable version -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js" crossorigin="anonymous"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -176,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.16.1</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 21:19:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.17</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 14:30:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -292,7 +291,7 @@
                     fileInput.value = '';
                     return;
                 }
-                } else { if (file.name.toLowerCase().endsWith('.zip')) {
+                if (file.name.toLowerCase().endsWith('.zip')) {
                     // Add safety check for JSZip availability
                     if (typeof JSZip === 'undefined') {
                         fileStatus.textContent = 'No file selected';
@@ -347,6 +346,10 @@
                                             enableButtonsAfterLoad();
                                             debounceDisplayRecords();
                                             fileStatus.textContent = `Loaded: ${foundFile.name}`;
+                                        } else {
+                                            fileStatus.textContent = 'No file selected';
+                                            alert(`Unsupported file type in ZIP: ${foundFile.name}. Expected .csv.enc${debugMode ? ' or .csv' : ''}.`);
+                                            fileInput.value = '';
                                         }
                                     }).catch((extractError) => {
                                         if (debugMode) console.log('ZIP extraction error:', extractError);
@@ -400,6 +403,7 @@
                     enableButtonsAfterLoad();
                     debounceDisplayRecords();
                     fileStatus.textContent = `Loaded: ${file.name}`;
+                } else {
                     fileStatus.textContent = 'No file selected';
                     alert(`Unsupported file type: ${file.name}. Expected .csv.enc${debugMode ? ' or .csv' : ''}.`);
                     fileInput.value = '';
@@ -529,7 +533,7 @@
                 }
             }, 2000);
         }
-        
+
         function deriveKey(passphrase, salt) {
             const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
             return CryptoJS.PBKDF2(utf8Passphrase, salt, {
@@ -1172,6 +1176,15 @@
                 console.log(`Opened mailto link with body length=${emailBody.length} chars`);
             }
         }
+
+        // Global error handler for JSZip module issues
+        window.addEventListener('error', function(e) {
+            if (e.filename && e.filename.includes('jszip') && e.message.includes('MODULE_NOT_FOUND')) {
+                console.warn('JSZip module error caught - ZIP support may be limited');
+                e.preventDefault();
+                return false;
+            }
+        });
 
         waitForCryptoJS(() => {
             initDebugMode();
