@@ -5,7 +5,9 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;">
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js" crossorigin="anonymous"></script>
+    <!-- Using browser-native ZIP libraries instead of JSZip -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jbinary/1.0.0/jbinary.min.js" crossorigin="anonymous"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -175,7 +177,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.17</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 14:30:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.18</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 15:45:00 PDT</span></p>
         <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
     </div>
     <div class="task-buttons">
@@ -259,6 +261,145 @@
             }
         }
 
+        // ZIP file processing using browser-native libraries
+        function processZipFile(arrayBuffer) {
+            try {
+                const uint8Array = new Uint8Array(arrayBuffer);
+                const view = new DataView(arrayBuffer);
+                
+                // Check if it's a valid ZIP file (starts with PK signature)
+                if (uint8Array[0] !== 0x50 || uint8Array[1] !== 0x4B) {
+                    throw new Error('Invalid ZIP file signature');
+                }
+                
+                if (debugMode) console.log('Processing ZIP file with native browser libraries');
+                
+                // Simple ZIP parsing - look for Central Directory
+                let foundFile = null;
+                let offset = arrayBuffer.byteLength - 22; // Start from end, look for End of Central Directory
+                
+                // Search backwards for End of Central Directory signature (PK\005\006)
+                while (offset > 0) {
+                    if (view.getUint32(offset, true) === 0x06054b50) {
+                        break;
+                    }
+                    offset--;
+                }
+                
+                if (offset === 0) {
+                    throw new Error('Could not find ZIP central directory');
+                }
+                
+                // Parse Central Directory entries
+                const cdOffset = view.getUint32(offset + 16, true);
+                const cdSize = view.getUint32(offset + 12, true);
+                let cdCurrent = cdOffset;
+                
+                while (cdCurrent < cdOffset + cdSize) {
+                    const signature = view.getUint32(cdCurrent, true);
+                    if (signature !== 0x02014b50) { // Central Directory File Header
+                        cdCurrent += 46; // Skip to next
+                        continue;
+                    }
+                    
+                    const compressedSize = view.getUint32(cdCurrent + 20, true);
+                    const uncompressedSize = view.getUint32(cdCurrent + 24, true);
+                    const compressionMethod = view.getUint16(cdCurrent + 10, true);
+                    const fileNameLength = view.getUint16(cdCurrent + 28, true);
+                    const extraFieldLength = view.getUint16(cdCurrent + 30, true);
+                    const fileNameOffset = cdCurrent + 46;
+                    
+                    const fileNameBytes = new Uint8Array(arrayBuffer, fileNameOffset, fileNameLength);
+                    const fileName = String.fromCharCode.apply(null, fileNameBytes).replace(/\0/g, '');
+                    
+                    if ((fileName.endsWith('.csv.enc') || (debugMode && fileName.endsWith('.csv'))) && !foundFile) {
+                        // Find the Local File Header for this entry
+                        const localHeaderOffset = view.getUint32(cdCurrent + 42, true);
+                        const localHeader = view.getUint32(localHeaderOffset, true);
+                        
+                        if (localHeader === 0x04034b50) { // Local File Header
+                            const localFileNameLength = view.getUint16(localHeaderOffset + 26, true);
+                            const localExtraLength = view.getUint16(localHeaderOffset + 28, true);
+                            const dataOffset = localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+                            
+                            const fileData = arrayBuffer.slice(dataOffset, dataOffset + compressedSize);
+                            foundFile = { 
+                                name: fileName, 
+                                data: fileData,
+                                uncompressedSize: uncompressedSize,
+                                compressionMethod: compressionMethod
+                            };
+                            
+                            if (debugMode) console.log(`Found ZIP entry: ${fileName}, size: ${compressedSize} bytes`);
+                            break;
+                        }
+                    }
+                    
+                    cdCurrent += 46 + fileNameLength + extraFieldLength;
+                }
+                
+                if (!foundFile) {
+                    throw new Error(`No .csv.enc${debugMode ? ' or .csv' : ''} file found in ZIP`);
+                }
+                
+                // Handle decompression if needed
+                let processedData = foundFile.data;
+                if (foundFile.compressionMethod === 8) { // DEFLATE
+                    try {
+                        const decompressed = pako.inflate(new Uint8Array(foundFile.data), { to: 'string' });
+                        processedData = new TextEncoder().encode(decompressed).buffer;
+                        if (debugMode) console.log(`Decompressed ZIP entry from ${foundFile.data.byteLength} to ${processedData.byteLength} bytes`);
+                    } catch (decompressError) {
+                        if (debugMode) console.log('Decompression failed, treating as raw data:', decompressError);
+                        processedData = foundFile.data;
+                    }
+                } else if (foundFile.compressionMethod === 0) { // Stored (no compression)
+                    processedData = foundFile.data;
+                } else {
+                    throw new Error(`Unsupported compression method: ${foundFile.compressionMethod}`);
+                }
+                
+                originalFileName = foundFile.name;
+                if (foundFile.name.endsWith('.csv.enc')) {
+                    getPassphrase('processZipEncryptedFile', foundFile.name);
+                    window.processZipEncryptedFile = () => {
+                        try {
+                            const result = decryptFile(processedData, decryptionPassphrase);
+                            if (typeof result === 'string') {
+                                records = parseCSVFile(result);
+                                enableButtonsAfterLoad();
+                                debounceDisplayRecords();
+                                fileStatus.textContent = `Loaded: ${foundFile.name}`;
+                            } else {
+                                fileStatus.textContent = 'No file selected';
+                                alert(`Decryption failed: ${result.error}`);
+                                decryptionPassphrase = null;
+                                fileInput.value = '';
+                            }
+                        } catch (decryptError) {
+                            if (debugMode) console.log('Decryption error in ZIP processing:', decryptError);
+                            fileStatus.textContent = 'No file selected';
+                            alert(`Error processing file in ZIP: ${decryptError.message}`);
+                            fileInput.value = '';
+                        }
+                    };
+                } else if (debugMode && foundFile.name.endsWith('.csv')) {
+                    const text = arrayBufferToBinary(processedData);
+                    records = parseCSVFile(text);
+                    decryptionPassphrase = null;
+                    enableButtonsAfterLoad();
+                    debounceDisplayRecords();
+                    fileStatus.textContent = `Loaded: ${foundFile.name}`;
+                }
+                
+            } catch (zipError) {
+                if (debugMode) console.log('ZIP processing error:', zipError);
+                fileStatus.textContent = 'No file selected';
+                alert(`Error processing ZIP: ${zipError.message}. Try unzipping manually and loading the .csv.enc file directly.`);
+                fileInput.value = '';
+            }
+        }
+
         function processFile() {
             const fileInput = document.getElementById('textFile');
             const file = fileInput.files[0];
@@ -292,92 +433,13 @@
                     return;
                 }
                 if (file.name.toLowerCase().endsWith('.zip')) {
-                    // Add safety check for JSZip availability
-                    if (typeof JSZip === 'undefined') {
-                        fileStatus.textContent = 'No file selected';
-                        alert('ZIP support requires JSZip library—please refresh the page and ensure all libraries load.');
-                        fileInput.value = '';
-                        return;
-                    }
-                    
+                    // Use native ZIP processing
                     try {
-                        const zip = new JSZip();
-                        zip.loadAsync(e.target.result).then((contents) => {
-                            // Wrap the entire ZIP processing in try-catch
-                            try {
-                                let foundFile = null;
-                                contents.forEach((relativePath, zipEntry) => {
-                                    if ((zipEntry.name.endsWith('.csv.enc') || (debugMode && zipEntry.name.endsWith('.csv'))) && !foundFile) {
-                                        foundFile = { name: zipEntry.name, entry: zipEntry };
-                                        if (debugMode) console.log(`Found matching file in ZIP: ${zipEntry.name}`);
-                                    }
-                                });
-                                
-                                if (foundFile) {
-                                    foundFile.entry.async('arraybuffer').then((data) => {
-                                        originalFileName = foundFile.name;
-                                        if (foundFile.name.endsWith('.csv.enc')) {
-                                            getPassphrase('processZipFile', foundFile.name);
-                                            window.processZipFile = () => {
-                                                try {
-                                                    const result = decryptFile(data, decryptionPassphrase);
-                                                    if (typeof result === 'string') {
-                                                        records = parseCSVFile(result);
-                                                        enableButtonsAfterLoad();
-                                                        debounceDisplayRecords();
-                                                        fileStatus.textContent = `Loaded: ${foundFile.name}`;
-                                                    } else {
-                                                        fileStatus.textContent = 'No file selected';
-                                                        alert(`Decryption failed: ${result.error}`);
-                                                        decryptionPassphrase = null;
-                                                        fileInput.value = '';
-                                                    }
-                                                } catch (decryptError) {
-                                                    if (debugMode) console.log('Decryption error in ZIP processing:', decryptError);
-                                                    fileStatus.textContent = 'No file selected';
-                                                    alert(`Error processing file in ZIP: ${decryptError.message}`);
-                                                    fileInput.value = '';
-                                                }
-                                            };
-                                        } else if (debugMode && foundFile.name.endsWith('.csv')) {
-                                            const text = arrayBufferToBinary(data);
-                                            records = parseCSVFile(text);
-                                            decryptionPassphrase = null;
-                                            enableButtonsAfterLoad();
-                                            debounceDisplayRecords();
-                                            fileStatus.textContent = `Loaded: ${foundFile.name}`;
-                                        } else {
-                                            fileStatus.textContent = 'No file selected';
-                                            alert(`Unsupported file type in ZIP: ${foundFile.name}. Expected .csv.enc${debugMode ? ' or .csv' : ''}.`);
-                                            fileInput.value = '';
-                                        }
-                                    }).catch((extractError) => {
-                                        if (debugMode) console.log('ZIP extraction error:', extractError);
-                                        fileStatus.textContent = 'No file selected';
-                                        alert(`Error extracting file from ZIP: ${extractError.message}`);
-                                        fileInput.value = '';
-                                    });
-                                } else {
-                                    fileStatus.textContent = 'No file selected';
-                                    alert(`No .csv.enc${debugMode ? ' or .csv' : ''} file found in ZIP. Please check contents.`);
-                                    fileInput.value = '';
-                                }
-                            } catch (zipError) {
-                                if (debugMode) console.log('ZIP contents processing error:', zipError);
-                                fileStatus.textContent = 'No file selected';
-                                alert(`Error processing ZIP contents: ${zipError.message}. Try unzipping manually.`);
-                                fileInput.value = '';
-                            }
-                        }).catch((loadError) => {
-                            if (debugMode) console.log('ZIP load error:', loadError);
-                            fileStatus.textContent = 'No file selected';
-                            alert(`Error reading ZIP: ${loadError.message}. Try unzipping manually.`);
-                            fileInput.value = '';
-                        });
-                    } catch (zipInitError) {
-                        if (debugMode) console.log('JSZip initialization error:', zipInitError);
+                        processZipFile(e.target.result);
+                    } catch (initError) {
+                        if (debugMode) console.log('ZIP initialization error:', initError);
                         fileStatus.textContent = 'No file selected';
-                        alert(`ZIP library error: ${zipInitError.message}. Please refresh and try again.`);
+                        alert(`ZIP processing failed to initialize: ${initError.message}. Please try unzipping manually.`);
                         fileInput.value = '';
                     }
                 } else if (file.name.endsWith('.csv.enc')) {
@@ -518,7 +580,7 @@
 
         function waitForCryptoJS(callback) {
             const checkInterval = setInterval(() => {
-                if (typeof CryptoJS !== 'undefined' && (typeof JSZip !== 'undefined' || !window.location.search.includes('debug=1'))) {
+                if (typeof CryptoJS !== 'undefined') {
                     clearInterval(checkInterval);
                     callback();
                 }
@@ -527,9 +589,6 @@
                 clearInterval(checkInterval);
                 if (typeof CryptoJS === 'undefined') {
                     console.error('CryptoJS failed to load after 2s—retry page load');
-                }
-                if (typeof JSZip === 'undefined' && window.location.search.includes('debug=1')) {
-                    console.error('JSZip failed to load after 2s—ZIP support disabled');
                 }
             }, 2000);
         }
@@ -1177,18 +1236,9 @@
             }
         }
 
-        // Global error handler for JSZip module issues
-        window.addEventListener('error', function(e) {
-            if (e.filename && e.filename.includes('jszip') && e.message.includes('MODULE_NOT_FOUND')) {
-                console.warn('JSZip module error caught - ZIP support may be limited');
-                e.preventDefault();
-                return false;
-            }
-        });
-
         waitForCryptoJS(() => {
             initDebugMode();
-            console.log('CryptoJS ready');
+            console.log('Libraries ready - CryptoJS and ZIP support loaded');
         });
     </script>
 </body>
