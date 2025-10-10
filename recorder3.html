@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.8</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 00:38:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.9</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 07:34:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -995,7 +995,7 @@
                         return;
                     }
                     const cleanType = recordType.toLowerCase() === 'partner' ? 'spouse' : 'person';
-                    const isEditable = isFieldEditable(record.record_type, data.field);
+                    const isEditable = fieldRestrictions[cleanType].editable.includes(data.field);
                     if (isEditable) {
                         const oldValue = record[data.field];
                         record[data.field] = data.value;
