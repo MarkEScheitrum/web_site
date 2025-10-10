@@ -5,7 +5,6 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;">
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
-    <!-- Using a known-good JSZip version that works in browsers -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.min.js" crossorigin="anonymous"></script>
     <style>
         body {
@@ -176,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.0</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-09 21:37:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.1</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-09 22:38:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -203,7 +202,6 @@
             <form id="modalForm"></form>
         </div>
     </div>
-
     <script type="text/javascript">
         var gk_isXlsx = false;
         var gk_xlsxFileLookup = {};
@@ -215,12 +213,10 @@
         let editingIndex = null;
         let editingField = null;
         let highlightedRow = null;
-        let vestigialColumns = new Set();
+        let vestigialColumns = new Set(['notes', 'unprocessed_items']);
         let debugMode = false;
         let renderTimeout = null;
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
-
-        // Prevent navigation on form submission
         window.addEventListener('beforeunload', function(e) {
             if (modalMode) {
                 e.preventDefault();
@@ -228,19 +224,15 @@
                 return '';
             }
         });
-
-        // Suppress extension errors
         window.addEventListener('error', function(e) {
             if (e.message && e.message.includes('runtime.lastError')) {
                 e.preventDefault();
                 return false;
             }
         });
-
         function selectAndLoadFile() {
             document.getElementById('textFile').click();
         }
-
         function handleFileSelect() {
             const fileInput = document.getElementById('textFile');
             const fileStatus = document.getElementById('fileStatus');
@@ -253,7 +245,6 @@
                 if (debugMode) console.log('No file selected');
             }
         }
-
         function getPassphrase(callback, fileName) {
             safeOpenModal('passphrase');
             document.getElementById('modalTitle').textContent = `Enter Passphrase for ${fileName || 'file'}`;
@@ -264,13 +255,11 @@
                 <button type="button" onclick="submitPassphrase('${callback}')">Submit</button>
             `;
         }
-
         function submitPassphrase(callback) {
             const passphrase = document.querySelector('#modalForm input[name="passphrase"]').value;
             if (passphrase) {
                 decryptionPassphrase = passphrase;
                 safeCloseModal();
-                // Ensure callback exists before calling
                 if (window[callback]) {
                     window[callback]();
                 } else {
@@ -282,10 +271,7 @@
                 document.getElementById('textFile').value = '';
             }
         }
-
-        // Safe modal operations that prevent navigation
         function safeOpenModal(mode) {
-            // Clear any URL parameters that might cause navigation
             if (window.location.search && !window.location.search.includes('debug=1')) {
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
@@ -300,27 +286,23 @@
                 e.stopPropagation();
                 return false;
             });
-            // Prevent form submission from navigating
             modalForm.onsubmit = function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 return false;
             };
         }
-
         function safeCloseModal() {
             const modal = document.getElementById('modal');
             modal.style.display = 'none';
             modalMode = null;
             document.getElementById('modalForm').innerHTML = '';
         }
-
         function safeShowError(message) {
-            // Use a custom error display instead of alert to prevent focus loss
             if (debugMode) console.error(`Validation Error: ${message}`);
             const errorDiv = document.createElement('div');
             errorDiv.style.cssText = `
-                position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; 
+                position: fixed; top: 20px; right: 20px; background: #dc3545; color: white;
                 padding: 15px; border-radius: 5px; z-index: 2000; max-width: 300px;
                 box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 14px;
             `;
@@ -331,7 +313,6 @@
             document.body.appendChild(errorDiv);
             setTimeout(() => errorDiv.remove(), 5000);
         }
-
         function processFile() {
             const fileInput = document.getElementById('textFile');
             const file = fileInput.files[0];
@@ -365,40 +346,30 @@
                     return;
                 }
                 if (file.name.toLowerCase().endsWith('.zip')) {
-                    // Use stable JSZip version with proper error handling
                     if (typeof JSZip === 'undefined') {
                         fileStatus.textContent = 'No file selected';
                         safeShowError('ZIP library failed to load. Please refresh the page.');
                         fileInput.value = '';
                         return;
                     }
-                    
                     try {
                         const zip = new JSZip();
                         zip.loadAsync(e.target.result).then((contents) => {
                             let foundFile = null;
                             let fileCount = 0;
-                            
-                            // Search for the target file
                             contents.forEach((relativePath, zipEntry) => {
                                 fileCount++;
                                 if (debugMode) console.log(`ZIP entry ${fileCount}: ${zipEntry.name}`);
-                                
                                 if ((zipEntry.name.endsWith('.enc') || (debugMode && zipEntry.name.endsWith('.csv'))) && !foundFile) {
                                     foundFile = { name: zipEntry.name, entry: zipEntry };
                                     if (debugMode) console.log(`Found target file in ZIP: ${zipEntry.name} (${fileCount} entries total)`);
                                 }
                             });
-                            
                             if (debugMode) console.log(`ZIP processing complete: ${fileCount} files, found target: ${!!foundFile}`);
-                            
                             if (foundFile) {
-                                // Extract the file as ArrayBuffer
                                 foundFile.entry.async('arraybuffer').then((data) => {
                                     if (debugMode) console.log(`Extracted ${foundFile.name}: ${data.byteLength} bytes`);
-                                    
                                     originalFileName = foundFile.name;
-                                    
                                     if (foundFile.name.endsWith('.enc')) {
                                         getPassphrase('processZipEncryptedFile', foundFile.name);
                                         window.processZipEncryptedFile = () => {
@@ -443,7 +414,6 @@
                                     fileInput.value = '';
                                 });
                             } else {
-                                // List available files for debugging
                                 const availableFiles = [];
                                 contents.forEach((relativePath, zipEntry) => {
                                     availableFiles.push(zipEntry.name);
@@ -504,7 +474,6 @@
                 reader.readAsText(file);
             }
         }
-
         function enableButtonsAfterLoad() {
             document.getElementById('addChildBtn').classList.remove('disabled-btn');
             document.getElementById('addSpouseBtn').classList.remove('disabled-btn');
@@ -515,11 +484,9 @@
             document.getElementById('returnUpdatesBtn').style.display = 'block';
             if (debugMode) console.log('Enabled task buttons and toggled Select/Load to Return Updates');
         }
-
         function filledCell(cell) {
             return cell !== '' && cell != null;
         }
-
         function loadFileData(filename) {
             if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
                 try {
@@ -544,7 +511,6 @@
             }
             return gk_fileData[filename] || "";
         }
-
         function isValidDate(dateStr) {
             if (!dateStr || dateStr.trim() === '') return true;
             const parts = dateStr.split('-');
@@ -566,7 +532,6 @@
             }
             return false;
         }
-
         const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
         function initDebugMode() {
             if (window.location.search.includes('debug=1')) {
@@ -575,7 +540,6 @@
                     if (CryptoJS.SHA256(decryptionPassphrase).toString() === debugPassphraseHash) {
                         debugMode = true;
                         console.log('Debug mode enabled');
-                        // Update file input to accept .csv files in debug mode
                         document.getElementById('textFile').setAttribute('accept', '.csv,.enc,.zip');
                     } else {
                         console.log('Debug mode disabled - incorrect passphrase');
@@ -584,26 +548,23 @@
                 };
             }
         }
-
         window.addEventListener('unload', () => {
             records = [];
             decryptionPassphrase = null;
             document.getElementById('fileStatus').textContent = 'No file selected';
         });
-
         const fieldRestrictions = {
             person: {
-                editable: ['name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service'],
+                editable: ['name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'attributes'],
                 uneditable: ['record_type'],
                 greyedOut: ['gen', 'marriage_date', 'relationship', 'divorced', 'parents']
             },
             spouse: {
-                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents'],
+                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents', 'attributes'],
                 uneditable: ['record_type'],
                 greyedOut: ['gen', 'gender']
             }
         };
-
         function waitForCryptoJS(callback) {
             const checkInterval = setInterval(() => {
                 if (typeof CryptoJS !== 'undefined' && (typeof JSZip !== 'undefined' || !window.location.search.includes('debug=1'))) {
@@ -621,7 +582,6 @@
                 }
             }, 2000);
         }
-
         function deriveKey(passphrase, salt) {
             const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
             return CryptoJS.PBKDF2(utf8Passphrase, salt, {
@@ -630,7 +590,6 @@
                 hasher: CryptoJS.algo.SHA256
             });
         }
-
         function arrayBufferToBinary(buffer) {
             const bytes = new Uint8Array(buffer);
             let binary = '';
@@ -639,7 +598,6 @@
             }
             return binary;
         }
-
         function decryptFile(encryptedData, passphrase) {
             try {
                 const binaryData = arrayBufferToBinary(encryptedData);
@@ -687,7 +645,6 @@
                 return { error: e.message, decryptedHex: null };
             }
         }
-
         function encryptFile(data, passphrase) {
             const salt = CryptoJS.lib.WordArray.random(16);
             const iv = CryptoJS.lib.WordArray.random(16);
@@ -713,7 +670,6 @@
             }
             return uint8Array;
         }
-
         function parseCSVLine(line) {
             const fields = [];
             let field = '';
@@ -734,7 +690,6 @@
             fields.push(field);
             return fields;
         }
-
         function parseCSVFile(text) {
             const normalizedText = text.replace(/\r\n|\r\r\n|\r/g, '\n');
             const lines = normalizedText.split('\n').filter(line => line.trim() !== '' && !line.trim().startsWith('#'));
@@ -753,7 +708,6 @@
             if (debugMode) console.log(`Parsed ${records.length} records`);
             return records;
         }
-
         function openModal(mode) {
             safeOpenModal(mode);
             const modalTitle = document.getElementById('modalTitle');
@@ -843,10 +797,9 @@
                 }
             });
             const submitBtn = document.createElement('button');
-            submitBtn.type = 'button'; // Explicitly prevent form submission
+            submitBtn.type = 'button';
             submitBtn.textContent = 'Save';
             submitBtn.onclick = () => {
-                // Prevent double-click
                 if (submitBtn.disabled) return;
                 submitBtn.disabled = true;
                 setTimeout(() => submitBtn.disabled = false, 1000);
@@ -876,29 +829,44 @@
                         fieldSelect.appendChild(option);
                     });
                     fieldSelect.value = '';
+                    fieldSelect.addEventListener('change', () => {
+                        const valueInput = modalForm.querySelector('[name="value"]');
+                        if (fieldSelect.value === 'attributes') {
+                            valueInput.replaceWith(document.createElement('select'));
+                            const newSelect = modalForm.querySelector('[name="value"]');
+                            newSelect.name = 'value';
+                            newSelect.required = true;
+                            ['', 'step', 'foster', 'adopted', 'continued'].forEach(opt => {
+                                const option = document.createElement('option');
+                                option.value = opt;
+                                option.textContent = opt || '(Select)';
+                                newSelect.appendChild(option);
+                            });
+                        } else if (valueInput.tagName === 'SELECT') {
+                            const newInput = document.createElement('input');
+                            newInput.type = 'text';
+                            newInput.name = 'value';
+                            newInput.required = true;
+                            valueInput.replaceWith(newInput);
+                        }
+                    });
                 });
             }
         }
-
         function closeModal() {
             safeCloseModal();
         }
-
         function saveModalData(mode) {
             try {
                 const form = document.getElementById('modalForm');
                 const data = {};
                 let hasErrors = false;
-                
-                // Collect form data safely
                 for (let input of form.elements) {
                     if (input.name && input.type !== 'button') {
                         data[input.name] = input.value || '';
                     }
                 }
-                
                 if (debugMode) console.log(`Processing ${mode} with data:`, data);
-                
                 if (mode === 'addChild') {
                     if (!data.name || !data.parents) {
                         safeShowError('Name and Parent are required.');
@@ -924,7 +892,10 @@
                         service: '',
                         marriage_date: '',
                         relationship: '',
-                        divorced: ''
+                        divorced: '',
+                        attributes: '',
+                        unprocessed_items: '',
+                        notes: ''
                     };
                     if (data.birth_date && !isValidDate(data.birth_date)) {
                         safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
@@ -960,7 +931,10 @@
                         service: '',
                         marriage_date: data.marriage_date || '',
                         relationship: data.relationship,
-                        divorced: ''
+                        divorced: '',
+                        attributes: '',
+                        unprocessed_items: '',
+                        notes: ''
                     };
                     if (data.birth_date && !isValidDate(data.birth_date)) {
                         safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
@@ -986,6 +960,10 @@
                     }
                     if (data.field === 'relationship' && !['Spouse', 'Other'].includes(data.value)) {
                         safeShowError('Relationship must be "Spouse" or "Other".');
+                        return;
+                    }
+                    if (data.field === 'attributes' && !['', 'step', 'foster', 'adopted', 'continued'].includes(data.value)) {
+                        safeShowError('Attributes must be one of: step, foster, adopted, continued, or empty.');
                         return;
                     }
                     if (dateFields.includes(data.field) && data.value && !isValidDate(data.value)) {
@@ -1034,17 +1012,14 @@
                     }
                     if (debugMode) console.log(`Updated death/burial info for ${name}`);
                 }
-                
                 safeCloseModal();
                 debounceDisplayRecords();
                 if (debugMode) console.log(`Successfully saved ${mode} data:`, data);
-                
             } catch (error) {
                 if (debugMode) console.error(`Error in saveModalData(${mode}):`, error);
                 safeShowError(`An unexpected error occurred: ${error.message}`);
             }
         }
-
         function toggleTable() {
             const tableContainer = document.getElementById('tableContainer');
             const isHidden = tableContainer.style.display === 'none';
@@ -1054,12 +1029,10 @@
             }
             if (debugMode) console.log(`Table toggled: ${isHidden ? 'shown' : 'hidden'}`);
         }
-
         function debounceDisplayRecords() {
             if (renderTimeout) clearTimeout(renderTimeout);
             renderTimeout = setTimeout(displayRecords, 16);
         }
-
         function toggleColumn(column) {
             if (vestigialColumns.has(column)) {
                 vestigialColumns.delete(column);
@@ -1070,7 +1043,6 @@
             }
             debounceDisplayRecords();
         }
-
         function isFieldEditable(recordType, field) {
             const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
             const restrictions = fieldRestrictions[cleanType];
@@ -1078,11 +1050,10 @@
                 if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to uneditable`);
                 return false;
             }
-            const isEditable = restrictions.editable.includes(field);
+            const isEditable = restrictions.editable.includes(field) && field !== 'attributes';
             if (debugMode) console.log(`Checking editable: record_type='${cleanType}', field=${field}, isEditable=${isEditable}`);
             return isEditable;
         }
-
         function isFieldGreyedOut(recordType, field) {
             const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
             const restrictions = fieldRestrictions[cleanType];
@@ -1094,7 +1065,6 @@
             if (debugMode) console.log(`Checking greyed-out: record_type='${cleanType}', field=${field}, isGreyedOut=${isGreyedOut}`);
             return isGreyedOut;
         }
-
         function displayRecords() {
             const recordBody = document.getElementById('recordBody');
             recordBody.innerHTML = '';
@@ -1104,7 +1074,7 @@
             }
             const table = document.createElement('table');
             const headerRow = document.createElement('tr');
-            const headers = Object.keys(records[0]);
+            const headers = Object.keys(records[0]).filter(header => !['notes', 'unprocessed_items'].includes(header));
             headers.forEach(header => {
                 const th = document.createElement('th');
                 th.className = header;
@@ -1131,8 +1101,8 @@
                     const td = document.createElement('td');
                     td.className = header;
                     const cellContent = document.createElement('span');
-                    const displayValue = header === 'record_type' && record[header].toLowerCase() === 'spouse' ? 'Partner' : 
-                     header === 'gender' ? (record[header] || '') : 
+                    const displayValue = header === 'record_type' && record[header].toLowerCase() === 'spouse' ? 'Partner' :
+                     header === 'gender' ? (record[header] || '') :
                      record[header] || '';
                     cellContent.textContent = displayValue;
                     cellContent.className = 'cell-content';
@@ -1166,7 +1136,6 @@
             recordBody.appendChild(table);
             if (debugMode) console.log(`Displayed ${records.length} records`);
         }
-
         function startEditing(index, field, td, currentValue) {
             editingIndex = index;
             editingField = field;
@@ -1188,7 +1157,6 @@
                 }
             };
         }
-
         function saveEdit(index, field, value, td, originalValue) {
             const trimmedValue = value.trim();
             if (dateFields.includes(field) && !isValidDate(trimmedValue)) {
@@ -1216,7 +1184,6 @@
             td.appendChild(cellContent);
             debounceDisplayRecords();
         }
-
         function cancelEdit(td, originalValue) {
             editingIndex = null;
             editingField = null;
@@ -1228,11 +1195,9 @@
             if (debugMode) console.log('Cancelled edit');
             debounceDisplayRecords();
         }
-
         function validateRecord(record) {
             return Object.values(record).every(value => typeof value === 'string');
         }
-
         function escapeCSVField(field) {
             if (typeof field !== 'string') field = String(field);
             if (field.includes('"') || field.includes(',')) {
@@ -1240,12 +1205,10 @@
             }
             return field;
         }
-
         function isValidEmail(email) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return emailRegex.test(email);
         }
-
         function showPopup(message) {
             const popup = document.createElement('div');
             popup.style.position = 'fixed';
@@ -1259,7 +1222,6 @@
             popup.innerHTML = message + '<br><button onclick="this.parentElement.remove()">Close</button>';
             document.body.appendChild(popup);
         }
-
         function downloadCSV() {
             if (records.length === 0) {
                 safeShowError('No records to download');
@@ -1305,7 +1267,6 @@
                 console.log(`Opened mailto link with body length=${emailBody.length} chars`);
             }
         }
-
         waitForCryptoJS(() => {
             initDebugMode();
             console.log('Libraries ready - CryptoJS and JSZip loaded');
