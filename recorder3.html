@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.16</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 14:32:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.16</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 14:51:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -456,7 +456,7 @@
                         }
                     };
                 } else if (debugMode && file.name.toLowerCase().endsWith('.csv')) {
-                    const text = arrayBufferToBinary(e.target.result); // Convert ArrayBuffer to string
+                    const text = arrayBufferToBinary(e.target.result);
                     records = parseCSVFile(text);
                     decryptionPassphrase = null;
                     enableButtonsAfterLoad();
@@ -558,9 +558,9 @@
         });
         const fieldRestrictions = {
             person: {
-                editable: ['name', 'sex', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'attributes'],
+                editable: ['name', 'sex', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'attributes', 'parents'],
                 uneditable: ['record_type'],
-                greyedOut: ['gen', 'marriage_date', 'relationship', 'divorced', 'divorce date', 'parents']
+                greyedOut: ['gen', 'marriage_date', 'relationship', 'divorced', 'divorce date']
             },
             spouse: {
                 editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorce', 'parents'],
@@ -1097,6 +1097,11 @@
             const restrictions = fieldRestrictions[cleanType];
             if (!restrictions) {
                 if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to uneditable`);
+                return false;
+            }
+            // Prevent 'parents' field from being editable in the table for Person records
+            if (cleanType === 'person' && field === 'parents') {
+                if (debugMode) console.log(`Field 'parents' is not editable in table for record_type='person'`);
                 return false;
             }
             const isEditable = restrictions.editable.includes(field) && field !== 'attributes' && field !== 'sex';
