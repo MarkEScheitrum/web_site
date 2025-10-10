@@ -191,7 +191,7 @@
     <div class="file-status">
         <span id="fileStatus">No file selected</span>
     </div>
-    <input type="file" id="textFile" accept=".csv.enc,.zip" style="display: none;" onchange="handleFileSelect()">
+    <input type="file" id="textFile" accept=".enc,.zip" style="display: none;" onchange="handleFileSelect()">
     <div id="tableContainer" class="table-container" style="display: none;">
         <div id="recordBody"></div>
     </div>
@@ -210,7 +210,7 @@
         var decryptionPassphrase = null;
         let modalMode = null;
         let records = [];
-        let originalFileName = 'records.csv.enc';
+        let originalFileName = 'records.enc';
         let editingIndex = null;
         let editingField = null;
         let highlightedRow = null;
@@ -383,7 +383,7 @@
                                 fileCount++;
                                 if (debugMode) console.log(`ZIP entry ${fileCount}: ${zipEntry.name}`);
                                 
-                                if ((zipEntry.name.endsWith('.csv.enc') || (debugMode && zipEntry.name.endsWith('.csv'))) && !foundFile) {
+                                if ((zipEntry.name.endsWith('.enc') || (debugMode && zipEntry.name.endsWith('.csv'))) && !foundFile) {
                                     foundFile = { name: zipEntry.name, entry: zipEntry };
                                     if (debugMode) console.log(`Found target file in ZIP: ${zipEntry.name} (${fileCount} entries total)`);
                                 }
@@ -398,7 +398,7 @@
                                     
                                     originalFileName = foundFile.name;
                                     
-                                    if (foundFile.name.endsWith('.csv.enc')) {
+                                    if (foundFile.name.endsWith('.enc')) {
                                         getPassphrase('processZipEncryptedFile', foundFile.name);
                                         window.processZipEncryptedFile = () => {
                                             try {
@@ -432,7 +432,7 @@
                                         if (debugMode) console.log(`Successfully loaded ${records.length} records from ZIP (debug CSV)`);
                                     } else {
                                         fileStatus.textContent = 'No file selected';
-                                        safeShowError(`Unsupported file type in ZIP: ${foundFile.name}. Expected .csv.enc${debugMode ? ' or .csv' : ''}.`);
+                                        safeShowError(`Unsupported file type in ZIP: ${foundFile.name}. Expected .enc${debugMode ? ' or .csv' : ''}.`);
                                         fileInput.value = '';
                                     }
                                 }).catch((extractError) => {
@@ -448,7 +448,7 @@
                                     availableFiles.push(zipEntry.name);
                                 });
                                 fileStatus.textContent = 'No file selected';
-                                const errorMsg = `No .csv.enc${debugMode ? ' or .csv' : ''} file found in ZIP (${fileCount} files total). Available: ${availableFiles.slice(0, 3).join(', ')}${availableFiles.length > 3 ? '...' : ''}`;
+                                const errorMsg = `No .enc${debugMode ? ' or .csv' : ''} file found in ZIP (${fileCount} files total). Available: ${availableFiles.slice(0, 3).join(', ')}${availableFiles.length > 3 ? '...' : ''}`;
                                 safeShowError(errorMsg);
                                 fileInput.value = '';
                                 if (debugMode) console.log('Available ZIP files:', availableFiles);
@@ -465,7 +465,7 @@
                         safeShowError(`ZIP library error: ${zipInitError.message}. Please refresh and try again.`);
                         fileInput.value = '';
                     }
-                } else if (file.name.endsWith('.csv.enc')) {
+                } else if (file.name.endsWith('.enc')) {
                     getPassphrase('processEncryptedFile', file.name);
                     window.processEncryptedFile = () => {
                         const result = decryptFile(e.target.result, decryptionPassphrase);
@@ -492,12 +492,12 @@
                     if (debugMode) console.log(`Successfully loaded ${records.length} records from debug CSV`);
                 } else {
                     fileStatus.textContent = 'No file selected';
-                    safeShowError(`Unsupported file type: ${file.name}. Expected .csv.enc${debugMode ? ' or .csv' : ''}.`);
+                    safeShowError(`Unsupported file type: ${file.name}. Expected .enc${debugMode ? ' or .csv' : ''}.`);
                     fileInput.value = '';
                     return;
                 }
             };
-            if (file.name.toLowerCase().endsWith('.zip') || file.name.endsWith('.csv.enc') || (debugMode && file.name.toLowerCase().endsWith('.csv'))) {
+            if (file.name.toLowerCase().endsWith('.zip') || file.name.endsWith('.enc') || (debugMode && file.name.toLowerCase().endsWith('.csv'))) {
                 reader.readAsArrayBuffer(file);
             } else {
                 reader.readAsText(file);
@@ -575,7 +575,7 @@
                         debugMode = true;
                         console.log('Debug mode enabled');
                         // Update file input to accept .csv files in debug mode
-                        document.getElementById('textFile').setAttribute('accept', '.csv,.csv.enc,.zip');
+                        document.getElementById('textFile').setAttribute('accept', '.csv,.enc,.zip');
                     } else {
                         console.log('Debug mode disabled - incorrect passphrase');
                     }
@@ -1274,10 +1274,10 @@
                 ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
             ].join('\r\n') + '\r\n';
             const encryptedData = encryptFile(csv, decryptionPassphrase);
-            let downloadFileName = 'returns.csv.enc';
+            let downloadFileName = 'returns.enc';
             const match = originalFileName.match(/^records_(\d{4})\.csv(\.enc)?$/i);
             if (match) {
-                downloadFileName = `returns_${match[1]}.csv.enc`;
+                downloadFileName = `returns_${match[1]}.enc`;
             }
             const encryptedBlob = new Blob([encryptedData], { type: 'application/octet-stream' });
             const encryptedLink = document.createElement('a');
