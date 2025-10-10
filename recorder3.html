@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.10</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 07:57:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.11</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 08:21:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -751,7 +751,7 @@
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
                     { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' },
-                    { name: 'relationship', label: 'Relationship', type: 'select', options: ['', 'Spouse', 'Other'], required: true },
+                    { name: 'relationship', label: 'Relationship', type: 'select', options: ['', 'spouse', 'other'], required: true },
                     { name: 'partner', label: 'Select Genealogical Partner', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true }
                 ];
             } else if (mode === 'updateRecord') {
@@ -837,7 +837,7 @@
                     fieldSelect.addEventListener('change', () => {
                         if (debugMode) console.log(`Debug: Field selected: ${fieldSelect.value}`);
                         const valueInput = modalForm.querySelector('[name="value"]');
-                        if (fieldSelect.value === 'attributes') {
+                        if (fieldSelect.value === 'attributes' && cleanType === 'person') {
                             const newSelect = document.createElement('select');
                             newSelect.name = 'value';
                             newSelect.required = true;
@@ -849,7 +849,7 @@
                             });
                             valueInput.replaceWith(newSelect);
                             if (debugMode) console.log('Debug: Attributes dropdown created with options: ["", "stillborn", "step", "foster", "adopted", "continuation"]');
-                        } else if (fieldSelect.value === 'sex') {
+                        } else if (fieldSelect.value === 'sex' && cleanType === 'person') {
                             const newSelect = document.createElement('select');
                             newSelect.name = 'value';
                             newSelect.required = true;
@@ -861,6 +861,18 @@
                             });
                             valueInput.replaceWith(newSelect);
                             if (debugMode) console.log('Debug: Sex dropdown created with options: ["", "male", "female"]');
+                        } else if (fieldSelect.value === 'relationship' && cleanType === 'spouse') {
+                            const newSelect = document.createElement('select');
+                            newSelect.name = 'value';
+                            newSelect.required = true;
+                            ['', 'spouse', 'partner', 'other'].forEach(opt => {
+                                const option = document.createElement('option');
+                                option.value = opt;
+                                option.textContent = opt || '(Select)';
+                                newSelect.appendChild(option);
+                            });
+                            valueInput.replaceWith(newSelect);
+                            if (debugMode) console.log('Debug: Relationship dropdown created with options: ["", "spouse", "partner", "other"]');
                         } else if (valueInput.tagName === 'SELECT') {
                             const newInput = document.createElement('input');
                             newInput.type = 'text';
@@ -978,8 +990,8 @@
                         safeShowError('Invalid record selected.');
                         return;
                     }
-                    if (data.field === 'relationship' && !['Spouse', 'Partner', 'Other'].includes(data.value)) {
-                        safeShowError('Relationship must be "Spouse", "Partner", or "Other".');
+                    if (data.field === 'relationship' && !['', 'spouse', 'partner', 'other'].includes(data.value)) {
+                        safeShowError('Relationship must be "spouse", "partner", or "other".');
                         return;
                     }
                     if (data.field === 'attributes' && !['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'].includes(data.value)) {
@@ -1152,7 +1164,7 @@
                     tr.appendChild(td);
                 });
                 tr.addEventListener('click', (e) => {
-                    if (editingIndex === null && e.target.tagName !== 'TEXTAREA') {
+                    if (editingIndex === null && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
                         highlightedRow = (highlightedRow === index) ? null : index;
                         if (debugMode) console.log(`Row ${highlightedRow !== null ? highlightedRow + 1 : 'none'} highlighted`);
                         debounceDisplayRecords();
@@ -1167,22 +1179,47 @@
             editingIndex = index;
             editingField = field;
             td.innerHTML = '';
-            const textarea = document.createElement('textarea');
-            textarea.className = 'edit-textarea';
-            textarea.value = currentValue;
-            textarea.rows = Math.max(2, currentValue.split('\n').length);
-            td.appendChild(textarea);
-            textarea.focus();
-            if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field}`);
-            textarea.onblur = () => saveEdit(index, field, textarea.value, td, currentValue);
-            textarea.onkeydown = (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    saveEdit(index, field, textarea.value, td, currentValue);
-                } else if (e.key === 'Escape') {
-                    cancelEdit(td, currentValue);
-                }
-            };
+            if (field === 'relationship' && records[index].record_type.toLowerCase() === 'spouse') {
+                const select = document.createElement('select');
+                select.className = 'edit-select';
+                ['', 'spouse', 'partner', 'other'].forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt || '(Select)';
+                    if (opt === currentValue) option.selected = true;
+                    select.appendChild(option);
+                });
+                td.appendChild(select);
+                select.focus();
+                if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field} with dropdown`);
+                select.onchange = () => saveEdit(index, field, select.value, td, currentValue);
+                select.onblur = () => saveEdit(index, field, select.value, td, currentValue);
+                select.onkeydown = (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveEdit(index, field, select.value, td, currentValue);
+                    } else if (e.key === 'Escape') {
+                        cancelEdit(td, currentValue);
+                    }
+                };
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.className = 'edit-textarea';
+                textarea.value = currentValue;
+                textarea.rows = Math.max(2, currentValue.split('\n').length);
+                td.appendChild(textarea);
+                textarea.focus();
+                if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field} with textarea`);
+                textarea.onblur = () => saveEdit(index, field, textarea.value, td, currentValue);
+                textarea.onkeydown = (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        saveEdit(index, field, textarea.value, td, currentValue);
+                    } else if (e.key === 'Escape') {
+                        cancelEdit(td, currentValue);
+                    }
+                };
+            }
         }
         function saveEdit(index, field, value, td, originalValue) {
             const trimmedValue = value.trim();
@@ -1192,8 +1229,8 @@
                 cancelEdit(td, originalValue);
                 return;
             }
-            if (field === 'relationship' && !['Spouse', 'Partner', 'Other'].includes(trimmedValue)) {
-                safeShowError('Relationship must be "Spouse", "Partner", or "Other".');
+            if (field === 'relationship' && !['', 'spouse', 'partner', 'other'].includes(trimmedValue)) {
+                safeShowError('Relationship must be "spouse", "partner", or "other".');
                 if (debugMode) console.log(`Relationship validation failed: ${trimmedValue}`);
                 cancelEdit(td, originalValue);
                 return;
