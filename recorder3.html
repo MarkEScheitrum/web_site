@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.6</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-09 23:47:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.7</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 00:01:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -736,7 +736,7 @@
                 const selectablePeople = records.filter((r, index) => {
                     if (index === 0 && r.record_type.toLowerCase() === 'person') return false;
                     if (r.record_type.toLowerCase() === 'spouse') {
-                        let nextPersonIndex = records.findIndex((rec, i) => i > index && rec.record_type.toLowerCase() === 'person');
+                        let nextPersonIndex = records.findIndex((rec, i) => i > index && r.record_type.toLowerCase() === 'person');
                         if (nextPersonIndex === -1) nextPersonIndex = records.length;
                         return index > 0 && index < nextPersonIndex && records[0].record_type.toLowerCase() === 'person';
                     }
@@ -829,9 +829,13 @@
                         fieldSelect.appendChild(option);
                     });
                     fieldSelect.value = '';
-                    fieldSelect.addEventListener('change', () => {
+                    // Remove existing change listeners to prevent duplicates
+                    const newFieldSelect = fieldSelect.cloneNode(true);
+                    fieldSelect.parentNode.replaceChild(newFieldSelect, fieldSelect);
+                    newFieldSelect.addEventListener('change', () => {
+                        if (debugMode) console.log(`Field selected: ${newFieldSelect.value}`);
                         const valueInput = modalForm.querySelector('[name="value"]');
-                        if (fieldSelect.value === 'attributes') {
+                        if (newFieldSelect.value === 'attributes') {
                             valueInput.replaceWith(document.createElement('select'));
                             const newSelect = modalForm.querySelector('[name="value"]');
                             newSelect.name = 'value';
@@ -842,7 +846,8 @@
                                 option.textContent = opt || '(None)';
                                 newSelect.appendChild(option);
                             });
-                        } else if (fieldSelect.value === 'sex') {
+                            if (debugMode) console.log('Attributes dropdown created');
+                        } else if (newFieldSelect.value === 'sex') {
                             valueInput.replaceWith(document.createElement('select'));
                             const newSelect = modalForm.querySelector('[name="value"]');
                             newSelect.name = 'value';
@@ -853,12 +858,14 @@
                                 option.textContent = opt || '(Select)';
                                 newSelect.appendChild(option);
                             });
+                            if (debugMode) console.log('Sex dropdown created');
                         } else if (valueInput.tagName === 'SELECT') {
                             const newInput = document.createElement('input');
                             newInput.type = 'text';
                             newInput.name = 'value';
                             newInput.required = true;
                             valueInput.replaceWith(newInput);
+                            if (debugMode) console.log('Reverted to text input');
                         }
                     });
                 });
