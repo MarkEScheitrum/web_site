@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.9</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 07:34:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.10</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 07:57:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -563,7 +563,7 @@
                 greyedOut: ['gen', 'marriage_date', 'relationship', 'divorced', 'parents']
             },
             spouse: {
-                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents', 'attributes'],
+                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents'],
                 uneditable: ['record_type'],
                 greyedOut: ['gen', 'sex']
             }
@@ -729,7 +729,7 @@
                 }).filter(r => r.record_type.toLowerCase() === 'person');
                 fields = [
                     { name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true },
-                    { name: 'sex', label: 'Sex', type: 'select', options: ['', 'Male', 'Female'] },
+                    { name: 'sex', label: 'Sex', type: 'select', options: ['', 'male', 'female'] },
                     { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
                     { name: 'birth_location', label: 'Birth Location', type: 'text' },
                     { name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true }
@@ -853,14 +853,14 @@
                             const newSelect = document.createElement('select');
                             newSelect.name = 'value';
                             newSelect.required = true;
-                            ['', 'Male', 'Female'].forEach(opt => {
+                            ['', 'male', 'female'].forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt;
                                 option.textContent = opt || '(Select)';
                                 newSelect.appendChild(option);
                             });
                             valueInput.replaceWith(newSelect);
-                            if (debugMode) console.log('Debug: Sex dropdown created with options: ["", "Male", "Female"]');
+                            if (debugMode) console.log('Debug: Sex dropdown created with options: ["", "male", "female"]');
                         } else if (valueInput.tagName === 'SELECT') {
                             const newInput = document.createElement('input');
                             newInput.type = 'text';
@@ -978,16 +978,16 @@
                         safeShowError('Invalid record selected.');
                         return;
                     }
-                    if (data.field === 'relationship' && !['Spouse', 'Other'].includes(data.value)) {
-                        safeShowError('Relationship must be "Spouse" or "Other".');
+                    if (data.field === 'relationship' && !['Spouse', 'Partner', 'Other'].includes(data.value)) {
+                        safeShowError('Relationship must be "Spouse", "Partner", or "Other".');
                         return;
                     }
                     if (data.field === 'attributes' && !['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'].includes(data.value)) {
                         safeShowError('Attributes must be one of: None, stillborn, step, foster, adopted, continuation.');
                         return;
                     }
-                    if (data.field === 'sex' && !['', 'Male', 'Female'].includes(data.value)) {
-                        safeShowError('Sex must be one of: Male, Female, or empty.');
+                    if (data.field === 'sex' && !['', 'male', 'female'].includes(data.value)) {
+                        safeShowError('Sex must be one of: male, female, or empty.');
                         return;
                     }
                     if (dateFields.includes(data.field) && data.value && !isValidDate(data.value)) {
@@ -1192,8 +1192,8 @@
                 cancelEdit(td, originalValue);
                 return;
             }
-            if (field === 'relationship' && !['Spouse', 'Other'].includes(trimmedValue)) {
-                safeShowError('Relationship must be "Spouse" or "Other".');
+            if (field === 'relationship' && !['Spouse', 'Partner', 'Other'].includes(trimmedValue)) {
+                safeShowError('Relationship must be "Spouse", "Partner", or "Other".');
                 if (debugMode) console.log(`Relationship validation failed: ${trimmedValue}`);
                 cancelEdit(td, originalValue);
                 return;
