@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.1</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-09 22:38:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.2</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-09 22:49:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -836,10 +836,10 @@
                             const newSelect = modalForm.querySelector('[name="value"]');
                             newSelect.name = 'value';
                             newSelect.required = true;
-                            ['', 'step', 'foster', 'adopted', 'continued'].forEach(opt => {
+                            ['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'].forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt;
-                                option.textContent = opt || '(Select)';
+                                option.textContent = opt || '(None)';
                                 newSelect.appendChild(option);
                             });
                         } else if (valueInput.tagName === 'SELECT') {
@@ -962,8 +962,8 @@
                         safeShowError('Relationship must be "Spouse" or "Other".');
                         return;
                     }
-                    if (data.field === 'attributes' && !['', 'step', 'foster', 'adopted', 'continued'].includes(data.value)) {
-                        safeShowError('Attributes must be one of: step, foster, adopted, continued, or empty.');
+                    if (data.field === 'attributes' && !['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'].includes(data.value)) {
+                        safeShowError('Attributes must be one of: None, stillborn, step, foster, adopted, continuation.');
                         return;
                     }
                     if (dateFields.includes(data.field) && data.value && !isValidDate(data.value)) {
