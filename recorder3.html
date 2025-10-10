@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.11</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 08:21:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.12</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 08:43:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -945,7 +945,7 @@
                         return;
                     }
                     const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
-                    if (!partner) {
+                    if (!parent) {
                         safeShowError('Invalid partner selected.');
                         return;
                     }
@@ -980,8 +980,12 @@
                     records.splice(insertIndex, 0, newRecord);
                     if (debugMode) console.log('Added spouse record:', newRecord);
                 } else if (mode === 'updateRecord') {
-                    if (!data.record || !data.field || !data.value) {
-                        safeShowError('Please select a record, field, and enter a value.');
+                    if (!data.record || !data.field) {
+                        safeShowError('Please select a record and field.');
+                        return;
+                    }
+                    if (!data.value && data.field !== 'attributes') {
+                        safeShowError('Please enter a value.');
                         return;
                     }
                     const [recordType, name] = data.record.split(': ');
