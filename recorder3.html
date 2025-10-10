@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.12</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 08:43:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.13</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 09:00:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -216,7 +216,7 @@
         let vestigialColumns = new Set(['notes', 'unprocessed_items']);
         let debugMode = false;
         let renderTimeout = null;
-        const dateFields = ['birth_date', 'death_date', 'marriage_date'];
+        const dateFields = ['birth_date', 'death_date', 'marriage_date', 'divorce'];
         window.addEventListener('beforeunload', function(e) {
             if (modalMode) {
                 e.preventDefault();
@@ -362,7 +362,7 @@
                             contents.forEach((relativePath, zipEntry) => {
                                 fileCount++;
                                 if (debugMode) console.log(`ZIP entry ${fileCount}: ${zipEntry.name}`);
-                                if ((zipEntry.name.endsWith('.enc') || (debugMode && zipEntry.name.endsWith('.csv'))) && !foundFile) {
+                                if ((zipEntry.name.endsWith('.enc') || (debugMode && zipEntry.name.endsWith('.csv')) ) && !foundFile) {
                                     foundFile = { name: zipEntry.name, entry: zipEntry };
                                     if (debugMode) console.log(`Found target file in ZIP: ${zipEntry.name} (${fileCount} entries total)`);
                                 }
@@ -560,10 +560,10 @@
             person: {
                 editable: ['name', 'sex', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'attributes'],
                 uneditable: ['record_type'],
-                greyedOut: ['gen', 'marriage_date', 'relationship', 'divorced', 'parents']
+                greyedOut: ['gen', 'marriage_date', 'relationship', 'divorce', 'parents']
             },
             spouse: {
-                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents'],
+                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorce', 'parents'],
                 uneditable: ['record_type'],
                 greyedOut: ['gen', 'sex']
             }
@@ -924,7 +924,7 @@
                         service: '',
                         marriage_date: '',
                         relationship: '',
-                        divorced: '',
+                        divorce: '',
                         attributes: '',
                         unprocessed_items: '',
                         notes: ''
@@ -945,7 +945,7 @@
                         return;
                     }
                     const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
-                    if (!parent) {
+                    if (!partner) {
                         safeShowError('Invalid partner selected.');
                         return;
                     }
@@ -963,7 +963,7 @@
                         service: '',
                         marriage_date: data.marriage_date || '',
                         relationship: data.relationship,
-                        divorced: '',
+                        divorce: '',
                         attributes: '',
                         unprocessed_items: '',
                         notes: ''
@@ -1004,6 +1004,10 @@
                     }
                     if (data.field === 'sex' && !['', 'male', 'female'].includes(data.value)) {
                         safeShowError('Sex must be one of: male, female, or empty.');
+                        return;
+                    }
+                    if (data.field === 'divorce' && data.value && data.value !== 'true' && !isValidDate(data.value)) {
+                        safeShowError('Divorce must be a valid date, "true", or empty.');
                         return;
                     }
                     if (dateFields.includes(data.field) && data.value && !isValidDate(data.value)) {
