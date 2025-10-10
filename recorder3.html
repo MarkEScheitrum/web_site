@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Genealogy Record Editor</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
+    <!-- Using a known-good JSZip version that works in browsers -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.5.0/jszip.min.js" crossorigin="anonymous"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 18px;
+            padding: 20px;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        .task-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .task-btn {
+            font-size: 20px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            min-width: 150px;
+            touch-action: manipulation;
+        }
+        .task-btn:hover:not(.disabled-btn) {
+            background-color: #0056b3;
+        }
+        .disabled-btn {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .file-status {
+            font-size: 16px;
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .close {
+            float: right;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .modal-content h3 {
+            margin-top: 0;
+            font-size: 24px;
+        }
+        .modal-content label {
+            display: block;
+            margin: 10px 0 5px;
+            font-size: 18px;
+        }
+        .modal-content input, .modal-content select, .modal-content textarea {
+            width: 100%;
+            padding: 10px;
+            font-size: 18px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .modal-content button {
+            margin-top: 20px;
+            padding: 12px 24px;
+            font-size: 18px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .modal-content button:hover {
+            background-color: #218838;
+        }
+        .table-container {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            font-size: 14px;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #ccc;
+            white-space: normal;
+            box-sizing: border-box;
+        }
+        th.vestigial {
+            padding: 4px;
+        }
+        th.record_type, td.record_type {
+            width: 60px;
+        }
+        th.gen, td.gen {
+            width: 40px;
+        }
+        th.sex, td.sex {
+            width: 40px;
+        }
+        th.record_type.vestigial, td.record_type.vestigial,
+        th.gen.vestigial, td.gen.vestigial,
+        th.name.vestigial, td.name.vestigial,
+        th.sex.vestigial, td.sex.vestigial {
+            width: inherit !important;
+        }
+        .action-icons {
+            font-size: 24px;
+            margin-right: 4px;
+        }
+        .vestigial {
+            width: 36px !important;
+            max-width: 36px !important;
+            min-width: 0 !important;
+            overflow: hidden;
+        }
+        .vestigial .header-text {
+            display: none;
+        }
+        .vestigial .cell-content {
+            display: none;
+        }
+        .editable-row:hover {
+            background-color: #d9edf7;
+        }
+        .highlighted-row {
+            background-color: #ffffcc !important;
+        }
+        .greyed-out {
+            background-color: #c0c0c0;
+            cursor: not-allowed;
+        }
+        @media (max-width: 768px) {
+            .task-btn {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            .modal-content {
+                width: 95%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h2>Genealogy Recorder</h2>
+    <div class="info">
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.21</span> <strong>Last Updated:</strong> <span id="pageDate">2025-09-19 17:15:00 PDT</span></p>
+        <p class="warning">Data is deleted when you leave this page. Download your changes!</p>
+    </div>
+    <div class="task-buttons">
+        <button onclick="openModal('addChild')" class="task-btn disabled-btn" id="addChildBtn">Add Child 👶</button>
+        <button onclick="openModal('addSpouse')" class="task-btn disabled-btn" id="addSpouseBtn">Add Partner 💍</button>
+        <button onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn">Update Record ✏️</button>
+        <button onclick="openModal('recordDeathBurial')" class="task-btn disabled-btn" id="recordDeathBurialBtn">Record Death/Burial ⚰️</button>
+        <button onclick="toggleTable()" class="task-btn disabled-btn" id="viewTableBtn">View Table 📋</button>
+        <button onclick="selectAndLoadFile()" class="task-btn" id="selectLoadBtn">Select/Load File 📂</button>
+        <button onclick="downloadCSV()" class="task-btn" id="returnUpdatesBtn" style="display: none;">Return Updates 📧</button>
+    </div>
+    <div class="file-status">
+        <span id="fileStatus">No file selected</span>
+    </div>
+    <input type="file" id="textFile" accept=".csv.enc,.zip" style="display: none;" onchange="handleFileSelect()">
+    <div id="tableContainer" class="table-container" style="display: none;">
+        <div id="recordBody"></div>
+    </div>
+    <div id="modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3 id="modalTitle"></h3>
+            <form id="modalForm"></form>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        var decryptionPassphrase = null;
+        let modalMode = null;
+        let records = [];
+        let originalFileName = 'records.csv.enc';
+        let editingIndex = null;
+        let editingField = null;
+        let highlightedRow = null;
+        let vestigialColumns = new Set();
+        let debugMode = false;
+        let renderTimeout = null;
+        const dateFields = ['birth_date', 'death_date', 'marriage_date'];
+
+        // Prevent navigation on form submission
+        window.addEventListener('beforeunload', function(e) {
+            if (modalMode) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
+            }
+        });
+
+        // Suppress extension errors
+        window.addEventListener('error', function(e) {
+            if (e.message && e.message.includes('runtime.lastError')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        function selectAndLoadFile() {
+            document.getElementById('textFile').click();
+        }
+
+        function handleFileSelect() {
+            const fileInput = document.getElementById('textFile');
+            const fileStatus = document.getElementById('fileStatus');
+            if (fileInput.files.length > 0) {
+                fileStatus.textContent = `Selected: ${fileInput.files[0].name}`;
+                if (debugMode) console.log(`File selected: ${fileInput.files[0].name}`);
+                processFile();
+            } else {
+                fileStatus.textContent = 'No file selected';
+                if (debugMode) console.log('No file selected');
+            }
+        }
+
+        function getPassphrase(callback, fileName) {
+            safeOpenModal('passphrase');
+            document.getElementById('modalTitle').textContent = `Enter Passphrase for ${fileName || 'file'}`;
+            const form = document.getElementById('modalForm');
+            form.innerHTML = `
+                <label>Passphrase</label>
+                <input type="password" name="passphrase" onkeydown="if (event.key === 'Enter') { event.preventDefault(); submitPassphrase('${callback}'); }">
+                <button type="button" onclick="submitPassphrase('${callback}')">Submit</button>
+            `;
+        }
+
+        function submitPassphrase(callback) {
+            const passphrase = document.querySelector('#modalForm input[name="passphrase"]').value;
+            if (passphrase) {
+                decryptionPassphrase = passphrase;
+                safeCloseModal();
+                // Ensure callback exists before calling
+                if (window[callback]) {
+                    window[callback]();
+                } else {
+                    if (debugMode) console.log(`Callback ${callback} not found`);
+                }
+            } else {
+                safeShowError('Passphrase is required.');
+                document.getElementById('fileStatus').textContent = 'No file selected';
+                document.getElementById('textFile').value = '';
+            }
+        }
+
+        // Safe modal operations that prevent navigation
+        function safeOpenModal(mode) {
+            // Clear any URL parameters that might cause navigation
+            if (window.location.search && !window.location.search.includes('debug=1')) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            modalMode = mode;
+            const modal = document.getElementById('modal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalForm = document.getElementById('modalForm');
+            modalForm.innerHTML = '';
+            modal.style.display = 'block';
+            modalForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            });
+            // Prevent form submission from navigating
+            modalForm.onsubmit = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            };
+        }
+
+        function safeCloseModal() {
+            const modal = document.getElementById('modal');
+            modal.style.display = 'none';
+            modalMode = null;
+            document.getElementById('modalForm').innerHTML = '';
+        }
+
+        function safeShowError(message) {
+            // Use a custom error display instead of alert to prevent focus loss
+            if (debugMode) console.error(`Validation Error: ${message}`);
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = `
+                position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; 
+                padding: 15px; border-radius: 5px; z-index: 2000; max-width: 300px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 14px;
+            `;
+            errorDiv.innerHTML = `
+                <strong>Error</strong><br>${message}
+                <button onclick="this.parentElement.remove()" style="margin-left: 10px; background: none; border: none; color: white; cursor: pointer; float: right;">&times;</button>
+            `;
+            document.body.appendChild(errorDiv);
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        function processFile() {
+            const fileInput = document.getElementById('textFile');
+            const file = fileInput.files[0];
+            const fileStatus = document.getElementById('fileStatus');
+            if (!file) {
+                fileStatus.textContent = 'No file selected';
+                safeShowError('No file selected. Please try again.');
+                if (debugMode) console.log('No file selected in processFile');
+                return;
+            }
+            if (typeof CryptoJS === 'undefined') {
+                fileStatus.textContent = 'No file selected';
+                safeShowError('Crypto library not loaded. Please refresh the page and try again.');
+                fileInput.value = '';
+                return;
+            }
+            originalFileName = file.name;
+            if (debugMode) console.log(`Processing file: ${file.name}`);
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (typeof CryptoJS === 'undefined') {
+                    fileStatus.textContent = 'No file selected';
+                    safeShowError('Crypto library failed to load during file read. Please refresh and retry.');
+                    fileInput.value = '';
+                    return;
+                }
+                if (typeof decryptFile === 'undefined') {
+                    fileStatus.textContent = 'No file selected';
+                    safeShowError('Decryption function not ready—please refresh and try again.');
+                    fileInput.value = '';
+                    return;
+                }
+                if (file.name.toLowerCase().endsWith('.zip')) {
+                    // Use stable JSZip version with proper error handling
+                    if (typeof JSZip === 'undefined') {
+                        fileStatus.textContent = 'No file selected';
+                        safeShowError('ZIP library failed to load. Please refresh the page.');
+                        fileInput.value = '';
+                        return;
+                    }
+                    
+                    try {
+                        const zip = new JSZip();
+                        zip.loadAsync(e.target.result).then((contents) => {
+                            let foundFile = null;
+                            let fileCount = 0;
+                            
+                            // Search for the target file
+                            contents.forEach((relativePath, zipEntry) => {
+                                fileCount++;
+                                if (debugMode) console.log(`ZIP entry ${fileCount}: ${zipEntry.name}`);
+                                
+                                if ((zipEntry.name.endsWith('.csv.enc') || (debugMode && zipEntry.name.endsWith('.csv'))) && !foundFile) {
+                                    foundFile = { name: zipEntry.name, entry: zipEntry };
+                                    if (debugMode) console.log(`Found target file in ZIP: ${zipEntry.name} (${fileCount} entries total)`);
+                                }
+                            });
+                            
+                            if (debugMode) console.log(`ZIP processing complete: ${fileCount} files, found target: ${!!foundFile}`);
+                            
+                            if (foundFile) {
+                                // Extract the file as ArrayBuffer
+                                foundFile.entry.async('arraybuffer').then((data) => {
+                                    if (debugMode) console.log(`Extracted ${foundFile.name}: ${data.byteLength} bytes`);
+                                    
+                                    originalFileName = foundFile.name;
+                                    
+                                    if (foundFile.name.endsWith('.csv.enc')) {
+                                        getPassphrase('processZipEncryptedFile', foundFile.name);
+                                        window.processZipEncryptedFile = () => {
+                                            try {
+                                                const result = decryptFile(data, decryptionPassphrase);
+                                                if (typeof result === 'string') {
+                                                    records = parseCSVFile(result);
+                                                    enableButtonsAfterLoad();
+                                                    debounceDisplayRecords();
+                                                    fileStatus.textContent = `Loaded: ${foundFile.name} (from ZIP)`;
+                                                    if (debugMode) console.log(`Successfully loaded ${records.length} records from ZIP`);
+                                                } else {
+                                                    fileStatus.textContent = 'No file selected';
+                                                    safeShowError(`Decryption failed: ${result.error}`);
+                                                    decryptionPassphrase = null;
+                                                    fileInput.value = '';
+                                                }
+                                            } catch (decryptError) {
+                                                if (debugMode) console.log('Decryption error in ZIP processing:', decryptError);
+                                                fileStatus.textContent = 'No file selected';
+                                                safeShowError(`Error decrypting file from ZIP: ${decryptError.message}`);
+                                                fileInput.value = '';
+                                            }
+                                        };
+                                    } else if (debugMode && foundFile.name.endsWith('.csv')) {
+                                        const text = arrayBufferToBinary(data);
+                                        records = parseCSVFile(text);
+                                        decryptionPassphrase = null;
+                                        enableButtonsAfterLoad();
+                                        debounceDisplayRecords();
+                                        fileStatus.textContent = `Loaded: ${foundFile.name} (from ZIP)`;
+                                        if (debugMode) console.log(`Successfully loaded ${records.length} records from ZIP (debug CSV)`);
+                                    } else {
+                                        fileStatus.textContent = 'No file selected';
+                                        safeShowError(`Unsupported file type in ZIP: ${foundFile.name}. Expected .csv.enc${debugMode ? ' or .csv' : ''}.`);
+                                        fileInput.value = '';
+                                    }
+                                }).catch((extractError) => {
+                                    if (debugMode) console.log('ZIP extraction error:', extractError);
+                                    fileStatus.textContent = 'No file selected';
+                                    safeShowError(`Error extracting file from ZIP: ${extractError.message}`);
+                                    fileInput.value = '';
+                                });
+                            } else {
+                                // List available files for debugging
+                                const availableFiles = [];
+                                contents.forEach((relativePath, zipEntry) => {
+                                    availableFiles.push(zipEntry.name);
+                                });
+                                fileStatus.textContent = 'No file selected';
+                                const errorMsg = `No .csv.enc${debugMode ? ' or .csv' : ''} file found in ZIP (${fileCount} files total). Available: ${availableFiles.slice(0, 3).join(', ')}${availableFiles.length > 3 ? '...' : ''}`;
+                                safeShowError(errorMsg);
+                                fileInput.value = '';
+                                if (debugMode) console.log('Available ZIP files:', availableFiles);
+                            }
+                        }).catch((loadError) => {
+                            if (debugMode) console.log('ZIP load error:', loadError);
+                            fileStatus.textContent = 'No file selected';
+                            safeShowError(`Error reading ZIP file: ${loadError.message}. Try unzipping manually.`);
+                            fileInput.value = '';
+                        });
+                    } catch (zipInitError) {
+                        if (debugMode) console.log('JSZip initialization error:', zipInitError);
+                        fileStatus.textContent = 'No file selected';
+                        safeShowError(`ZIP library error: ${zipInitError.message}. Please refresh and try again.`);
+                        fileInput.value = '';
+                    }
+                } else if (file.name.endsWith('.csv.enc')) {
+                    getPassphrase('processEncryptedFile', file.name);
+                    window.processEncryptedFile = () => {
+                        const result = decryptFile(e.target.result, decryptionPassphrase);
+                        if (typeof result === 'string') {
+                            records = parseCSVFile(result);
+                            enableButtonsAfterLoad();
+                            debounceDisplayRecords();
+                            fileStatus.textContent = `Loaded: ${file.name}`;
+                            if (debugMode) console.log(`Successfully loaded ${records.length} records from direct file`);
+                        } else {
+                            fileStatus.textContent = 'No file selected';
+                            safeShowError(`Decryption failed: ${result.error}`);
+                            decryptionPassphrase = null;
+                            fileInput.value = '';
+                        }
+                    };
+                } else if (debugMode && file.name.toLowerCase().endsWith('.csv')) {
+                    const text = e.target.result;
+                    records = parseCSVFile(text);
+                    decryptionPassphrase = null;
+                    enableButtonsAfterLoad();
+                    debounceDisplayRecords();
+                    fileStatus.textContent = `Loaded: ${file.name}`;
+                    if (debugMode) console.log(`Successfully loaded ${records.length} records from debug CSV`);
+                } else {
+                    fileStatus.textContent = 'No file selected';
+                    safeShowError(`Unsupported file type: ${file.name}. Expected .csv.enc${debugMode ? ' or .csv' : ''}.`);
+                    fileInput.value = '';
+                    return;
+                }
+            };
+            if (file.name.toLowerCase().endsWith('.zip') || file.name.endsWith('.csv.enc') || (debugMode && file.name.toLowerCase().endsWith('.csv'))) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file);
+            }
+        }
+
+        function enableButtonsAfterLoad() {
+            document.getElementById('addChildBtn').classList.remove('disabled-btn');
+            document.getElementById('addSpouseBtn').classList.remove('disabled-btn');
+            document.getElementById('updateRecordBtn').classList.remove('disabled-btn');
+            document.getElementById('recordDeathBurialBtn').classList.remove('disabled-btn');
+            document.getElementById('viewTableBtn').classList.remove('disabled-btn');
+            document.getElementById('selectLoadBtn').style.display = 'none';
+            document.getElementById('returnUpdatesBtn').style.display = 'block';
+            if (debugMode) console.log('Enabled task buttons and toggled Select/Load to Return Updates');
+        }
+
+        function filledCell(cell) {
+            return cell !== '' && cell != null;
+        }
+
+        function loadFileData(filename) {
+            if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+                try {
+                    var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                    var firstSheetName = workbook.SheetNames[0];
+                    var worksheet = workbook.Sheets[firstSheetName];
+                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                    var filteredData = jsonData.filter(row => row.some(filledCell));
+                    var headerRowIndex = filteredData.findIndex((row, index) =>
+                        row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                    );
+                    if (headerRowIndex === -1 || headerRowIndex > 25) {
+                        headerRowIndex = 0;
+                    }
+                    var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+                    csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                    return csv;
+                } catch (e) {
+                    console.error(e);
+                    return "";
+                }
+            }
+            return gk_fileData[filename] || "";
+        }
+
+        function isValidDate(dateStr) {
+            if (!dateStr || dateStr.trim() === '') return true;
+            const parts = dateStr.split('-');
+            if (parts.length === 1) {
+                const year = parseInt(parts[0], 10);
+                return !isNaN(year) && year >= 1 && year <= 9999;
+            } else if (parts.length === 2) {
+                const year = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                return !isNaN(year) && year >= 1 && year <= 9999 &&
+                       !isNaN(month) && month >= 1 && month <= 12;
+            } else if (parts.length === 3) {
+                const date = Date.parse(dateStr + 'T00:00:00');
+                if (isNaN(date)) return false;
+                const parsedDate = new Date(date);
+                return parsedDate.getFullYear() == parts[0] &&
+                       (parsedDate.getMonth() + 1) == parts[1] &&
+                       parsedDate.getDate() == parts[2];
+            }
+            return false;
+        }
+
+        const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
+        function initDebugMode() {
+            if (window.location.search.includes('debug=1')) {
+                getPassphrase('enableDebugMode', 'debug mode');
+                window.enableDebugMode = () => {
+                    if (CryptoJS.SHA256(decryptionPassphrase).toString() === debugPassphraseHash) {
+                        debugMode = true;
+                        console.log('Debug mode enabled');
+                        // Update file input to accept .csv files in debug mode
+                        document.getElementById('textFile').setAttribute('accept', '.csv,.csv.enc,.zip');
+                    } else {
+                        console.log('Debug mode disabled - incorrect passphrase');
+                    }
+                    decryptionPassphrase = null;
+                };
+            }
+        }
+
+        window.addEventListener('unload', () => {
+            records = [];
+            decryptionPassphrase = null;
+            document.getElementById('fileStatus').textContent = 'No file selected';
+        });
+
+        const fieldRestrictions = {
+            person: {
+                editable: ['name', 'gender', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service'],
+                uneditable: ['record_type'],
+                greyedOut: ['gen', 'marriage_date', 'relationship', 'divorced', 'parents']
+            },
+            spouse: {
+                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'parents'],
+                uneditable: ['record_type'],
+                greyedOut: ['gen', 'gender']
+            }
+        };
+
+        function waitForCryptoJS(callback) {
+            const checkInterval = setInterval(() => {
+                if (typeof CryptoJS !== 'undefined' && (typeof JSZip !== 'undefined' || !window.location.search.includes('debug=1'))) {
+                    clearInterval(checkInterval);
+                    callback();
+                }
+            }, 100);
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                if (typeof CryptoJS === 'undefined') {
+                    console.error('CryptoJS failed to load after 2s—retry page load');
+                }
+                if (typeof JSZip === 'undefined' && window.location.search.includes('debug=1')) {
+                    console.warn('JSZip failed to load after 2s—ZIP support disabled');
+                }
+            }, 2000);
+        }
+
+        function deriveKey(passphrase, salt) {
+            const utf8Passphrase = CryptoJS.enc.Utf8.parse(passphrase);
+            return CryptoJS.PBKDF2(utf8Passphrase, salt, {
+                keySize: 8,
+                iterations: 100000,
+                hasher: CryptoJS.algo.SHA256
+            });
+        }
+
+        function arrayBufferToBinary(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return binary;
+        }
+
+        function decryptFile(encryptedData, passphrase) {
+            try {
+                const binaryData = arrayBufferToBinary(encryptedData);
+                if (binaryData.length < 32) throw new Error("Data too short for salt and IV");
+                const saltBinary = binaryData.slice(0, 16);
+                const ivBinary = binaryData.slice(16, 32);
+                const ciphertextBinary = binaryData.slice(32);
+                const salt = CryptoJS.enc.Latin1.parse(saltBinary);
+                const iv = CryptoJS.enc.Latin1.parse(ivBinary);
+                const ciphertext = CryptoJS.enc.Latin1.parse(ciphertextBinary);
+                const key = deriveKey(passphrase, salt);
+                if (debugMode) {
+                    console.log(`Decryption: data length=${binaryData.length} bytes`);
+                    console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                    console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                    console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+                    console.log(`Ciphertext length: ${ciphertextBinary.length} bytes`);
+                }
+                const decrypted = CryptoJS.AES.decrypt(
+                    { ciphertext: ciphertext },
+                    key,
+                    { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+                );
+                try {
+                    const result = decrypted.toString(CryptoJS.enc.Utf8);
+                    if (result === '') {
+                        if (debugMode) console.log('Decrypted to empty string, trying Latin1');
+                        throw new Error('Empty UTF-8 result');
+                    }
+                    if (debugMode) console.log(`Decrypted data (first 100 chars): ${result.slice(0, 100)}`);
+                    return result;
+                } catch (e) {
+                    if (debugMode) console.log(`UTF-8 decode failed: ${e.message}, trying Latin1`);
+                    try {
+                        const result = decrypted.toString(CryptoJS.enc.Latin1);
+                        if (debugMode) console.log(`Decrypted data (first 100 chars, Latin1): ${result.slice(0, 100)}`);
+                        return result;
+                    } catch (e2) {
+                        if (debugMode) console.log(`Decryption failed: Invalid UTF-8 and Latin1, hex: ${decrypted.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+                        return { error: "Invalid UTF-8 and Latin1", decryptedHex: decrypted.toString(CryptoJS.enc.Hex) };
+                    }
+                }
+            } catch (e) {
+                if (debugMode) console.log(`Decryption error: ${e.message}`);
+                return { error: e.message, decryptedHex: null };
+            }
+        }
+
+        function encryptFile(data, passphrase) {
+            const salt = CryptoJS.lib.WordArray.random(16);
+            const iv = CryptoJS.lib.WordArray.random(16);
+            const key = deriveKey(passphrase, salt);
+            const encrypted = CryptoJS.AES.encrypt(data, key, {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.Pkcs7
+            });
+            const fullBinary = salt.concat(iv).concat(encrypted.ciphertext);
+            const uint8Array = new Uint8Array(fullBinary.sigBytes);
+            for (let i = 0; i < fullBinary.sigBytes; i++) {
+                const wordIndex = Math.floor(i / 4);
+                const byteIndex = i % 4;
+                uint8Array[i] = (fullBinary.words[wordIndex] >>> (24 - byteIndex * 8)) & 0xff;
+            }
+            if (debugMode) {
+                console.log(`Encryption: plaintext=${data.length} bytes, ciphertext=${encrypted.ciphertext.sigBytes} bytes, total=${uint8Array.length} bytes`);
+                console.log(`Salt (hex): ${salt.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                console.log(`IV (hex): ${iv.toString(CryptoJS.enc.Hex).slice(0, 32)}`);
+                console.log(`Key (hex): ${key.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+                console.log(`Ciphertext (first 32 bytes, hex): ${encrypted.ciphertext.toString(CryptoJS.enc.Hex).slice(0, 64)}`);
+            }
+            return uint8Array;
+        }
+
+        function parseCSVLine(line) {
+            const fields = [];
+            let field = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                    continue;
+                }
+                if (char === ',' && !inQuotes) {
+                    fields.push(field);
+                    field = '';
+                    continue;
+                }
+                field += char;
+            }
+            fields.push(field);
+            return fields;
+        }
+
+        function parseCSVFile(text) {
+            const normalizedText = text.replace(/\r\n|\r\r\n|\r/g, '\n');
+            const lines = normalizedText.split('\n').filter(line => line.trim() !== '' && !line.trim().startsWith('#'));
+            const headers = parseCSVLine(lines[0]);
+            const records = [];
+            for (let i = 1; i < lines.length; i++) {
+                const fields = parseCSVLine(lines[i]);
+                if (fields.length === headers.length) {
+                    const record = {};
+                    headers.forEach((header, index) => {
+                        record[header] = fields[index].trim();
+                    });
+                    records.push(record);
+                }
+            }
+            if (debugMode) console.log(`Parsed ${records.length} records`);
+            return records;
+        }
+
+        function openModal(mode) {
+            safeOpenModal(mode);
+            const modalTitle = document.getElementById('modalTitle');
+            const modalForm = document.getElementById('modalForm');
+            let fields = [];
+            if (mode === 'addChild') {
+                modalTitle.textContent = 'Add Child';
+                const selectablePeople = records.filter((r, index) => {
+                    if (index === 0 && r.record_type.toLowerCase() === 'person') return false;
+                    if (r.record_type.toLowerCase() === 'spouse') {
+                        let nextPersonIndex = records.findIndex((rec, i) => i > index && rec.record_type.toLowerCase() === 'person');
+                        if (nextPersonIndex === -1) nextPersonIndex = records.length;
+                        return index > 0 && index < nextPersonIndex && records[0].record_type.toLowerCase() === 'person';
+                    }
+                    return true;
+                }).filter(r => r.record_type.toLowerCase() === 'person');
+                fields = [
+                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true },
+                    { name: 'gender', label: 'Sex', type: 'select', options: ['', 'Male', 'Female'] },
+                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
+                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
+                    { name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true }
+                ];
+            } else if (mode === 'addSpouse') {
+                modalTitle.textContent = 'Add Partner';
+                const selectablePeople = records.filter((r, index) => {
+                    if (index === 0 && r.record_type.toLowerCase() === 'person') return false;
+                    if (r.record_type.toLowerCase() === 'spouse') {
+                        let nextPersonIndex = records.findIndex((rec, i) => i > index && rec.record_type.toLowerCase() === 'person');
+                        if (nextPersonIndex === -1) nextPersonIndex = records.length;
+                        return index > 0 && index < nextPersonIndex && records[0].record_type.toLowerCase() === 'person';
+                    }
+                    return true;
+                }).filter(r => r.record_type.toLowerCase() === 'person');
+                fields = [
+                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true },
+                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
+                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
+                    { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text' },
+                    { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' },
+                    { name: 'relationship', label: 'Relationship', type: 'select', options: ['', 'Spouse', 'Other'], required: true },
+                    { name: 'partner', label: 'Select Genealogical Partner', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true }
+                ];
+            } else if (mode === 'updateRecord') {
+                modalTitle.textContent = 'Update Record';
+                fields = [
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
+                    { name: 'field', label: 'Field to Update', type: 'select', options: [''] },
+                    { name: 'value', label: 'New Value', type: 'text', required: true }
+                ];
+            } else if (mode === 'recordDeathBurial') {
+                modalTitle.textContent = 'Record Death/Burial';
+                fields = [
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
+                    { name: 'death_date', label: 'Death Date (YYYY-MM-DD)', type: 'text' },
+                    { name: 'death_location', label: 'Death Location', type: 'text' },
+                    { name: 'burial_location', label: 'Burial Location', type: 'text' }
+                ];
+            }
+            fields.forEach(field => {
+                const label = document.createElement('label');
+                label.textContent = field.label;
+                if (field.required) {
+                    label.innerHTML += ' <span style="color: red;">*</span>';
+                }
+                modalForm.appendChild(label);
+                if (field.type === 'select') {
+                    const select = document.createElement('select');
+                    select.name = field.name;
+                    if (field.required) select.required = true;
+                    field.options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.textContent = opt || '(Select)';
+                        select.appendChild(option);
+                    });
+                    modalForm.appendChild(select);
+                } else {
+                    const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
+                    input.type = field.type;
+                    input.name = field.name;
+                    if (field.required) input.required = true;
+                    if (field.autocomplete) {
+                        input.setAttribute('autocomplete', field.autocomplete);
+                    }
+                    modalForm.appendChild(input);
+                }
+            });
+            const submitBtn = document.createElement('button');
+            submitBtn.type = 'button'; // Explicitly prevent form submission
+            submitBtn.textContent = 'Save';
+            submitBtn.onclick = () => {
+                // Prevent double-click
+                if (submitBtn.disabled) return;
+                submitBtn.disabled = true;
+                setTimeout(() => submitBtn.disabled = false, 1000);
+                saveModalData(mode);
+            };
+            modalForm.appendChild(submitBtn);
+            if (mode === 'updateRecord') {
+                const recordSelect = modalForm.querySelector('select[name="record"]');
+                const fieldSelect = modalForm.querySelector('select[name="field"]');
+                recordSelect.addEventListener('change', () => {
+                    const selectedRecord = recordSelect.value;
+                    if (!selectedRecord) {
+                        fieldSelect.innerHTML = '<option value=""></option>';
+                        return;
+                    }
+                    const [recordType, name] = selectedRecord.split(': ');
+                    const cleanType = recordType.toLowerCase() === 'partner' ? 'spouse' : 'person';
+                    const editableFields = [...fieldRestrictions[cleanType].editable];
+                    fieldSelect.innerHTML = '';
+                    const emptyOption = document.createElement('option');
+                    emptyOption.value = '';
+                    fieldSelect.appendChild(emptyOption);
+                    editableFields.forEach(f => {
+                        const option = document.createElement('option');
+                        option.value = f;
+                        option.textContent = f;
+                        fieldSelect.appendChild(option);
+                    });
+                    fieldSelect.value = '';
+                });
+            }
+        }
+
+        function closeModal() {
+            safeCloseModal();
+        }
+
+        function saveModalData(mode) {
+            try {
+                const form = document.getElementById('modalForm');
+                const data = {};
+                let hasErrors = false;
+                
+                // Collect form data safely
+                for (let input of form.elements) {
+                    if (input.name && input.type !== 'button') {
+                        data[input.name] = input.value || '';
+                    }
+                }
+                
+                if (debugMode) console.log(`Processing ${mode} with data:`, data);
+                
+                if (mode === 'addChild') {
+                    if (!data.name || !data.parents) {
+                        safeShowError('Name and Parent are required.');
+                        return;
+                    }
+                    const parent = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
+                    if (!parent) {
+                        safeShowError('Invalid parent selected.');
+                        return;
+                    }
+                    const parentGen = parseInt(parent.gen) || 0;
+                    const newRecord = {
+                        record_type: 'Person',
+                        gen: (parentGen + 1).toString(),
+                        name: data.name,
+                        gender: data.gender || '',
+                        birth_date: data.birth_date || '',
+                        birth_location: data.birth_location || '',
+                        parents: '',
+                        death_date: '',
+                        death_location: '',
+                        burial_location: '',
+                        service: '',
+                        marriage_date: '',
+                        relationship: '',
+                        divorced: ''
+                    };
+                    if (data.birth_date && !isValidDate(data.birth_date)) {
+                        safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+                    let insertIndex = records.indexOf(parent) + 1;
+                    while (insertIndex < records.length && records[insertIndex].record_type.toLowerCase() === 'spouse') {
+                        insertIndex++;
+                    }
+                    records.splice(insertIndex, 0, newRecord);
+                    if (debugMode) console.log('Added child record:', newRecord);
+                } else if (mode === 'addSpouse') {
+                    if (!data.name || !data.partner || !data.relationship) {
+                        safeShowError('Name, Select Genealogical Partner, and Relationship are required.');
+                        return;
+                    }
+                    const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
+                    if (!partner) {
+                        safeShowError('Invalid partner selected.');
+                        return;
+                    }
+                    const newRecord = {
+                        record_type: 'Spouse',
+                        gen: '',
+                        name: data.name,
+                        gender: '',
+                        birth_date: data.birth_date || '',
+                        birth_location: data.birth_location || '',
+                        parents: data.parents || '',
+                        death_date: '',
+                        death_location: '',
+                        burial_location: '',
+                        service: '',
+                        marriage_date: data.marriage_date || '',
+                        relationship: data.relationship,
+                        divorced: ''
+                    };
+                    if (data.birth_date && !isValidDate(data.birth_date)) {
+                        safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+                    if (data.marriage_date && !isValidDate(data.marriage_date)) {
+                        safeShowError('Invalid marriage date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+                    let insertIndex = records.indexOf(partner) + 1;
+                    records.splice(insertIndex, 0, newRecord);
+                    if (debugMode) console.log('Added spouse record:', newRecord);
+                } else if (mode === 'updateRecord') {
+                    if (!data.record || !data.field || !data.value) {
+                        safeShowError('Please select a record, field, and enter a value.');
+                        return;
+                    }
+                    const [recordType, name] = data.record.split(': ');
+                    const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
+                    if (!record) {
+                        safeShowError('Invalid record selected.');
+                        return;
+                    }
+                    if (data.field === 'relationship' && !['Spouse', 'Other'].includes(data.value)) {
+                        safeShowError('Relationship must be "Spouse" or "Other".');
+                        return;
+                    }
+                    if (dateFields.includes(data.field) && data.value && !isValidDate(data.value)) {
+                        safeShowError('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+                    if (isFieldEditable(record.record_type, data.field)) {
+                        const oldValue = record[data.field];
+                        record[data.field] = data.value;
+                        if (debugMode) console.log(`Updated ${data.field} from "${oldValue}" to "${data.value}" for ${name}`);
+                    } else {
+                        safeShowError('Selected field is not editable.');
+                        return;
+                    }
+                } else if (mode === 'recordDeathBurial') {
+                    if (!data.record) {
+                        safeShowError('Please select a record.');
+                        return;
+                    }
+                    const [recordType, name] = data.record.split(': ');
+                    const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
+                    if (!record) {
+                        safeShowError('Invalid record selected.');
+                        return;
+                    }
+                    if (data.death_date && !isValidDate(data.death_date)) {
+                        safeShowError('Invalid death date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+                    let updated = false;
+                    if (data.death_date && isFieldEditable(record.record_type, 'death_date')) {
+                        record.death_date = data.death_date;
+                        updated = true;
+                    }
+                    if (data.death_location && isFieldEditable(record.record_type, 'death_location')) {
+                        record.death_location = data.death_location;
+                        updated = true;
+                    }
+                    if (data.burial_location && isFieldEditable(record.record_type, 'burial_location')) {
+                        record.burial_location = data.burial_location;
+                        updated = true;
+                    }
+                    if (!updated) {
+                        safeShowError('At least one field (Death Date, Death Location, or Burial Location) must be provided and editable.');
+                        return;
+                    }
+                    if (debugMode) console.log(`Updated death/burial info for ${name}`);
+                }
+                
+                safeCloseModal();
+                debounceDisplayRecords();
+                if (debugMode) console.log(`Successfully saved ${mode} data:`, data);
+                
+            } catch (error) {
+                if (debugMode) console.error(`Error in saveModalData(${mode}):`, error);
+                safeShowError(`An unexpected error occurred: ${error.message}`);
+            }
+        }
+
+        function toggleTable() {
+            const tableContainer = document.getElementById('tableContainer');
+            const isHidden = tableContainer.style.display === 'none';
+            tableContainer.style.display = isHidden ? 'block' : 'none';
+            if (isHidden && records.length > 0) {
+                debounceDisplayRecords();
+            }
+            if (debugMode) console.log(`Table toggled: ${isHidden ? 'shown' : 'hidden'}`);
+        }
+
+        function debounceDisplayRecords() {
+            if (renderTimeout) clearTimeout(renderTimeout);
+            renderTimeout = setTimeout(displayRecords, 16);
+        }
+
+        function toggleColumn(column) {
+            if (vestigialColumns.has(column)) {
+                vestigialColumns.delete(column);
+                if (debugMode) console.log(`Restored column: ${column}`);
+            } else {
+                vestigialColumns.add(column);
+                if (debugMode) console.log(`Collapsed column: ${column}`);
+            }
+            debounceDisplayRecords();
+        }
+
+        function isFieldEditable(recordType, field) {
+            const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
+            const restrictions = fieldRestrictions[cleanType];
+            if (!restrictions) {
+                if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to uneditable`);
+                return false;
+            }
+            const isEditable = restrictions.editable.includes(field);
+            if (debugMode) console.log(`Checking editable: record_type='${cleanType}', field=${field}, isEditable=${isEditable}`);
+            return isEditable;
+        }
+
+        function isFieldGreyedOut(recordType, field) {
+            const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
+            const restrictions = fieldRestrictions[cleanType];
+            if (!restrictions) {
+                if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to not greyed-out`);
+                return false;
+            }
+            const isGreyedOut = restrictions.greyedOut.includes(field);
+            if (debugMode) console.log(`Checking greyed-out: record_type='${cleanType}', field=${field}, isGreyedOut=${isGreyedOut}`);
+            return isGreyedOut;
+        }
+
+        function displayRecords() {
+            const recordBody = document.getElementById('recordBody');
+            recordBody.innerHTML = '';
+            if (records.length === 0) {
+                if (debugMode) console.log('No records to display');
+                return;
+            }
+            const table = document.createElement('table');
+            const headerRow = document.createElement('tr');
+            const headers = Object.keys(records[0]);
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.className = header;
+                if (!['record_type', 'gen', 'name', 'gender'].includes(header)) {
+                    const toggleButton = document.createElement('span');
+                    toggleButton.textContent = vestigialColumns.has(header) ? '👁️‍🗨️' : '👁️';
+                    toggleButton.className = 'action-icons';
+                    toggleButton.onclick = () => toggleColumn(header);
+                    th.appendChild(toggleButton);
+                }
+                const headerText = document.createElement('span');
+                headerText.textContent = header === 'record_type' ? 'record' : header === 'gender' ? 'sex' : header;
+                headerText.className = 'header-text';
+                th.appendChild(headerText);
+                if (vestigialColumns.has(header) && !['record_type', 'gen', 'name', 'gender'].includes(header)) th.className += ' vestigial';
+                headerRow.appendChild(th);
+            });
+            table.appendChild(headerRow);
+            records.forEach((record, index) => {
+                const tr = document.createElement('tr');
+                if (index === highlightedRow) tr.className = 'highlighted-row';
+                tr.className += ' editable-row';
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.className = header;
+                    const cellContent = document.createElement('span');
+                    const displayValue = header === 'record_type' && record[header].toLowerCase() === 'spouse' ? 'Partner' : 
+                     header === 'gender' ? (record[header] || '') : 
+                     record[header] || '';
+                    cellContent.textContent = displayValue;
+                    cellContent.className = 'cell-content';
+                    td.appendChild(cellContent);
+                    const isEditable = isFieldEditable(record.record_type, header);
+                    const isGrey = isFieldGreyedOut(record.record_type, header);
+                    if (isEditable && !vestigialColumns.has(header)) {
+                        td.className += ' editable';
+                        td.addEventListener('click', (e) => {
+                            if (editingIndex === null) {
+                                startEditing(index, header, td, cellContent.textContent);
+                                e.stopPropagation();
+                                if (debugMode) console.log(`Cell clicked: record ${index + 1}, field ${header}`);
+                            }
+                        });
+                    } else if (isGrey) {
+                        td.className += ' greyed-out';
+                    }
+                    if (vestigialColumns.has(header) && !['record_type', 'gen', 'name', 'gender'].includes(header)) td.className += ' vestigial';
+                    tr.appendChild(td);
+                });
+                tr.addEventListener('click', (e) => {
+                    if (editingIndex === null && e.target.tagName !== 'TEXTAREA') {
+                        highlightedRow = (highlightedRow === index) ? null : index;
+                        if (debugMode) console.log(`Row ${highlightedRow !== null ? highlightedRow + 1 : 'none'} highlighted`);
+                        debounceDisplayRecords();
+                    }
+                });
+                table.appendChild(tr);
+            });
+            recordBody.appendChild(table);
+            if (debugMode) console.log(`Displayed ${records.length} records`);
+        }
+
+        function startEditing(index, field, td, currentValue) {
+            editingIndex = index;
+            editingField = field;
+            td.innerHTML = '';
+            const textarea = document.createElement('textarea');
+            textarea.className = 'edit-textarea';
+            textarea.value = currentValue;
+            textarea.rows = Math.max(2, currentValue.split('\n').length);
+            td.appendChild(textarea);
+            textarea.focus();
+            if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field}`);
+            textarea.onblur = () => saveEdit(index, field, textarea.value, td, currentValue);
+            textarea.onkeydown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    saveEdit(index, field, textarea.value, td, currentValue);
+                } else if (e.key === 'Escape') {
+                    cancelEdit(td, currentValue);
+                }
+            };
+        }
+
+        function saveEdit(index, field, value, td, originalValue) {
+            const trimmedValue = value.trim();
+            if (dateFields.includes(field) && !isValidDate(trimmedValue)) {
+                safeShowError(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD (e.g., 2023, 2023-05, 2023-05-15).`);
+                if (debugMode) console.log(`Date validation failed for ${field}: ${trimmedValue}`);
+                cancelEdit(td, originalValue);
+                return;
+            }
+            if (field === 'relationship' && !['Spouse', 'Other'].includes(trimmedValue)) {
+                safeShowError('Relationship must be "Spouse" or "Other".');
+                if (debugMode) console.log(`Relationship validation failed: ${trimmedValue}`);
+                cancelEdit(td, originalValue);
+                return;
+            }
+            if (trimmedValue !== originalValue) {
+                records[index][field] = trimmedValue;
+                if (debugMode) console.log(`Saved edit: record ${index + 1}, field ${field}, value ${trimmedValue}`);
+            }
+            editingIndex = null;
+            editingField = null;
+            td.innerHTML = '';
+            const cellContent = document.createElement('span');
+            cellContent.textContent = trimmedValue;
+            cellContent.className = 'cell-content';
+            td.appendChild(cellContent);
+            debounceDisplayRecords();
+        }
+
+        function cancelEdit(td, originalValue) {
+            editingIndex = null;
+            editingField = null;
+            td.innerHTML = '';
+            const cellContent = document.createElement('span');
+            cellContent.textContent = originalValue;
+            cellContent.className = 'cell-content';
+            td.appendChild(cellContent);
+            if (debugMode) console.log('Cancelled edit');
+            debounceDisplayRecords();
+        }
+
+        function validateRecord(record) {
+            return Object.values(record).every(value => typeof value === 'string');
+        }
+
+        function escapeCSVField(field) {
+            if (typeof field !== 'string') field = String(field);
+            if (field.includes('"') || field.includes(',')) {
+                return `"${field.replace(/"/g, '""')}"`;
+            }
+            return field;
+        }
+
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        function showPopup(message) {
+            const popup = document.createElement('div');
+            popup.style.position = 'fixed';
+            popup.style.top = '50%';
+            popup.style.left = '50%';
+            popup.style.transform = 'translate(-50%, -50%)';
+            popup.style.backgroundColor = '#fff';
+            popup.style.border = '1px solid #000';
+            popup.style.padding = '20px';
+            popup.style.zIndex = '1000';
+            popup.innerHTML = message + '<br><button onclick="this.parentElement.remove()">Close</button>';
+            document.body.appendChild(popup);
+        }
+
+        function downloadCSV() {
+            if (records.length === 0) {
+                safeShowError('No records to download');
+                return;
+            }
+            if (decryptionPassphrase === null) {
+                safeShowError('No passphrase available. Please load an encrypted file first.');
+                return;
+            }
+            const headers = Object.keys(records[0]);
+            const csv = [
+                headers.map(escapeCSVField).join(','),
+                ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
+            ].join('\r\n') + '\r\n';
+            const encryptedData = encryptFile(csv, decryptionPassphrase);
+            let downloadFileName = 'returns.csv.enc';
+            const match = originalFileName.match(/^records_(\d{4})\.csv(\.enc)?$/i);
+            if (match) {
+                downloadFileName = `returns_${match[1]}.csv.enc`;
+            }
+            const encryptedBlob = new Blob([encryptedData], { type: 'application/octet-stream' });
+            const encryptedLink = document.createElement('a');
+            encryptedLink.href = URL.createObjectURL(encryptedBlob);
+            encryptedLink.download = downloadFileName;
+            const emailBody = `Please attach the file "${downloadFileName}" from your Downloads folder and send.\n\nSteps:\n1. Find "${downloadFileName}" in your Downloads folder (Windows: C:\\Users\\YourName\\Downloads, macOS: ~/Downloads).\n2. Attach it to this email using the "Attach File" or drag-and-drop option.\n3. Click Send to submit your updated genealogy records.`;
+            setTimeout(() => {
+                encryptedLink.click();
+                URL.revokeObjectURL(encryptedLink.href);
+                const mailtoLink = `mailto:markscheitrum@aol.com?subject=${encodeURIComponent('Updated Genealogy Records')}&body=${encodeURIComponent(emailBody)}`;
+                window.location.href = mailtoLink;
+            }, 100);
+            showPopup(`
+                Downloaded "${downloadFileName}" to your Downloads folder.<br><br>
+                Your email client should have opened with a new email to <strong>markscheitrum@aol.com</strong>.<br>
+                Follow the instructions in the email to attach "${downloadFileName}" and send.<br><br>
+                <strong>If the email didn't open:</strong><br>
+                1. Open your email client (e.g., <a href="https://mail.aol.com">AOL Mail</a>, <a href="https://outlook.live.com">Outlook</a>, or Thunderbird).<br>
+                2. Create a new email to <strong>markscheitrum@aol.com</strong> with subject <strong>Updated Genealogy Records</strong>.<br>
+                3. Attach "${downloadFileName}" from your Downloads folder and send.
+            `);
+            if (debugMode) {
+                console.log(`Downloaded ${downloadFileName}, size=${encryptedData.length} bytes`);
+                console.log(`Opened mailto link with body length=${emailBody.length} chars`);
+            }
+        }
+
+        waitForCryptoJS(() => {
+            initDebugMode();
+            console.log('Libraries ready - CryptoJS and JSZip loaded');
+        });
+    </script>
+</body>
+</html>
