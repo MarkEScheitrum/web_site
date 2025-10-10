@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.13</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 09:00:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.15</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 09:15:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -216,7 +216,7 @@
         let vestigialColumns = new Set(['notes', 'unprocessed_items']);
         let debugMode = false;
         let renderTimeout = null;
-        const dateFields = ['birth_date', 'death_date', 'marriage_date', 'divorce'];
+        const dateFields = ['birth_date', 'death_date', 'marriage_date'];
         window.addEventListener('beforeunload', function(e) {
             if (modalMode) {
                 e.preventDefault();
@@ -560,7 +560,7 @@
             person: {
                 editable: ['name', 'sex', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'attributes'],
                 uneditable: ['record_type'],
-                greyedOut: ['gen', 'marriage_date', 'relationship', 'divorce', 'parents']
+                greyedOut: ['gen', 'marriage_date', 'relationship', 'divorced', 'divorce date', 'parents']
             },
             spouse: {
                 editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorce', 'parents'],
@@ -706,6 +706,8 @@
                         record[header] = fields[index].trim();
                     });
                     records.push(record);
+                } else {
+                    if (debugMode) console.log(`Skipped line ${i + 1}: field length mismatch (${fields.length} vs ${headers.length})`);
                 }
             }
             if (debugMode) console.log(`Parsed ${records.length} records`);
@@ -984,7 +986,7 @@
                         safeShowError('Please select a record and field.');
                         return;
                     }
-                    if (!data.value && data.field !== 'attributes') {
+                    if (!data.value && data.field !== 'attributes' && data.field !== 'sex') {
                         safeShowError('Please enter a value.');
                         return;
                     }
@@ -1231,7 +1233,7 @@
         }
         function saveEdit(index, field, value, td, originalValue) {
             const trimmedValue = value.trim();
-            if (dateFields.includes(field) && !isValidDate(trimmedValue)) {
+            if (dateFields.includes(field) && trimmedValue && trimmedValue !== 'true' && !isValidDate(trimmedValue)) {
                 safeShowError(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD (e.g., 2023, 2023-05, 2023-05-15).`);
                 if (debugMode) console.log(`Date validation failed for ${field}: ${trimmedValue}`);
                 cancelEdit(td, originalValue);
