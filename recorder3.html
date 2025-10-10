@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.15</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 09:15:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.16</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 14:32:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -456,7 +456,7 @@
                         }
                     };
                 } else if (debugMode && file.name.toLowerCase().endsWith('.csv')) {
-                    const text = e.target.result;
+                    const text = arrayBufferToBinary(e.target.result); // Convert ArrayBuffer to string
                     records = parseCSVFile(text);
                     decryptionPassphrase = null;
                     enableButtonsAfterLoad();
