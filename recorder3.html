@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.16</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 14:51:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.17</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-10 15:18:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -216,6 +216,7 @@
         let vestigialColumns = new Set(['notes', 'unprocessed_items']);
         let debugMode = false;
         let renderTimeout = null;
+        let isInputCsv = false; // Track if input file is a .csv
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
         window.addEventListener('beforeunload', function(e) {
             if (modalMode) {
@@ -269,6 +270,7 @@
                 safeShowError('Passphrase is required.');
                 document.getElementById('fileStatus').textContent = 'No file selected';
                 document.getElementById('textFile').value = '';
+                isInputCsv = false;
             }
         }
         function safeOpenModal(mode) {
@@ -323,12 +325,14 @@
                 fileStatus.textContent = 'No file selected';
                 safeShowError('No file selected. Please try again.');
                 if (debugMode) console.log('No file selected in processFile');
+                isInputCsv = false;
                 return;
             }
             if (typeof CryptoJS === 'undefined') {
                 fileStatus.textContent = 'No file selected';
                 safeShowError('Crypto library not loaded. Please refresh the page and try again.');
                 fileInput.value = '';
+                isInputCsv = false;
                 return;
             }
             originalFileName = file.name;
@@ -339,12 +343,14 @@
                     fileStatus.textContent = 'No file selected';
                     safeShowError('Crypto library failed to load during file read. Please refresh and retry.');
                     fileInput.value = '';
+                    isInputCsv = false;
                     return;
                 }
                 if (typeof decryptFile === 'undefined') {
                     fileStatus.textContent = 'No file selected';
                     safeShowError('Decryption function not ready—please refresh and try again.');
                     fileInput.value = '';
+                    isInputCsv = false;
                     return;
                 }
                 if (file.name.toLowerCase().endsWith('.zip')) {
@@ -352,6 +358,7 @@
                         fileStatus.textContent = 'No file selected';
                         safeShowError('ZIP library failed to load. Please refresh the page.');
                         fileInput.value = '';
+                        isInputCsv = false;
                         return;
                     }
                     try {
@@ -373,6 +380,7 @@
                                     if (debugMode) console.log(`Extracted ${foundFile.name}: ${data.byteLength} bytes`);
                                     originalFileName = foundFile.name;
                                     if (foundFile.name.endsWith('.enc')) {
+                                        isInputCsv = false;
                                         getPassphrase('processZipEncryptedFile', foundFile.name);
                                         window.processZipEncryptedFile = () => {
                                             try {
@@ -388,15 +396,18 @@
                                                     safeShowError(`Decryption failed: ${result.error}`);
                                                     decryptionPassphrase = null;
                                                     fileInput.value = '';
+                                                    isInputCsv = false;
                                                 }
                                             } catch (decryptError) {
                                                 if (debugMode) console.log('Decryption error in ZIP processing:', decryptError);
                                                 fileStatus.textContent = 'No file selected';
                                                 safeShowError(`Error decrypting file from ZIP: ${decryptError.message}`);
                                                 fileInput.value = '';
+                                                isInputCsv = false;
                                             }
                                         };
                                     } else if (debugMode && foundFile.name.endsWith('.csv')) {
+                                        isInputCsv = true;
                                         const text = arrayBufferToBinary(data);
                                         records = parseCSVFile(text);
                                         decryptionPassphrase = null;
@@ -408,12 +419,14 @@
                                         fileStatus.textContent = 'No file selected';
                                         safeShowError(`Unsupported file type in ZIP: ${foundFile.name}. Expected .enc${debugMode ? ' or .csv' : ''}.`);
                                         fileInput.value = '';
+                                        isInputCsv = false;
                                     }
                                 }).catch((extractError) => {
                                     if (debugMode) console.log('ZIP extraction error:', extractError);
                                     fileStatus.textContent = 'No file selected';
                                     safeShowError(`Error extracting file from ZIP: ${extractError.message}`);
                                     fileInput.value = '';
+                                    isInputCsv = false;
                                 });
                             } else {
                                 const availableFiles = [];
@@ -424,6 +437,7 @@
                                 const errorMsg = `No .enc${debugMode ? ' or .csv' : ''} file found in ZIP (${fileCount} files total). Available: ${availableFiles.slice(0, 3).join(', ')}${availableFiles.length > 3 ? '...' : ''}`;
                                 safeShowError(errorMsg);
                                 fileInput.value = '';
+                                isInputCsv = false;
                                 if (debugMode) console.log('Available ZIP files:', availableFiles);
                             }
                         }).catch((loadError) => {
@@ -431,14 +445,17 @@
                             fileStatus.textContent = 'No file selected';
                             safeShowError(`Error reading ZIP file: ${loadError.message}. Try unzipping manually.`);
                             fileInput.value = '';
+                            isInputCsv = false;
                         });
                     } catch (zipInitError) {
                         if (debugMode) console.log('JSZip initialization error:', zipInitError);
                         fileStatus.textContent = 'No file selected';
                         safeShowError(`ZIP library error: ${zipInitError.message}. Please refresh and try again.`);
                         fileInput.value = '';
+                        isInputCsv = false;
                     }
                 } else if (file.name.endsWith('.enc')) {
+                    isInputCsv = false;
                     getPassphrase('processEncryptedFile', file.name);
                     window.processEncryptedFile = () => {
                         const result = decryptFile(e.target.result, decryptionPassphrase);
@@ -453,9 +470,11 @@
                             safeShowError(`Decryption failed: ${result.error}`);
                             decryptionPassphrase = null;
                             fileInput.value = '';
+                            isInputCsv = false;
                         }
                     };
                 } else if (debugMode && file.name.toLowerCase().endsWith('.csv')) {
+                    isInputCsv = true;
                     const text = arrayBufferToBinary(e.target.result);
                     records = parseCSVFile(text);
                     decryptionPassphrase = null;
@@ -467,6 +486,7 @@
                     fileStatus.textContent = 'No file selected';
                     safeShowError(`Unsupported file type: ${file.name}. Expected .enc${debugMode ? ' or .csv' : ''}.`);
                     fileInput.value = '';
+                    isInputCsv = false;
                     return;
                 }
             };
@@ -553,6 +573,7 @@
         window.addEventListener('unload', () => {
             records = [];
             decryptionPassphrase = null;
+            isInputCsv = false;
             document.getElementById('fileStatus').textContent = 'No file selected';
             if (debugMode) console.log('Page unloaded, cleared records and passphrase');
         });
@@ -1099,7 +1120,6 @@
                 if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}, defaulting to uneditable`);
                 return false;
             }
-            // Prevent 'parents' field from being editable in the table for Person records
             if (cleanType === 'person' && field === 'parents') {
                 if (debugMode) console.log(`Field 'parents' is not editable in table for record_type='person'`);
                 return false;
@@ -1306,7 +1326,7 @@
                 safeShowError('No records to download');
                 return;
             }
-            if (decryptionPassphrase === null) {
+            if (!isInputCsv && decryptionPassphrase === null) {
                 safeShowError('No passphrase available. Please load an encrypted file first.');
                 return;
             }
@@ -1315,20 +1335,27 @@
                 headers.map(escapeCSVField).join(','),
                 ...records.map(record => headers.map(h => escapeCSVField(record[h])).join(','))
             ].join('\r\n') + '\r\n';
-            const encryptedData = encryptFile(csv, decryptionPassphrase);
-            let downloadFileName = 'returns.enc';
+            let downloadFileName = isInputCsv ? 'returns.csv' : 'returns.enc';
             const match = originalFileName.match(/^records_(\d{4})\.csv(\.enc)?$/i);
             if (match) {
-                downloadFileName = `returns_${match[1]}.enc`;
+                downloadFileName = `returns_${match[1]}.${isInputCsv ? 'csv' : 'enc'}`;
             }
-            const encryptedBlob = new Blob([encryptedData], { type: 'application/octet-stream' });
-            const encryptedLink = document.createElement('a');
-            encryptedLink.href = URL.createObjectURL(encryptedBlob);
-            encryptedLink.download = downloadFileName;
+            let downloadBlob;
+            if (isInputCsv) {
+                downloadBlob = new Blob([csv], { type: 'text/csv' });
+                if (debugMode) console.log(`Prepared unencrypted CSV for download: ${downloadFileName}, size=${csv.length} bytes`);
+            } else {
+                const encryptedData = encryptFile(csv, decryptionPassphrase);
+                downloadBlob = new Blob([encryptedData], { type: 'application/octet-stream' });
+                if (debugMode) console.log(`Prepared encrypted file for download: ${downloadFileName}, size=${encryptedData.length} bytes`);
+            }
+            const downloadLink = document.createElement('a');
+            downloadLink.href = URL.createObjectURL(downloadBlob);
+            downloadLink.download = downloadFileName;
             const emailBody = `Please attach the file "${downloadFileName}" from your Downloads folder and send.\n\nSteps:\n1. Find "${downloadFileName}" in your Downloads folder (Windows: C:\\Users\\YourName\\Downloads, macOS: ~/Downloads).\n2. Attach it to this email using the "Attach File" or drag-and-drop option.\n3. Click Send to submit your updated genealogy records.`;
             setTimeout(() => {
-                encryptedLink.click();
-                URL.revokeObjectURL(encryptedLink.href);
+                downloadLink.click();
+                URL.revokeObjectURL(downloadLink.href);
                 const mailtoLink = `mailto:markscheitrum@aol.com?subject=${encodeURIComponent('Updated Genealogy Records')}&body=${encodeURIComponent(emailBody)}`;
                 window.location.href = mailtoLink;
             }, 100);
@@ -1342,7 +1369,7 @@
                 3. Attach "${downloadFileName}" from your Downloads folder and send.
             `);
             if (debugMode) {
-                console.log(`Downloaded ${downloadFileName}, size=${encryptedData.length} bytes`);
+                console.log(`Downloaded ${downloadFileName}`);
                 console.log(`Opened mailto link with body length=${emailBody.length} chars`);
             }
         }
