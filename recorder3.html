@@ -175,7 +175,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.2</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-09 22:49:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.3</span> <strong>Last Updated:</strong> <span id="pageDate">2025-10-09 23:00:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -360,7 +360,7 @@
                             contents.forEach((relativePath, zipEntry) => {
                                 fileCount++;
                                 if (debugMode) console.log(`ZIP entry ${fileCount}: ${zipEntry.name}`);
-                                if ((zipEntry.name.endsWith('.enc') || (debugMode && zipEntry.name.endsWith('.csv'))) && !foundFile) {
+                                if ((zipEntry.name.endsWith('.enc') || (debugMode && zipEntry.name.endsWith('.csv')) ) && !foundFile) {
                                     foundFile = { name: zipEntry.name, entry: zipEntry };
                                     if (debugMode) console.log(`Found target file in ZIP: ${zipEntry.name} (${fileCount} entries total)`);
                                 }
@@ -829,27 +829,27 @@
                         fieldSelect.appendChild(option);
                     });
                     fieldSelect.value = '';
-                    fieldSelect.addEventListener('change', () => {
-                        const valueInput = modalForm.querySelector('[name="value"]');
-                        if (fieldSelect.value === 'attributes') {
-                            valueInput.replaceWith(document.createElement('select'));
-                            const newSelect = modalForm.querySelector('[name="value"]');
-                            newSelect.name = 'value';
-                            newSelect.required = true;
-                            ['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'].forEach(opt => {
-                                const option = document.createElement('option');
-                                option.value = opt;
-                                option.textContent = opt || '(None)';
-                                newSelect.appendChild(option);
-                            });
-                        } else if (valueInput.tagName === 'SELECT') {
-                            const newInput = document.createElement('input');
-                            newInput.type = 'text';
-                            newInput.name = 'value';
-                            newInput.required = true;
-                            valueInput.replaceWith(newInput);
-                        }
-                    });
+                });
+                fieldSelect.addEventListener('change', () => {
+                    const valueInput = modalForm.querySelector('[name="value"]');
+                    if (fieldSelect.value === 'attributes') {
+                        let newSelect = document.createElement('select');
+                        newSelect.name = 'value';
+                        newSelect.required = true;
+                        ['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'].forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt;
+                            option.textContent = opt || '(None)';
+                            newSelect.appendChild(option);
+                        });
+                        valueInput.replaceWith(newSelect);
+                    } else if (valueInput.tagName === 'SELECT') {
+                        let newInput = document.createElement('input');
+                        newInput.type = 'text';
+                        newInput.name = 'value';
+                        newInput.required = true;
+                        valueInput.replaceWith(newInput);
+                    }
                 });
             }
         }
