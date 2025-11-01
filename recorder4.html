@@ -570,7 +570,7 @@
                     if(data.marriage_date&&!isValidDate(data.marriage_date)){safeShowError('Invalid marriage date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');return;}
                     const newRecord={record_type:'Spouse',gen:'',name:data.name,sex:'',birth_date:data.birth_date||'',birth_location:data.birth_location||'',parents:data.parents||'',death_date:'',death_location:'',burial_location:'',service:'',marriage_date:data.marriage_date||'',relationship:data.relationship,divorce:'',attributes:'',unprocessed_items:'',notes:''};
                     let insertIndex=records.indexOf(partner)+1;
-                    const spouses=records.slice(insertIndex).filter((r,i,arr)=>r.record_type.toLowerCase()==='spouse'&&(i+insertIndex===arr.length-1||arr[i+insertIndex+1].record_type.toLowerCase()!=='spouse'));
+                    const spouses = records.slice(insertIndex).filter((r, i, arr) => r.record_type.toLowerCase() === 'spouse' && (i + insertIndex === records.length - 1 || records[i + insertIndex + 1].record_type.toLowerCase() !== 'spouse'));
                     if(debugMode)console.log(`Found ${spouses.length} spouses for partner ${partner.name}`);
                     if(spouses.length>0&&data.marriage_date){
                         const newTimestamp=dateToTimestamp(data.marriage_date);
