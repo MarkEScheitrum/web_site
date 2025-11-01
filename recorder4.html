@@ -8,175 +8,41 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 18px;
-            padding: 20px;
-            max-width: 100%;
-            margin: 0 auto;
-        }
-        .task-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-        .task-btn {
-            font-size: 20px;
-            padding: 8px 16px;
-            border-radius: 8px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
-            min-width: 150px;
-            touch-action: manipulation;
-        }
-        .task-btn:hover:not(.disabled-btn) {
-            background-color: #0056b3;
-        }
-        .disabled-btn {
-            background-color: #cccccc;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
-        .file-status {
-            font-size: 16px;
-            color: #333;
-            text-align: center;
-            margin-bottom: 10px;
-        }
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-        .modal-content {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        .close {
-            float: right;
-            font-size: 24px;
-            cursor: pointer;
-        }
-        .modal-content h3 {
-            margin-top: 0;
-            font-size: 24px;
-        }
-        .modal-content label {
-            display: block;
-            margin: 10px 0 5px;
-            font-size: 18px;
-        }
-        .modal-content input, .modal-content select, .modal-content textarea {
-            width: 100%;
-            padding: 10px;
-            font-size: 18px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-sizing: border-box;
-        }
-        .modal-content button {
-            margin-top: 20px;
-            padding: 12px 24px;
-            font-size: 18px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        .modal-content button:hover {
-            background-color: #218838;
-        }
-        .table-container {
-            margin-top: 20px;
-            overflow-x: auto;
-        }
-        table {
-            width: 100%;
-            font-size: 14px;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 8px;
-            border: 1px solid #ccc;
-            white-space: normal;
-            box-sizing: border-box;
-        }
-        th.vestigial {
-            padding: 4px;
-        }
-        th.record_type, td.record_type {
-            width: 60px;
-        }
-        th.gen, td.gen {
-            width: 40px;
-        }
-        th.sex, td.sex {
-            width: 40px;
-        }
-        th.record_type.vestigial, td.record_type.vestigial,
-        th.gen.vestigial, td.gen.vestigial,
-        th.name.vestigial, td.name.vestigial,
-        th.sex.vestigial, td.sex.vestigial {
-            width: inherit !important;
-        }
-        .action-icons {
-            font-size: 24px;
-            margin-right: 4px;
-        }
-        .vestigial {
-            width: 36px !important;
-            max-width: 36px !important;
-            min-width: 0 !important;
-            overflow: hidden;
-        }
-        .vestigial .header-text {
-            display: none;
-        }
-        .vestigial .cell-content {
-            display: none;
-        }
-        .editable-row:hover {
-            background-color: #d9edf7;
-        }
-        .highlighted-row {
-            background-color: #ffffcc !important;
-        }
-        .greyed-out {
-            background-color: #c0c0c0;
-            cursor: not-allowed;
-        }
-        @media (max-width: 768px) {
-            .task-btn {
-                width: 100%;
-                margin-bottom: 10px;
-            }
-            .modal-content {
-                width: 95%;
-            }
-        }
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:18px;padding:20px;max-width:100%;margin:0 auto}
+        .task-buttons{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;margin-bottom:20px}
+        .task-btn{font-size:20px;padding:8px 16px;border-radius:8px;background:#007bff;color:white;border:none;cursor:pointer;min-width:150px;touch-action:manipulation}
+        .task-btn:hover:not(.disabled-btn){background:#0056b3}
+        .disabled-btn{background:#ccc;cursor:not-allowed;pointer-events:none}
+        .file-status{font-size:16px;color:#333;text-align:center;margin-bottom:10px}
+        .modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+        .modal-content{background:white;padding:20px;border-radius:10px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto}
+        .close{float:right;font-size:24px;cursor:pointer}
+        .modal-content h3{margin-top:0;font-size:24px}
+        .modal-content label{display:block;margin:10px 0 5px;font-size:18px}
+        .modal-content input,.modal-content select,.modal-content textarea{width:100%;padding:10px;font-size:18px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box}
+        .modal-content button{margin-top:20px;padding:12px 24px;font-size:18px;background:#28a745;color:white;border:none;border-radius:5px;cursor:pointer}
+        .modal-content button:hover{background:#218838}
+        .table-container{margin-top:20px;overflow-x:auto}
+        table{width:100%;font-size:14px;border-collapse:collapse}
+        th,td{padding:8px;border:1px solid #ccc;white-space:normal;box-sizing:border-box}
+        th.vestigial{padding:4px}
+        th.record_type,td.record_type{width:60px}
+        th.gen,td.gen{width:40px}
+        th.sex,td.sex{width:40px}
+        th.record_type.vestigial,td.record_type.vestigial,th.gen.vestigial,td.gen.vestigial,th.name.vestigial,td.name.vestigial,th.sex.vestigial,td.sex.vestigial{width:inherit!important}
+        .action-icons{font-size:24px;margin-right:4px}
+        .vestigial{width:36px!important;max-width:36px!important;min-width:0!important;overflow:hidden}
+        .vestigial .header-text,.vestigial .cell-content{display:none}
+        .editable-row:hover{background:#d9edf7}
+        .highlighted-row{background:#ffffcc!important}
+        .greyed-out{background:#c0c0c0;cursor:not-allowed}
+        @media(max-width:768px){.task-btn{width:100%;margin-bottom:10px}.modal-content{width:95%}}
     </style>
 </head>
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.3</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-01 10:53:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.3</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-01 11:42:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -187,23 +53,23 @@
         <button onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn">Update Record ✏️</button>
         <button onclick="openModal('recordDeathBurial')" class="task-btn disabled-btn" id="recordDeathBurialBtn">Record Death/Burial ⚰️</button>
         <button onclick="toggleTable()" class="task-btn disabled-btn" id="viewTableBtn">View Table 📋</button>
-        <button onclick="downloadCSV()" class="task-btn" id="returnUpdatesBtn" style="display: none;">Return Updates 📧</button>
+        <button onclick="downloadCSV()" class="task-btn" id="returnUpdatesBtn" style="display:none;">Return Updates 📧</button>
     </div>
     <div class="file-status">
         <span id="fileStatus">No file selected</span>
     </div>
-    <input type="file" id="textFile" accept=".zip,.csv" style="display: none;" onchange="handleFileSelect()">
-    <div id="tableContainer" class="table-container" style="display: none;">
+    <input type="file" id="textFile" accept=".zip,.csv" style="display:none;" onchange="handleFileSelect()">
+    <div id="tableContainer" class="table-container" style="display:none;">
         <div id="recordBody"></div>
     </div>
-    <div id="modal" class="modal" style="display: none;">
+    <div id="modal" class="modal" style="display:none;">
         <div class="modal-content">
             <span class="close" onclick="closeModal()">&times;</span>
             <h3 id="modalTitle"></h3>
             <form id="modalForm"></form>
         </div>
     </div>
-    <script type="text/javascript">
+    <script>
         let records = [], decryptionPassphrase = null, originalFileName = 'records.zip';
         let debugMode = false, isInputCsv = false, isEncryptedZip = false;
         let modalMode = null, editingIndex = null, editingField = null, highlightedRow = null;
@@ -224,22 +90,21 @@
             }
         };
 
-        // ---------- EVENT LISTENERS ----------
-        window.addEventListener('beforeunload', function(e) {
+        // Event Listeners
+        window.addEventListener('beforeunload', e => {
             if (modalMode) {
                 e.preventDefault();
                 e.returnValue = '';
-                return '';
             }
         });
-        window.addEventListener('error', function(e) {
-            if (e.message && e.message.includes('runtime.lastError')) {
+        window.addEventListener('error', e => {
+            if (e.message.includes('runtime.lastError')) {
                 e.preventDefault();
                 return false;
             }
         });
 
-        // ---------- FILE HANDLING ----------
+        // File Handling
         function selectAndLoadFile() {
             document.getElementById('textFile').click();
         }
@@ -260,24 +125,12 @@
             isInputCsv = false;
             try {
                 if (name.toLowerCase().endsWith('.zip')) {
-                    const zip = await JSZip.loadAsync(buffer);
-                    const csvEntry = Object.values(zip.files).find(f => f.name.endsWith('.csv'));
-                    if (csvEntry) {
-                        if (debugMode) {
-                            const text = await csvEntry.async('text');
-                            records = parseCSV(text);
-                            finishLoad(`Debug CSV from ${name}`);
-                            isInputCsv = true;
-                            return;
-                        } else {
-                            decryptionPassphrase = await askPassphrase(name);
-                            const plainZip = decryptBlob(buffer, decryptionPassphrase);
-                            await loadZipFromBinary(plainZip);
-                            isEncryptedZip = true;
-                            finishLoad(`Decrypted ZIP: ${name}`);
-                            return;
-                        }
-                    }
+                    decryptionPassphrase = await askPassphrase(name);
+                    const plainZip = decryptBlob(buffer, decryptionPassphrase);
+                    await loadZipFromBinary(plainZip);
+                    isEncryptedZip = true;
+                    finishLoad(`Decrypted ZIP: ${name}`);
+                    return;
                 }
                 if (debugMode && name.toLowerCase().endsWith('.csv')) {
                     const text = new TextDecoder().decode(buffer);
@@ -286,7 +139,7 @@
                     isInputCsv = true;
                     return;
                 }
-                throw new Error(`Unsupported file. Use .zip (encrypted) or .csv (debug)`);
+                throw new Error(`Unsupported file. Use .zip${debugMode ? ' or .csv' : ''}`);
             } catch (err) {
                 if (debugMode) console.log(`Error processing file: ${err.message}`);
                 safeShowError(err.message);
@@ -309,7 +162,7 @@
                 document.getElementById('modalTitle').textContent = `Passphrase for ${fileName}`;
                 document.getElementById('modalForm').innerHTML = `
                     <label>Passphrase</label>
-                    <input type="password" id="pp" autofocus onkeydown="if (event.key === 'Enter') { event.preventDefault(); resolvePass(); }">
+                    <input type="password" id="pp" autofocus onkeydown="if(event.key === 'Enter'){event.preventDefault();resolvePass();}">
                     <button type="button" onclick="resolvePass()">Submit</button>
                 `;
                 window.resolvePass = () => {
@@ -331,11 +184,9 @@
             if (debugMode) console.log(msg);
         }
 
-        // ---------- CRYPTO (MATCHES PYTHON) ----------
+        // Crypto (Matches zip_encrypt.py)
         function deriveKey(passphrase, salt) {
-            return CryptoJS.PBKDF2(passphrase, salt, {
-                keySize: 8, iterations: 100000, hasher: CryptoJS.algo.SHA256
-            });
+            return CryptoJS.PBKDF2(passphrase, salt, {keySize: 8, iterations: 100000, hasher: CryptoJS.algo.SHA256});
         }
 
         function decryptBlob(arrayBuffer, passphrase) {
@@ -345,12 +196,8 @@
             const iv = CryptoJS.enc.Latin1.parse(data.slice(16, 32));
             const ct = CryptoJS.enc.Latin1.parse(data.slice(32));
             const key = deriveKey(passphrase, salt);
-            if (debugMode) {
-                console.log(`Decryption: data=${data.length}B, salt=${salt.toString(CryptoJS.enc.Hex)}, iv=${iv.toString(CryptoJS.enc.Hex)}`);
-            }
-            const decrypted = CryptoJS.AES.decrypt({ciphertext: ct}, key, {
-                iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding
-            });
+            if (debugMode) console.log(`Decryption: data=${data.length}B, salt=${salt.toString(CryptoJS.enc.Hex)}, iv=${iv.toString(CryptoJS.enc.Hex)}`);
+            const decrypted = CryptoJS.AES.decrypt({ciphertext: ct}, key, {iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding});
             const padded = CryptoJS.enc.Latin1.parse(decrypted.toString(CryptoJS.enc.Base64));
             const padLen = padded.words[padded.words.length - 1] & 0xFF;
             if (padLen < 1 || padLen > 16) throw new Error("Invalid padding");
@@ -368,17 +215,13 @@
             let padded = zipBinaryString;
             for (let i = 0; i < padLen; i++) padded += String.fromCharCode(padLen);
             const wordArray = CryptoJS.enc.Latin1.parse(padded);
-            const encrypted = CryptoJS.AES.encrypt(wordArray, key, {
-                iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding
-            });
+            const encrypted = CryptoJS.AES.encrypt(wordArray, key, {iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding});
             const result = salt.concat(iv).concat(encrypted.ciphertext);
-            if (debugMode) {
-                console.log(`Encryption: plaintext=${len}B, padded=${padded.length}B, ciphertext=${result.sigBytes}B`);
-            }
+            if (debugMode) console.log(`Encryption: plaintext=${len}B, padded=${padded.length}B, ciphertext=${result.sigBytes}B`);
             return result;
         }
 
-        // ---------- CSV ----------
+        // CSV
         function escapeCSVField(f) {
             if (typeof f !== 'string') f = String(f);
             if (f.includes('"') || f.includes(',')) return `"${f.replace(/"/g, '""')}"`;
@@ -409,15 +252,8 @@
             let inQuotes = false;
             for (let i = 0; i < line.length; i++) {
                 const char = line[i];
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                    continue;
-                }
-                if (char === ',' && !inQuotes) {
-                    fields.push(field);
-                    field = '';
-                    continue;
-                }
+                if (char === '"') { inQuotes = !inQuotes; continue; }
+                if (char === ',' && !inQuotes) { fields.push(field); field = ''; continue; }
                 field += char;
             }
             fields.push(field);
@@ -432,7 +268,7 @@
             return rows.join('\r\n') + '\r\n';
         }
 
-        // ---------- DOWNLOAD ----------
+        // Download
         async function downloadCSV() {
             if (!records.length) return safeShowError('No data to download');
             if (!isInputCsv && !decryptionPassphrase) return safeShowError('No passphrase available');
@@ -450,8 +286,8 @@
                 const encrypted = encryptBlob(String.fromCharCode.apply(null, zipBin), decryptionPassphrase);
                 const uint8 = new Uint8Array(encrypted.sigBytes);
                 for (let i = 0; i < encrypted.sigBytes; i++) {
-                    const w = encrypted.words[Math.floor(i / 4)];
-                    uint8[i] = (w >>> (24 - (i % 4) * 8)) & 0xFF;
+                    const w = encrypted.words[Math.floor(i/4)];
+                    uint8[i] = (w >>> (24 - (i%4)*8)) & 0xFF;
                 }
                 blob = new Blob([uint8], {type: 'application/octet-stream'});
                 ext = 'zip';
@@ -468,41 +304,26 @@
             setTimeout(() => {
                 window.location.href = `mailto:markscheitrum@aol.com?subject=Updated%20Genealogy%20Records&body=${encodeURIComponent(body)}`;
             }, 100);
-            showPopup(`
-                Downloaded "${dlName}" to your Downloads folder.<br><br>
-                Your email client should have opened with a new email to <strong>markscheitrum@aol.com</strong>.<br>
-                Follow the instructions in the email to attach "${dlName}" and send.<br><br>
-                <strong>If the email didn't open:</strong><br>
-                1. Open your email client (e.g., <a href="https://mail.aol.com">AOL Mail</a>, <a href="https://outlook.live.com">Outlook</a>).<br>
-                2. Create a new email to <strong>markscheitrum@aol.com</strong> with subject <strong>Updated Genealogy Records</strong>.<br>
-                3. Attach "${dlName}" from your Downloads folder and send.
-            `);
+            showPopup(`Downloaded "${dlName}" to your Downloads folder.<br><br>Your email client should have opened with a new email to <strong>markscheitrum@aol.com</strong>.<br>Follow the instructions in the email to attach "${dlName}" and send.<br><br><strong>If the email didn't open:</strong><br>1. Open your email client (e.g., <a href="https://mail.aol.com">AOL Mail</a>, <a href="https://outlook.live.com">Outlook</a>).<br>2. Create a new email to <strong>markscheitrum@aol.com</strong> with subject <strong>Updated Genealogy Records</strong>.<br>3. Attach "${dlName}" from your Downloads folder and send.`);
             if (debugMode) console.log(`Downloaded ${dlName}`);
         }
 
-        // ---------- UI ----------
+        // UI
         function enableButtonsAfterLoad() {
-            ['addChildBtn', 'addSpouseBtn', 'updateRecordBtn', 'recordDeathBurialBtn', 'viewTableBtn'].forEach(id =>
-                document.getElementById(id).classList.remove('disabled-btn'));
+            ['addChildBtn','addSpouseBtn','updateRecordBtn','recordDeathBurialBtn','viewTableBtn'].forEach(id => document.getElementById(id).classList.remove('disabled-btn'));
             document.getElementById('selectLoadBtn').style.display = 'none';
             document.getElementById('returnUpdatesBtn').style.display = 'block';
             if (debugMode) console.log('Enabled task buttons');
         }
 
         function safeOpenModal(mode) {
-            if (window.location.search && !window.location.search.includes('debug=1')) {
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
+            if (window.location.search && !window.location.search.includes('debug=1')) window.history.replaceState({}, document.title, window.location.pathname);
             modalMode = mode;
             const modal = document.getElementById('modal');
             modal.style.display = 'block';
             const modalForm = document.getElementById('modalForm');
             modalForm.innerHTML = '';
-            modalForm.addEventListener('submit', e => {
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-            });
+            modalForm.addEventListener('submit', e => {e.preventDefault(); e.stopPropagation(); return false;});
             if (debugMode) console.log(`Opened modal for ${mode}`);
         }
 
@@ -516,15 +337,8 @@
         function safeShowError(message) {
             if (debugMode) console.error(`Error: ${message}`);
             const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = `
-                position: fixed; top: 20px; right: 20px; background: #dc3545; color: white;
-                padding: 15px; border-radius: 5px; z-index: 2000; max-width: 300px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 14px;
-            `;
-            errorDiv.innerHTML = `
-                <strong>Error</strong><br>${message}
-                <button onclick="this.parentElement.remove()" style="margin-left: 10px; background: none; border: none; color: white; cursor: pointer; float: right;">&times;</button>
-            `;
+            errorDiv.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px;border-radius:5px;z-index:2000;max-width:300px;box-shadow:0 2px 10px rgba(0,0,0,0.2);font-size:14px';
+            errorDiv.innerHTML = `<strong>Error</strong><br>${message}<button onclick="this.parentElement.remove()" style="margin-left:10px;background:none;border:none;color:white;cursor:pointer;float:right">&times;</button>`;
             document.body.appendChild(errorDiv);
             setTimeout(() => errorDiv.remove(), 5000);
         }
@@ -545,20 +359,17 @@
             } else if (parts.length === 2) {
                 const year = parseInt(parts[0], 10);
                 const month = parseInt(parts[1], 10);
-                return !isNaN(year) && year >= 1 && year <= 9999 &&
-                       !isNaN(month) && month >= 1 && month <= 12;
+                return !isNaN(year) && year >= 1 && year <= 9999 && !isNaN(month) && month >= 1 && month <= 12;
             } else if (parts.length === 3) {
                 const date = Date.parse(dateStr + 'T00:00:00');
                 if (isNaN(date)) return false;
                 const parsedDate = new Date(date);
-                return parsedDate.getFullYear() == parts[0] &&
-                       (parsedDate.getMonth() + 1) == parts[1] &&
-                       parsedDate.getDate() == parts[2];
+                return parsedDate.getFullYear() == parts[0] && (parsedDate.getMonth() + 1) == parts[1] && parsedDate.getDate() == parts[2];
             }
             return false;
         }
 
-        // ---------- MODAL AND TABLE ----------
+        // Modal and Table
         function openModal(mode) {
             safeOpenModal(mode);
             const modalTitle = document.getElementById('modalTitle');
@@ -576,11 +387,11 @@
                     return true;
                 }).filter(r => r.record_type.toLowerCase() === 'person');
                 fields = [
-                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true },
-                    { name: 'sex', label: 'Sex', type: 'select', options: ['', 'male', 'female'] },
-                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
-                    { name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true }
+                    {name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true},
+                    {name: 'sex', label: 'Sex', type: 'select', options: ['', 'male', 'female']},
+                    {name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text'},
+                    {name: 'birth_location', label: 'Birth Location', type: 'text'},
+                    {name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true}
                 ];
             } else if (mode === 'addSpouse') {
                 modalTitle.textContent = 'Add Partner';
@@ -594,34 +405,34 @@
                     return true;
                 }).filter(r => r.record_type.toLowerCase() === 'person');
                 fields = [
-                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true },
-                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
-                    { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' },
-                    { name: 'relationship', label: 'Relationship', type: 'select', options: ['', 'spouse', 'other'], required: true },
-                    { name: 'partner', label: 'Select Genealogical Partner', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true }
+                    {name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true},
+                    {name: 'birth_date', label: 'Birth Date (YYYY-MM-DD)', type: 'text'},
+                    {name: 'birth_location', label: 'Birth Location', type: 'text'},
+                    {name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD)', type: 'text'},
+                    {name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off'},
+                    {name: 'relationship', label: 'Relationship', type: 'select', options: ['', 'spouse', 'other'], required: true},
+                    {name: 'partner', label: 'Select Genealogical Partner', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true}
                 ];
             } else if (mode === 'updateRecord') {
                 modalTitle.textContent = 'Update Record';
                 fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
-                    { name: 'field', label: 'Field to Update', type: 'select', options: [''] },
-                    { name: 'value', label: 'New Value', type: 'text', required: true }
+                    {name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)], required: true},
+                    {name: 'field', label: 'Field to Update', type: 'select', options: ['']},
+                    {name: 'value', label: 'New Value', type: 'text', required: true}
                 ];
             } else if (mode === 'recordDeathBurial') {
                 modalTitle.textContent = 'Record Death/Burial';
                 fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
-                    { name: 'death_date', label: 'Death Date (YYYY-MM-DD)', type: 'text' },
-                    { name: 'death_location', label: 'Death Location', type: 'text' },
-                    { name: 'burial_location', label: 'Burial Location', type: 'text' }
+                    {name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)], required: true},
+                    {name: 'death_date', label: 'Death Date (YYYY-MM-DD)', type: 'text'},
+                    {name: 'death_location', label: 'Death Location', type: 'text'},
+                    {name: 'burial_location', label: 'Burial Location', type: 'text'}
                 ];
             }
             fields.forEach(field => {
                 const label = document.createElement('label');
                 label.textContent = field.label;
-                if (field.required) label.innerHTML += ' <span style="color: red;">*</span>';
+                if (field.required) label.innerHTML += ' <span style="color:red">*</span>';
                 modalForm.appendChild(label);
                 if (field.type === 'select') {
                     const select = document.createElement('select');
@@ -731,11 +542,8 @@
             try {
                 const form = document.getElementById('modalForm');
                 const data = {};
-                let hasErrors = false;
                 for (let input of form.elements) {
-                    if (input.name && input.type !== 'button') {
-                        data[input.name] = input.value || '';
-                    }
+                    if (input.name && input.type !== 'button') data[input.name] = input.value || '';
                 }
                 if (debugMode) console.log(`Processing ${mode} with data:`, data);
                 if (mode === 'addChild') {
@@ -773,9 +581,7 @@
                         notes: ''
                     };
                     let insertIndex = records.indexOf(parent) + 1;
-                    while (insertIndex < records.length && records[insertIndex].record_type.toLowerCase() === 'spouse') {
-                        insertIndex++;
-                    }
+                    while (insertIndex < records.length && records[insertIndex].record_type.toLowerCase() === 'spouse') insertIndex++;
                     records.splice(insertIndex, 0, newRecord);
                     if (debugMode) console.log('Added child record:', newRecord);
                 } else if (mode === 'addSpouse') {
@@ -910,9 +716,7 @@
             const tableContainer = document.getElementById('tableContainer');
             const isHidden = tableContainer.style.display === 'none';
             tableContainer.style.display = isHidden ? 'block' : 'none';
-            if (isHidden && records.length > 0) {
-                debounceDisplayRecords();
-            }
+            if (isHidden && records.length > 0) debounceDisplayRecords();
             if (debugMode) console.log(`Table toggled: ${isHidden ? 'shown' : 'hidden'}`);
         }
 
@@ -996,9 +800,7 @@
                     const td = document.createElement('td');
                     td.className = header;
                     const cellContent = document.createElement('span');
-                    const displayValue = header === 'record_type' && record[header].toLowerCase() === 'spouse' ? 'Partner' :
-                                         header === 'sex' ? (record[header] || '') :
-                                         record[header] || '';
+                    const displayValue = header === 'record_type' && record[header].toLowerCase() === 'spouse' ? 'Partner' : header === 'sex' ? (record[header] || '') : record[header] || '';
                     cellContent.textContent = displayValue;
                     cellContent.className = 'cell-content';
                     td.appendChild(cellContent);
@@ -1006,7 +808,7 @@
                     const isGrey = isFieldGreyedOut(record.record_type, header);
                     if (isEditable && !vestigialColumns.has(header)) {
                         td.className += ' editable';
-                        td.addEventListener('click', (e) => {
+                        td.addEventListener('click', e => {
                             if (editingIndex === null) {
                                 startEditing(index, header, td, cellContent.textContent);
                                 e.stopPropagation();
@@ -1019,7 +821,7 @@
                     if (vestigialColumns.has(header) && !['record_type', 'gen', 'name', 'sex'].includes(header)) td.className += ' vestigial';
                     tr.appendChild(td);
                 });
-                tr.addEventListener('click', (e) => {
+                tr.addEventListener('click', e => {
                     if (editingIndex === null && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
                         highlightedRow = (highlightedRow === index) ? null : index;
                         if (debugMode) console.log(`Row ${highlightedRow !== null ? highlightedRow + 1 : 'none'} highlighted`);
@@ -1051,7 +853,7 @@
                 if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field} with dropdown`);
                 select.onchange = () => saveEdit(index, field, select.value, td, currentValue);
                 select.onblur = () => saveEdit(index, field, select.value, td, currentValue);
-                select.onkeydown = (e) => {
+                select.onkeydown = e => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
                         saveEdit(index, field, select.value, td, currentValue);
@@ -1068,7 +870,7 @@
                 textarea.focus();
                 if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field} with textarea`);
                 textarea.onblur = () => saveEdit(index, field, textarea.value, td, currentValue);
-                textarea.onkeydown = (e) => {
+                textarea.onkeydown = e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
                         saveEdit(index, field, textarea.value, td, currentValue);
@@ -1117,7 +919,7 @@
             debounceDisplayRecords();
         }
 
-        // ---------- DEBUG MODE ----------
+        // Debug Mode
         function initDebug() {
             if (window.location.search.includes('debug=1')) {
                 (async () => {
@@ -1135,5 +937,6 @@
         }
         initDebug();
     </script>
+    <!-- END OF FILE: COMPLETE -->
 </body>
 </html>
