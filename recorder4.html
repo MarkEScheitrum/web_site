@@ -1,3 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Genealogy Record Editor</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com;">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
+    <style>
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:18px;padding:20px;max-width:100%;margin:0 auto}
+        .task-buttons{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;margin-bottom:20px}
+        .task-btn{font-size:20px;padding:8px 16px;border-radius:8px;background:#007bff;color:white;border:none;cursor:pointer;min-width:150px;touch-action:manipulation}
+        .task-btn:hover:not(.disabled-btn){background:#0056b3}
+        .disabled-btn{background:#ccc;cursor:not-allowed;pointer-events:none}
+        .file-status{font-size:16px;color:#333;text-align:center;margin-bottom:10px}
+        .modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+        .modal-content{background:white;padding:20px;border-radius:10px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto}
+        .close{float:right;font-size:24px;cursor:pointer}
+        .modal-content h3{margin-top:0;font-size:24px}
+        .modal-content label{display:block;margin:10px 0 5px;font-size:18px}
+        .modal-content input,.modal-content select,.modal-content textarea{width:100%;padding:10px;font-size:18px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box}
+        .modal-content button{margin-top:20px;padding:12px 24px;font-size:18px;background:#28a745;color:white;border:none;border-radius:5px;cursor:pointer}
+        .modal-content button:hover{background:#218838}
+        .table-container{margin-top:20px;overflow-x:auto}
+        table{width:100%;font-size:14px;border-collapse:collapse}
+        th,td{padding:8px;border:1px solid #ccc;white-space:normal;box-sizing:border-box}
+        th.vestigial{padding:4px}
+        th.record_type,td.record_type{width:60px}
+        th.gen,td.gen{width:40px}
+        th.sex,td.sex{width:40px}
+        th.record_type.vestigial,td.record_type.vestigial,th.gen.vestigial,td.gen.vestigial,th.name.vestigial,td.name.vestigial,th.sex.vestigial,td.sex.vestigial{width:inherit!important}
+        .action-icons{font-size:24px;margin-right:4px}
+        .vestigial{width:36px!important;max-width:36px!important;min-width:0!important;overflow:hidden}
+        .vestigial .header-text,.vestigial .cell-content{display:none}
+        .editable-row:hover{background:#d9edf7}
+        .highlighted-row{background:#ffffcc!important}
+        .greyed-out{background:#c0c0c0;cursor:not-allowed}
+        @media(max-width:768px){.task-btn{width:100%;margin-bottom:10px}.modal-content{width:95%}}
+    </style>
+</head>
+<body>
+    <h2>Genealogy Recorder</h2>
+    <div class="info">
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.4</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-01 14:22:00 PDT</span></p>
+        <p class="warning">Hit "Select/Load File" to start.</p>
+        <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
+    </div>
+    <div class="task-buttons">
+        <button onclick="selectAndLoadFile()" class="task-btn" id="selectLoadBtn">Select/Load File 📂</button>
+        <button onclick="openModal('addChild')" class="task-btn disabled-btn" id="addChildBtn">Add Child 👶</button>
+        <button onclick="openModal('addSpouse')" class="task-btn disabled-btn" id="addSpouseBtn">Add Partner 💍</button>
+        <button onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn">Update Record ✏️</button>
+        <button onclick="openModal('recordDeathBurial')" class="task-btn disabled-btn" id="recordDeathBurialBtn">Record Death/Burial ⚰️</button>
+        <button onclick="toggleTable()" class="task-btn disabled-btn" id="viewTableBtn">View Table 📋</button>
+        <button onclick="downloadCSV()" class="task-btn" id="returnUpdatesBtn" style="display:none;">Return Updates 📧</button>
+    </div>
+    <div class="file-status">
+        <span id="fileStatus">No file selected</span>
+    </div>
+    <input type="file" id="textFile" accept=".zip,.csv" style="display:none;" onchange="handleFileSelect()">
+    <div id="tableContainer" class="table-container" style="display:none;">
+        <div id="recordBody"></div>
+    </div>
+    <div id="modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3 id="modalTitle"></h3>
+            <form id="modalForm"></form>
+        </div>
+    </div>
+    <script>
+        let records=[],decryptionPassphrase=null,originalFileName='records.zip';
+        let debugMode=false,isInputCsv=false,isEncryptedZip=false;
+        let modalMode=null,editingIndex=null,editingField=null,highlightedRow=null;
+        let vestigialColumns=new Set(['notes','unprocessed_items']);
+        let renderTimeout=null;
+        const debugPassphraseHash='0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
+        const dateFields=['birth_date','death_date','marriage_date'];
+        const fieldRestrictions={person:{editable:['name','sex','birth_date','birth_location','death_date','death_location','burial_location','service','attributes','parents'],uneditable:['record_type'],greyedOut:['gen','marriage_date','relationship','divorced','divorce date']},spouse:{editable:['name','birth_date','birth_location','death_date','death_location','burial_location','service','marriage_date','relationship','divorce','parents'],uneditable:['record_type'],greyedOut:['gen','sex']}};
+
+        function dateToTimestamp(dateStr){
+            if(!dateStr)return Infinity;
+            const parts=dateStr.split('-').map(Number);
+            if(parts.length===1)return parts[0]*10000*100;
+            if(parts.length===2)return parts[0]*10000*100+parts[1]*100;
+            return parts[0]*10000*100+parts[1]*100+parts[2];
+        }
+
+        window.addEventListener('beforeunload',e=>{if(modalMode){e.preventDefault();e.returnValue='';}});
+        window.addEventListener('error',e=>{if(e.message.includes('runtime.lastError')){e.preventDefault();return false;}});
+
+        function selectAndLoadFile(){document.getElementById('textFile').click();}
+
+        function handleFileSelect(){
+            const file=document.getElementById('textFile').files[0];
+            if(!file)return;
+            originalFileName=file.name;
+            document.getElementById('fileStatus').textContent=`Selected: ${file.name}`;
+            if(debugMode)console.log(`File selected: ${file.name}`);
+            const reader=new FileReader();
+            reader.onload=e=>processUploadedFile(e.target.result,file.name);
+            reader.readAsArrayBuffer(file);
+        }
+
+        async function processUploadedFile(buffer,name){
+            isEncryptedZip=false;isInputCsv=false;
+            try{
+                if(debugMode)console.log(`Processing file: ${name}, size: ${buffer.byteLength} bytes`);
+                if(name.toLowerCase().endsWith('.zip')){
+                    decryptionPassphrase=await askPassphrase(name);
+                    if(debugMode)console.log(`Got passphrase for ${name}`);
+                    const plainZip=decryptBlob(buffer,decryptionPassphrase);
+                    if(debugMode)console.log(`Decrypted ZIP, length: ${plainZip.length} bytes`);
+                    await loadZipFromBinary(plainZip);
+                    isEncryptedZip=true;
+                    finishLoad(`Decrypted ZIP: ${name}`);
+                    return;
+                }
+                if(debugMode&&name.toLowerCase().endsWith('.csv')){
+                    if(debugMode)console.log(`Processing CSV: ${name}`);
+                    const text=new TextDecoder().decode(buffer);
+                    records=parseCSV(text);
+                    isInputCsv=true;
+                    finishLoad(`Debug CSV: ${name}`);
+                    return;
+                }
+                throw new Error(`Unsupported file. Use .zip${debugMode?' or .csv':''}`);
+            }catch(err){
+                if(debugMode)console.log(`Error processing file: ${err.message}`);
+                safeShowError(err.message);
+                document.getElementById('fileStatus').textContent='No file selected';
+                document.getElementById('textFile').value='';
+            }
+        }
+
+        async function loadZipFromBinary(binaryString){
+            if(debugMode)console.log(`Loading ZIP, length: ${binaryString.length} bytes`);
+            const zip=await JSZip.loadAsync(binaryString,{createFolders:true});
+            const csvEntry=Object.values(zip.files).find(f=>f.name.endsWith('.csv'));
+            if(!csvEntry)throw new Error("No CSV found in ZIP");
+            if(debugMode)console.log(`Found CSV in ZIP: ${csvEntry.name}`);
+            const text=await csvEntry.async('text');
+            records=parseCSV(text);
+        }
+
+        function askPassphrase(fileName){
+            return new Promise(resolve=>{
+                safeOpenModal('passphrase');
+                document.getElementById('modalTitle').textContent=`Passphrase for ${fileName}`;
+                document.getElementById('modalForm').innerHTML=`
+                    <label>Passphrase</label>
+                    <input type="password" id="pp" autofocus onkeydown="if(event.key === 'Enter'){event.preventDefault();resolvePass();}">
+                    <button type="button" onclick="resolvePass()">Submit</button>
+                `;
+                window.resolvePass=()=>{
+                    const pp=document.getElementById('pp').value;
+                    if(pp){safeCloseModal();resolve(pp);}else{safeShowError('Passphrase required');}
+                };
+            });
+        }
+
+        function finishLoad(msg){
+            enableButtonsAfterLoad();
+            debounceDisplayRecords();
+            document.getElementById('fileStatus').textContent=msg;
+            if(debugMode)console.log(msg);
+        }
+
+        function deriveKey(passphrase,salt){
+            if(debugMode)console.log(`Deriving key with passphrase length: ${passphrase.length}, salt: ${salt.toString(CryptoJS.enc.Hex)}`);
+            return CryptoJS.PBKDF2(passphrase,salt,{keySize:8,iterations:100000,hasher:CryptoJS.algo.SHA256});
+        }
+
+        function decryptBlob(arrayBuffer,passphrase){
+            try{
+                const data=new Uint8Array(arrayBuffer);
+                if(debugMode)console.log(`DecryptBlob input: ${data.length} bytes`);
+                if(data.length<32)throw new Error("File too short for salt and IV");
+                const salt=CryptoJS.lib.WordArray.create(data.slice(0,16));
+                const iv=CryptoJS.lib.WordArray.create(data.slice(16,32));
+                const ct=CryptoJS.lib.WordArray.create(data.slice(32));
+                if(debugMode)console.log(`Salt: ${salt.toString(CryptoJS.enc.Hex)}, IV: ${iv.toString(CryptoJS.enc.Hex)}, Ciphertext: ${ct.sigBytes} bytes`);
+                const key=deriveKey(passphrase,salt);
+                const decrypted=CryptoJS.AES.decrypt({ciphertext:ct},key,{iv:iv,mode:CryptoJS.mode.CBC,padding:CryptoJS.pad.NoPadding});
+                if(debugMode)console.log(`Decryption completed, WordArray length: ${decrypted.sigBytes} bytes`);
+                const decryptedBytes=CryptoJS.enc.Latin1.stringify(decrypted);
+                if(!decryptedBytes){if(debugMode)console.log("Decrypted bytes empty");throw new Error("Decryption failed, likely incorrect passphrase");}
+                if(debugMode)console.log(`Decrypted bytes length: ${decryptedBytes.length}`);
+                const padLen=decryptedBytes.charCodeAt(decryptedBytes.length-1);
+                if(debugMode)console.log(`Padding length: ${padLen}`);
+                if(padLen<1||padLen>16||!decryptedBytes.slice(-padLen).split('').every(c=>c.charCodeAt(0)===padLen)){
+                    if(debugMode)console.log(`Invalid padding, padLen: ${padLen}, last bytes: ${decryptedBytes.slice(-padLen)}`);
+                    throw new Error("Invalid padding");
+                }
+                const result=decryptedBytes.slice(0,-padLen);
+                if(debugMode)console.log(`Final decrypted length: ${result.length} bytes`);
+                return result;
+            }catch(err){
+                if(debugMode)console.error(`DecryptBlob error: ${err.message}`);
+                throw new Error("Decryption failed: "+(err.message.includes("padding")||err.message.includes("passphrase")?"Invalid passphrase or corrupted file":err.message));
+            }
+        }
+
+        function encryptBlob(zipBinaryString,passphrase){
+            const salt=CryptoJS.lib.WordArray.random(16);
+            const iv=CryptoJS.lib.WordArray.random(16);
+            const key=deriveKey(passphrase,salt);
+            const len=zipBinaryString.length;
+            const padLen=16-(len%16);
+            let padded=zipBinaryString;
+            for(let i=0;i<padLen;i++)padded+=String.fromCharCode(padLen);
+            if(debugMode)console.log(`Encrypting: plaintext=${len}B, padded=${padded.length}B`);
+            const wordArray=CryptoJS.enc.Latin1.parse(padded);
+            const encrypted=CryptoJS.AES.encrypt(wordArray,key,{iv:iv,mode:CryptoJS.mode.CBC,padding:CryptoJS.pad.NoPadding});
+            const result=salt.concat(iv).concat(encrypted.ciphertext);
+            if(debugMode)console.log(`Encryption complete: ciphertext=${result.sigBytes}B`);
+            return result;
+        }
+
         function escapeCSVField(f){
             if(typeof f!=='string')f=String(f);
             if(f.includes('"')||f.includes(','))return `"${f.replace(/"/g,'""')}"`;
@@ -332,7 +552,7 @@
                     const children=records.slice(insertIndex).filter((r,i,arr)=>r.record_type.toLowerCase()==='person'&&(i+insertIndex===arr.length-1||arr[i+insertIndex+1].record_type.toLowerCase()==='person'));
                     if(debugMode)console.log(`Found ${children.length} children for parent ${parent.name}`);
                     if(children.length>0&&data.birth_date){
-                        const newTimestamp=dateToTimestamp(data.birth_date);
+                        const newTimestamp=dateToTimestamp(toTimestamp(data.birth_date);
                         if(debugMode)console.log(`New child birth_date: ${data.birth_date}, timestamp: ${newTimestamp}`);
                         const sortedChildren=children.map((child,i)=>({index:i+insertIndex,ts:dateToTimestamp(child.birth_date)})).sort((a,b)=>a.ts-b.ts);
                         if(debugMode)console.log(`Sorted children:`,sortedChildren);
