@@ -552,7 +552,7 @@
                     const children=records.slice(insertIndex).filter((r,i,arr)=>r.record_type.toLowerCase()==='person'&&(i+insertIndex===arr.length-1||arr[i+insertIndex+1].record_type.toLowerCase()==='person'));
                     if(debugMode)console.log(`Found ${children.length} children for parent ${parent.name}`);
                     if(children.length>0&&data.birth_date){
-                        const newTimestamp=dateToTimestamp(toTimestamp(data.birth_date);
+                        const newTimestamp=dateToTimestamp(data.birth_date);
                         if(debugMode)console.log(`New child birth_date: ${data.birth_date}, timestamp: ${newTimestamp}`);
                         const sortedChildren=children.map((child,i)=>({index:i+insertIndex,ts:dateToTimestamp(child.birth_date)})).sort((a,b)=>a.ts-b.ts);
                         if(debugMode)console.log(`Sorted children:`,sortedChildren);
