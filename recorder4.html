@@ -42,7 +42,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.5</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-01 17:22:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.5</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-01 17:44:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -546,10 +546,12 @@
                     if(!parent){safeShowError('Invalid parent selected.');return;}
                     if(data.birth_date&&!isValidDate(data.birth_date)){safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');return;}
                     const parentGen=parseInt(parent.gen)||0;
-                    const newRecord={record_type:'Person',gen:(parentGen+1).toString(),name:data.name,sex:data.sex||'',birth_date:data.birth_date||'',birth_location:data.birth_location||'',parents:data.parents||'',death_date:'',death_location:'',burial_location:'',service:'',marriage_date:'',relationship:'',divorce:'',attributes:'',unprocessed_items:'',notes:''};
+                    const newRecord={record_type:'Person',gen:(parentGen+1).toString(),name:data.name,sex:data.sex||'',birth_date:data.birth_date||'',birth_location:data.birth_location||'',parents:data.parents,death_date:'',death_location:'',burial_location:'',service:'',marriage_date:'',relationship:'',divorce:'',attributes:'',unprocessed_items:'',notes:''};
                     let insertIndex=records.indexOf(parent)+1;
-                    while(insertIndex<records.length&&records[insertIndex].record_type.toLowerCase()==='spouse')insertIndex++;
-                    const children = records.slice(insertIndex).filter((r, i, arr) => r.record_type.toLowerCase() === 'person' && (i + insertIndex === records.length - 1 || records[i + insertIndex + 1].record_type.toLowerCase() === 'person'));
+                    let treeEnd=records.length;
+                    for(let i=insertIndex;i<records.length;i++){if(parseInt(records[i].gen)||0<=parentGen){treeEnd=i;break;}}
+                    if(debugMode)console.log(`Parent ${parent.name} (gen: ${parentGen}) descendant tree ends at index ${treeEnd}`);
+                    const children=records.slice(insertIndex,treeEnd).filter(r=>r.record_type.toLowerCase()==='person'&&(parseInt(r.gen)||0)===parentGen+1);
                     if(debugMode)console.log(`Found ${children.length} children for parent ${parent.name}`);
                     if(children.length>0&&data.birth_date){
                         const newTimestamp=dateToTimestamp(data.birth_date);
