@@ -42,7 +42,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.5</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-01 17:44:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.5</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-01 18:47:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -549,20 +549,20 @@
                     const newRecord={record_type:'Person',gen:(parentGen+1).toString(),name:data.name,sex:data.sex||'',birth_date:data.birth_date||'',birth_location:data.birth_location||'',parents:data.parents,death_date:'',death_location:'',burial_location:'',service:'',marriage_date:'',relationship:'',divorce:'',attributes:'',unprocessed_items:'',notes:''};
                     let insertIndex=records.indexOf(parent)+1;
                     let treeEnd=records.length;
-                    for(let i=insertIndex;i<records.length;i++){if(parseInt(records[i].gen)||0<=parentGen){treeEnd=i;break;}}
+                    for(let i=insertIndex;i<records.length;i++){if(records[i].record_type.toLowerCase()==='person'&&(parseInt(records[i].gen)||0)<=parentGen){treeEnd=i;break;}}
                     if(debugMode)console.log(`Parent ${parent.name} (gen: ${parentGen}) descendant tree ends at index ${treeEnd}`);
                     const children=records.slice(insertIndex,treeEnd).filter(r=>r.record_type.toLowerCase()==='person'&&(parseInt(r.gen)||0)===parentGen+1);
                     if(debugMode)console.log(`Found ${children.length} children for parent ${parent.name}`);
                     if(children.length>0&&data.birth_date){
                         const newTimestamp=dateToTimestamp(data.birth_date);
                         if(debugMode)console.log(`New child birth_date: ${data.birth_date}, timestamp: ${newTimestamp}`);
-                        const sortedChildren=children.map((child,i)=>({index:i+insertIndex,ts:dateToTimestamp(child.birth_date)})).sort((a,b)=>a.ts-b.ts);
+                        const sortedChildren=children.map((child,i)=>({index:i+insertIndex+children.slice(0,i).filter(c=>c.record_type.toLowerCase()!=='person').length,ts:dateToTimestamp(child.birth_date)})).sort((a,b)=>a.ts-b.ts);
                         if(debugMode)console.log(`Sorted children:`,sortedChildren);
                         const insertPos=sortedChildren.findIndex(c=>c.ts>newTimestamp);
                         insertIndex=insertPos===-1?sortedChildren[sortedChildren.length-1].index+1:sortedChildren[insertPos].index;
                         if(debugMode)console.log(`Inserting child at index ${insertIndex}`);
                     }
-                    records.splice(insertIndex,0,newRecord);
+                    records.splice(insertIndex,0,newRecord);                    
                     if(debugMode)console.log('Added child record:',newRecord,`at index ${insertIndex}`);
                 }else if(mode==='addSpouse'){
                     if(!data.name||!data.partner||!data.relationship){safeShowError('Name, Select Genealogical Partner, and Relationship are required.');return;}
