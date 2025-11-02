@@ -42,7 +42,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.4</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-01 14:22:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.5</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-01 17:22:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -549,7 +549,7 @@
                     const newRecord={record_type:'Person',gen:(parentGen+1).toString(),name:data.name,sex:data.sex||'',birth_date:data.birth_date||'',birth_location:data.birth_location||'',parents:data.parents||'',death_date:'',death_location:'',burial_location:'',service:'',marriage_date:'',relationship:'',divorce:'',attributes:'',unprocessed_items:'',notes:''};
                     let insertIndex=records.indexOf(parent)+1;
                     while(insertIndex<records.length&&records[insertIndex].record_type.toLowerCase()==='spouse')insertIndex++;
-                    const children=records.slice(insertIndex).filter((r,i,arr)=>r.record_type.toLowerCase()==='person'&&(i+insertIndex===arr.length-1||arr[i+insertIndex+1].record_type.toLowerCase()==='person'));
+                    const children = records.slice(insertIndex).filter((r, i, arr) => r.record_type.toLowerCase() === 'person' && (i + insertIndex === records.length - 1 || records[i + insertIndex + 1].record_type.toLowerCase() === 'person'));
                     if(debugMode)console.log(`Found ${children.length} children for parent ${parent.name}`);
                     if(children.length>0&&data.birth_date){
                         const newTimestamp=dateToTimestamp(data.birth_date);
