@@ -116,6 +116,18 @@
         .instructions strong {
             color: #0066cc;
         }
+        .version-legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 12px;
+            color: #666;
+            background: #f9f9f9;
+            padding: 5px 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
         @media (max-width: 600px) {
             #issue-submission {
                 position: static;
@@ -135,6 +147,11 @@
             .instructions {
                 padding: 15px;
             }
+            .version-legend {
+                position: static;
+                margin: 10px auto;
+                text-align: center;
+            }
         }
     </style>
 </head>
@@ -148,7 +165,7 @@
         <h2>How to Use the Genealogy Recorder</h2>
         <ol>
             <li>Save the attached file from the email to your <strong>Downloads folder</strong> on your computer. (Do not open the file; it is encrypted. Save it and use the recorder page to select and open it.)</li>
-            <li>Click this <a href="recorder4.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one">link</a> to open the <strong>Genealogy Recorder</strong>. Follow these instructions to proceed.</li>
+            <li>Click <a href="recorder4.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one">Genealogy Recorder</a> link to open the recorder page.</li>
             <li>In the recorder, click the <strong>"Select/Load File"</strong> button and use your file finder to select the file saved in step 1.</li>
             <li>When the <strong>Passphrase dialog box</strong> appears, enter the <strong>Passphrase</strong> from the email. It is <strong>case sensitive</strong>.</li>
             <li>Edit records with this guidance:
@@ -164,7 +181,7 @@
             <li>For any issues, functionality concerns, confusion, recommendations, or questions:
                 <ul>
                     <li>Call me directly, or</li>
-                    <li>Return to this intro page and fill out the <strong>issue submission form</strong> below to send a ticket.</li>
+                    <li>Fill out the <a href="#issue-submission">Report an Issue</a> form to send a ticket.</li>
                 </ul>
             </li>
         </ol>
@@ -179,6 +196,7 @@
         </form>
         <p id="issue-feedback" style="display:none;"></p>
     </div>
+    <div class="version-legend">Version 1.0.0</div>
     <script>
         // Existing issue submission script
         document.getElementById('issue-form').addEventListener('submit', (e) => {
@@ -214,7 +232,6 @@
                 const availHeight = screen.availHeight || screen.height;
                 const width = Math.max(800, Math.min(1600, Math.floor(availWidth * 0.8)));
                 const height = Math.max(600, Math.min(900, Math.floor(availHeight * 0.8)));
-                
                 // Open new window and store reference
                 editorWindow = window.open('recorder4.html', 'genealogyEditor', `width=${width},height=${height}`);
                 if (!editorWindow) {
@@ -223,7 +240,6 @@
                 }
             }
         });
-        
     </script>
 </body>
 </html>
