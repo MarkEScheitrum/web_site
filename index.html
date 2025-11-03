@@ -210,14 +210,21 @@
                 // If window exists and isn't closed, focus it
                 editorWindow.focus();
             } else {
+                // Dynamically calculate size: ~80% of available screen, min 800x600
+                const availWidth = screen.availWidth || screen.width;
+                const availHeight = screen.availHeight || screen.height;
+                const width = Math.max(800, Math.min(1600, Math.floor(availWidth * 0.8)));
+                const height = Math.max(600, Math.min(900, Math.floor(availHeight * 0.8)));
+                
                 // Open new window and store reference
-                editorWindow = window.open('recorder4.html', 'genealogyEditor', 'width=800,height=600');
+                editorWindow = window.open('recorder4.html', 'genealogyEditor', `width=${width},height=${height}`);
                 if (!editorWindow) {
                     // Show warning if popup is blocked
                     document.getElementById('popupWarning').style.display = 'block';
                 }
             }
-        });
+        });        
     </script>
 </body>
 </html>
+
