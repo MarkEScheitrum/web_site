@@ -88,6 +88,34 @@
             font-size: 14px;
             color: #333;
         }
+        .instructions {
+            text-align: left;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f9f9f9;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .instructions h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+        .instructions ol {
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+        .instructions ul {
+            padding-left: 30px;
+        }
+        .instructions strong {
+            color: #0066cc;
+        }
         @media (max-width: 600px) {
             #issue-submission {
                 position: static;
@@ -98,20 +126,46 @@
                 margin: 10px;
             }
             .photo-frame img {
-                max-width: 600px;
-                max-height: 600px;
+                max-width: 100%;
+                max-height: 400px;
             }
             .photo-frame p {
                 font-size: 12px;
+            }
+            .instructions {
+                padding: 15px;
             }
         }
     </style>
 </head>
 <body>
     <h1>Welcome to the Genealogy Recorder</h1>
-    <p>Click the link below to access the genealogy record editor:</p>
+    <div class="instructions">
+        <h2>How to Use the Genealogy Recorder</h2>
+        <ol>
+            <li>Save the attached file from the email to your <strong>Downloads folder</strong> on your computer. (Do not open the file; it is encrypted. Save it and use the recorder page to select and open it.)</li>
+            <li>Click the link below to open the <strong>Genealogy Recorder</strong>. Follow the instructions there to proceed.</li>
+            <li>In the recorder, click the <strong>"Select/Load File"</strong> button and use your file finder to select the file saved in step 1.</li>
+            <li>When the <strong>Passphrase dialog box</strong> appears, enter the <strong>Passphrase</strong> from the email. It is <strong>case sensitive</strong>.</li>
+            <li>Edit records with this guidance:
+                <ul>
+                    <li><strong>View Table</strong> to see the current extracted information (from the Leiby Genealogy Book, 2016 edition).</li>
+                    <li>Use the <strong>action buttons</strong> to add spouses/partners, children, or record deaths as needed.</li>
+                    <li>Use the <strong>"Update Record"</strong> button to fix typos or omissions in editable fields.</li>
+                </ul>
+            </li>
+            <li>Review the resulting changes in the table.</li>
+            <li>If satisfied, click the <strong>"Return Updates"</strong> button. This generates a file in your <strong>Downloads folder</strong> and composes an email to me. If no email is created, follow the instructions to do it manually in your email app.</li>
+            <li>Attach the edited file from your <strong>Downloads folder</strong> to the email and send it.</li>
+            <li>For any issues, functionality concerns, confusion, recommendations, or questions:
+                <ul>
+                    <li>Call me directly, or</li>
+                    <li>Return to this intro page and fill out the <strong>issue submission form</strong> below to send a ticket.</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
     <p><a href="recorder4.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one">Open Genealogy Recorder</a></p>
-    <p>Upload your genealogy text file to view, add, edit, or delete records, then download the updated file to send back.</p>
     <p id="popupWarning" style="display:none;color:red;">Please allow popups for this site to open the editor.</p>
     <div class="photo-frame">
         <img src="img/tabernacle bridge2.jpg" alt="Tabernacle Bridge circa 1960">
@@ -148,7 +202,7 @@
             }
         });
 
-        // New script to prevent duplicate editor windows
+        // Script to prevent duplicate editor windows
         let editorWindow = null; // Store reference to editor window
         document.getElementById('openEditorLink').addEventListener('click', function(e) {
             e.preventDefault(); // Prevent default link behavior
