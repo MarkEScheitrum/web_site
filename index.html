@@ -110,8 +110,9 @@
 <body>
     <h1>Welcome to the Genealogy Recorder</h1>
     <p>Click the link below to access the genealogy record editor:</p>
-    <p><a href="recorder4.html" target="_blank">>Open Genealogy Recorder</a></p>
+    <p><a href="recorder4.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one">Open Genealogy Recorder</a></p>
     <p>Upload your genealogy text file to view, add, edit, or delete records, then download the updated file to send back.</p>
+    <p id="popupWarning" style="display:none;color:red;">Please allow popups for this site to open the editor.</p>
     <div class="photo-frame">
         <img src="img/tabernacle bridge2.jpg" alt="Tabernacle Bridge circa 1960">
         <p>Tabernacle Bridge, Lewistown Valley, Tamaqua PA circa 1960</p>
@@ -125,18 +126,16 @@
         </form>
         <p id="issue-feedback" style="display:none;"></p>
     </div>
-
     <script>
+        // Existing issue submission script
         document.getElementById('issue-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const title = document.getElementById('issue-title').value;
             const body = document.getElementById('issue-body').value;
             const feedback = document.getElementById('issue-feedback');
-
             try {
                 const mailtoLink = `mailto:markscheitrum@aol.com?subject=${encodeURIComponent('Genealogy Recorder Issue: ' + title)}&body=${encodeURIComponent(body + '\n\nSent from Genealogy Recorder index.html')}`;
                 window.location.href = mailtoLink;
-
                 feedback.style.display = 'block';
                 feedback.style.color = 'green';
                 feedback.textContent = 'Your email client should have opened. Please attach any relevant files and send. If no email opened, manually email markscheitrum@aol.com with the issue details.';
@@ -148,14 +147,23 @@
                 console.error('Mailto error:', err);
             }
         });
+
+        // New script to prevent duplicate editor windows
+        let editorWindow = null; // Store reference to editor window
+        document.getElementById('openEditorLink').addEventListener('click', function(e) {
+            e.preventDefault(); // Prevent default link behavior
+            if (editorWindow && !editorWindow.closed) {
+                // If window exists and isn't closed, focus it
+                editorWindow.focus();
+            } else {
+                // Open new window and store reference
+                editorWindow = window.open('recorder4.html', 'genealogyEditor', 'width=800,height=600');
+                if (!editorWindow) {
+                    // Show warning if popup is blocked
+                    document.getElementById('popupWarning').style.display = 'block';
+                }
+            }
+        });
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
