@@ -140,11 +140,15 @@
 </head>
 <body>
     <h1>Welcome to the Genealogy Recorder</h1>
+    <div class="photo-frame">
+        <img src="img/tabernacle bridge2.jpg" alt="Tabernacle Bridge circa 1960">
+        <p>Tabernacle Bridge, Lewistown Valley, Tamaqua PA circa 1960</p>
+    </div>
     <div class="instructions">
         <h2>How to Use the Genealogy Recorder</h2>
         <ol>
             <li>Save the attached file from the email to your <strong>Downloads folder</strong> on your computer. (Do not open the file; it is encrypted. Save it and use the recorder page to select and open it.)</li>
-            <li>Click the link below to open the <strong>Genealogy Recorder</strong>. Follow the instructions there to proceed.</li>
+            <li>Click this <a href="recorder4.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one">link</a> to open the <strong>Genealogy Recorder</strong>. Follow these instructions to proceed.</li>
             <li>In the recorder, click the <strong>"Select/Load File"</strong> button and use your file finder to select the file saved in step 1.</li>
             <li>When the <strong>Passphrase dialog box</strong> appears, enter the <strong>Passphrase</strong> from the email. It is <strong>case sensitive</strong>.</li>
             <li>Edit records with this guidance:
@@ -165,12 +169,7 @@
             </li>
         </ol>
     </div>
-    <p><a href="recorder4.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one">Open Genealogy Recorder</a></p>
     <p id="popupWarning" style="display:none;color:red;">Please allow popups for this site to open the editor.</p>
-    <div class="photo-frame">
-        <img src="img/tabernacle bridge2.jpg" alt="Tabernacle Bridge circa 1960">
-        <p>Tabernacle Bridge, Lewistown Valley, Tamaqua PA circa 1960</p>
-    </div>
     <div id="issue-submission">
         <h3>Report an Issue</h3>
         <form id="issue-form">
@@ -223,8 +222,8 @@
                     document.getElementById('popupWarning').style.display = 'block';
                 }
             }
-        });        
+        });
+        
     </script>
 </body>
 </html>
-
