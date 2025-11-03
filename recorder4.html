@@ -42,7 +42,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.6</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-01 20:47:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.7</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-03 15:34:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -78,7 +78,6 @@
         const debugPassphraseHash='0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
         const dateFields=['birth_date','death_date','marriage_date'];
         const fieldRestrictions={person:{editable:['name','sex','birth_date','birth_location','death_date','death_location','burial_location','service','attributes','parents'],uneditable:['record_type'],greyedOut:['gen','marriage_date','relationship','divorced','divorce date']},spouse:{editable:['name','birth_date','birth_location','death_date','death_location','burial_location','service','marriage_date','relationship','divorce','parents'],uneditable:['record_type'],greyedOut:['gen','sex']}};
-
         function dateToTimestamp(dateStr){
             if(!dateStr)return Infinity;
             const parts=dateStr.split('-').map(Number);
@@ -86,12 +85,9 @@
             if(parts.length===2)return parts[0]*10000*100+parts[1]*100;
             return parts[0]*10000*100+parts[1]*100+parts[2];
         }
-
         window.addEventListener('beforeunload',e=>{if(modalMode){e.preventDefault();e.returnValue='';}});
         window.addEventListener('error',e=>{if(e.message.includes('runtime.lastError')){e.preventDefault();return false;}});
-
         function selectAndLoadFile(){document.getElementById('textFile').click();}
-
         function handleFileSelect(){
             const file=document.getElementById('textFile').files[0];
             if(!file)return;
@@ -102,7 +98,6 @@
             reader.onload=e=>processUploadedFile(e.target.result,file.name);
             reader.readAsArrayBuffer(file);
         }
-
         async function processUploadedFile(buffer,name){
             isEncryptedZip=false;isInputCsv=false;
             try{
@@ -133,7 +128,6 @@
                 document.getElementById('textFile').value='';
             }
         }
-
         async function loadZipFromBinary(binaryString){
             if(debugMode)console.log(`Loading ZIP, length: ${binaryString.length} bytes`);
             const zip=await JSZip.loadAsync(binaryString,{createFolders:true});
@@ -143,7 +137,6 @@
             const text=await csvEntry.async('text');
             records=parseCSV(text);
         }
-
         function askPassphrase(fileName){
             return new Promise(resolve=>{
                 safeOpenModal('passphrase');
@@ -159,19 +152,16 @@
                 };
             });
         }
-
         function finishLoad(msg){
             enableButtonsAfterLoad();
             debounceDisplayRecords();
             document.getElementById('fileStatus').textContent=msg;
             if(debugMode)console.log(msg);
         }
-
         function deriveKey(passphrase,salt){
             if(debugMode)console.log(`Deriving key with passphrase length: ${passphrase.length}, salt: ${salt.toString(CryptoJS.enc.Hex)}`);
             return CryptoJS.PBKDF2(passphrase,salt,{keySize:8,iterations:100000,hasher:CryptoJS.algo.SHA256});
         }
-
         function decryptBlob(arrayBuffer,passphrase){
             try{
                 const data=new Uint8Array(arrayBuffer);
@@ -201,7 +191,6 @@
                 throw new Error("Decryption failed: "+(err.message.includes("padding")||err.message.includes("passphrase")?"Invalid passphrase or corrupted file":err.message));
             }
         }
-
         function encryptBlob(zipBinaryString,passphrase){
             const salt=CryptoJS.lib.WordArray.random(16);
             const iv=CryptoJS.lib.WordArray.random(16);
@@ -217,13 +206,11 @@
             if(debugMode)console.log(`Encryption complete: ciphertext=${result.sigBytes}B`);
             return result;
         }
-
         function escapeCSVField(f){
             if(typeof f!=='string')f=String(f);
             if(f.includes('"')||f.includes(','))return `"${f.replace(/"/g,'""')}"`;
             return f;
         }
-
         function parseCSV(text){
             if(debugMode)console.log(`Parsing CSV, length: ${text.length} bytes`);
             const lines=text.replace(/\r\n|\r/g,'\n').split('\n').filter(l=>l.trim()&&!l.trim().startsWith('#'));
@@ -242,7 +229,6 @@
             if(debugMode)console.log(`Parsed ${recs.length} records`);
             return recs;
         }
-
         function parseCSVLine(line){
             const fields=[];
             let field='';
@@ -256,7 +242,6 @@
             fields.push(field);
             return fields;
         }
-
         function buildCSV(){
             if(!records.length)return '';
             const headers=Object.keys(records[0]);
@@ -264,7 +249,6 @@
             records.forEach(r=>rows.push(headers.map(h=>escapeCSVField(r[h]||''))));
             return rows.join('\r\n')+'\r\n';
         }
-
         async function downloadCSV(){
             if(!records.length)return safeShowError('No data to download');
             if(!isInputCsv&&!decryptionPassphrase)return safeShowError('No passphrase available');
@@ -293,8 +277,7 @@
                 ext='zip';
                 mime='application/zip';
             }
-            const base=originalFileName.replace(/\.(zip|csv).*$/i,'');
-            const dlName=`edited_${base}.${ext}`;
+            const dlName=`edited_${originalFileName}`;
             const a=document.createElement('a');
             a.href=URL.createObjectURL(blob);
             a.download=dlName;
@@ -305,14 +288,12 @@
             showPopup(`Downloaded "${dlName}" to your Downloads folder.<br><br>Your email client should have opened with a new email to <strong>markscheitrum@aol.com</strong>.<br>Follow the instructions in the email to attach "${dlName}" and send.<br><br><strong>If the email didn't open:</strong><br>1. Open your email client (e.g., <a href="https://mail.aol.com">AOL Mail</a>, <a href="https://outlook.live.com">Outlook</a>).<br>2. Create a new email to <strong>markscheitrum@aol.com</strong> with subject <strong>Updated Genealogy Records</strong>.<br>3. Attach "${dlName}" from your Downloads folder and send.`);
             if(debugMode)console.log(`Downloaded ${dlName}`);
         }
-
         function enableButtonsAfterLoad(){
             ['addChildBtn','addSpouseBtn','updateRecordBtn','recordDeathBurialBtn','viewTableBtn'].forEach(id=>document.getElementById(id).classList.remove('disabled-btn'));
             document.getElementById('selectLoadBtn').style.display='none';
             document.getElementById('returnUpdatesBtn').style.display='block';
             if(debugMode)console.log('Enabled task buttons');
         }
-
         function safeOpenModal(mode){
             if(window.location.search&&!window.location.search.includes('debug=1'))window.history.replaceState({},document.title,window.location.pathname);
             modalMode=mode;
@@ -323,14 +304,12 @@
             modalForm.addEventListener('submit',e=>{e.preventDefault();e.stopPropagation();return false;});
             if(debugMode)console.log(`Opened modal for ${mode}`);
         }
-
         function safeCloseModal(){
             document.getElementById('modal').style.display='none';
             modalMode=null;
             document.getElementById('modalForm').innerHTML='';
             if(debugMode)console.log('Closed modal');
         }
-
         function safeShowError(message){
             if(debugMode)console.error(`Error: ${message}`);
             const errorDiv=document.createElement('div');
@@ -339,14 +318,12 @@
             document.body.appendChild(errorDiv);
             setTimeout(()=>errorDiv.remove(),5000);
         }
-
         function showPopup(html){
             const div=document.createElement('div');
             div.style='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border:1px solid #000;z-index:10000';
             div.innerHTML=html+'<br><button onclick="this.parentElement.remove()">Close</button>';
             document.body.appendChild(div);
         }
-
         function isValidDate(dateStr){
             if(!dateStr||dateStr.trim()==='')return true;
             const parts=dateStr.split('-');
@@ -365,7 +342,6 @@
             }
             return false;
         }
-
         function openModal(mode){
             safeOpenModal(mode);
             const modalTitle=document.getElementById('modalTitle');
@@ -529,9 +505,7 @@
                 });
             }
         }
-
         function closeModal(){safeCloseModal();}
-
         function saveModalData(mode){
             try{
                 const form=document.getElementById('modalForm');
@@ -630,7 +604,6 @@
                 safeShowError(`An unexpected error occurred: ${error.message}`);
             }
         }
-
         function toggleTable(){
             const tableContainer=document.getElementById('tableContainer');
             const isHidden=tableContainer.style.display==='none';
@@ -638,12 +611,10 @@
             if(isHidden&&records.length>0)debounceDisplayRecords();
             if(debugMode)console.log(`Table toggled: ${isHidden?'shown':'hidden'}`);
         }
-
         function debounceDisplayRecords(){
             if(renderTimeout)clearTimeout(renderTimeout);
             renderTimeout=setTimeout(displayRecords,16);
         }
-
         function toggleColumn(column){
             if(vestigialColumns.has(column)){
                 vestigialColumns.delete(column);
@@ -654,7 +625,6 @@
             }
             debounceDisplayRecords();
         }
-
         function isFieldEditable(recordType,field){
             const cleanType=recordType?recordType.toString().trim().toLowerCase():'';
             const restrictions=fieldRestrictions[cleanType];
@@ -664,7 +634,6 @@
             if(debugMode)console.log(`Checking editable: record_type='${cleanType}', field=${field}, isEditable=${isEditable}`);
             return isEditable;
         }
-
         function isFieldGreyedOut(recordType,field){
             const cleanType=recordType?recordType.toString().trim().toLowerCase():'';
             const restrictions=fieldRestrictions[cleanType];
@@ -673,7 +642,6 @@
             if(debugMode)console.log(`Checking greyed-out: record_type='${cleanType}', field=${field}, isGreyedOut=${isGreyedOut}`);
             return isGreyedOut;
         }
-
         function displayRecords(){
             const recordBody=document.getElementById('recordBody');
             recordBody.innerHTML='';
@@ -741,7 +709,6 @@
             recordBody.appendChild(table);
             if(debugMode)console.log(`Displayed ${records.length} records`);
         }
-
         function startEditing(index,field,td,currentValue){
             editingIndex=index;
             editingField=field;
@@ -788,7 +755,6 @@
                 };
             }
         }
-
         function saveEdit(index,field,value,td,originalValue){
             const trimmedValue=value.trim();
             if(dateFields.includes(field)&&trimmedValue&&trimmedValue!=='true'&&!isValidDate(trimmedValue)){
@@ -814,7 +780,6 @@
             td.appendChild(cellContent);
             debounceDisplayRecords();
         }
-
         function cancelEdit(td,originalValue){
             editingIndex=null;
             editingField=null;
@@ -826,7 +791,6 @@
             if(debugMode)console.log('Cancelled edit');
             debounceDisplayRecords();
         }
-
         function initDebug(){
             if(window.location.search.includes('debug=1')){
                 (async()=>{
