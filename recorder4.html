@@ -42,7 +42,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.7</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-03 15:34:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.7</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-03 16:10:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -263,7 +263,7 @@
             }else{
                 if(debugMode)console.log(`Generating ZIP with CSV: ${csv.length} bytes`);
                 const zip=new JSZip();
-                const csvFileName=originalFileName.replace(/\.zip.*$/i,'')+'.csv';
+                const csvFileName=`edited_${originalFileName.replace(/\.zip.*$/i,'')}.csv`;
                 zip.file(csvFileName,csv);
                 const zipBin=await zip.generateAsync({type:'uint8array'});
                 if(debugMode)console.log(`ZIP generated: ${zipBin.length} bytes`);
