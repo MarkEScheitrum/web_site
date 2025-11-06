@@ -948,7 +948,7 @@
             headers.forEach(header => {
                 const th = document.createElement('th');
                 th.className = header;
-                if (!['record_type', 'gen', 'name', 'sex'].includes(header Wim header)) {
+                if (!['record_type', 'gen', 'name', 'sex'].includes(header)) {
                     const toggleButton = document.createElement('span');
                     toggleButton.textContent = vestigialColumns.has(header) ? '👁️‍🗨️' : '👁️';
                     toggleButton.className = 'action-icons';
