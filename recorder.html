@@ -1034,19 +1034,19 @@
             }
         }
 
-        function saveEdit(index, field, value, td, originalValue) {
+        function saveEdit(index, field, value, td, currentValue) {
             const trimmedValue = value.trim();
             if (dateFields.includes(field) && trimmedValue && trimmedValue !== 'true' && !isValidDate(trimmedValue)) {
                 safeShowError(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD.`);
-                cancelEdit(td, originalValue);
+                cancelEdit(td, currentValue);
                 return;
             }
             if (field === 'relationship' && !['', 'spouse', 'partner', 'other'].includes(trimmedValue)) {
                 safeShowError('Relationship must be "spouse", "partner", or "other".');
-                cancelEdit(td, originalValue);
+                cancelEdit(td, currentValue);
                 return;
             }
-            if (trimmedValue !== originalValue) {
+            if (trimmedValue !== currentValue) {
                 records[index][field] = trimmedValue;
                 if (debugMode) console.log(`Saved edit: record ${index + 1}, field ${field}, value ${trimmedValue}`);
             }
@@ -1060,12 +1060,12 @@
             debounceDisplayRecords();
         }
 
-        function cancelEdit(td, originalValue) {
+        function cancelEdit(td, currentValue) {
             editingIndex = null;
             editingField = null;
             td.innerHTML = '';
             const cellContent = document.createElement('span');
-            cellContent.textContent = originalValue;
+            cellContent.textContent = currentValue;
             cellContent.className = 'cell-content';
             td.appendChild(cellContent);
             if (debugMode) console.log('Cancelled edit');
