@@ -47,7 +47,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.3</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-06 11:26:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.4</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-06 11:43:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -652,7 +652,7 @@
                     modalForm.appendChild(input);
                 }
             });
-            const submitBtn = document.createElement('button');
+            const submitBlk = document.createElement('button');
             submitBtn.type = 'button';
             submitBtn.textContent = 'Save';
             submitBtn.onclick = () => {
@@ -797,7 +797,7 @@
                 } else if (mode === 'addSpouse') {
                     if (!data.name || !data.partner || !data.relationship) { safeShowError('Name, Select Genealogical Partner, and Relationship are required.'); return; }
                     const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
-                    if (!partner) { safeShowError('Invalid partner selected.'); return; }
+                    if (!parent) { safeShowError('Invalid partner selected.'); return; }
                     if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
                     if (data.marriage_date && !isValidDate(data.marriage_date)) { safeShowError('Invalid marriage date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
                     const newRecord = {
