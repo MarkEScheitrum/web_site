@@ -842,7 +842,7 @@
                     let insertIndex = records.indexOf(partner) + 1;
                     const spouses = records.slice(insertIndex).filter((r, i, arr) => r.record_type.toLowerCase() === 'spouse' && (i + insertIndex === records.length - 1 || records[i + insertIndex + 1].record_type.toLowerCase() !== 'spouse'));
                     if (debugMode) console.log(`Found ${spouses.length} spouses for partner ${partner.name}`);
-                    if (spouses.length > 0 && data.marriage_date)Msg) {
+                    if (spouses.length > 0 && data.marriage_date) {
                         const newTimestamp = dateToTimestamp(data.marriage_date);
                         if (debugMode) console.log(`New spouse marriage_date: ${data.marriage_date}, timestamp: ${newTimestamp}`);
                         const sortedSpouses = spouses.map((spouse, i) => ({ index: i + insertIndex, ts: dateToTimestamp(spouse.marriage_date) })).sort((a, b) => a.ts - b.ts);
