@@ -17,12 +17,15 @@
         .disabled-btn{background:#ccc;cursor:not-allowed;pointer-events:none}
         .file-status{font-size:16px;color:#333;text-align:center;margin-bottom:10px}
         .modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
-        .modal-content{background:white;padding:20px;border-radius:10px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto}
+        .modal-content{background:white;padding:20px;border-radius:10px;width:90%;max-width:400px;max-height:80vh;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
         .close{float:right;font-size:24px;cursor:pointer}
-        .modal-content h3{margin-top:0;font-size:24px}
+        .modal-content h3{margin-top:0;font-size:24px;text-align:center}
         .modal-content label{display:block;margin:10px 0 5px;font-size:18px}
         .modal-content input,.modal-content select,.modal-content textarea{width:100%;padding:10px;font-size:18px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box}
-        .modal-content button{margin-top:20px;padding:12px 24px;font-size:18px;background:#28a745;color:white;border:none;border-radius:5px;cursor:pointer}
+        .modal-content .radio-group{display:flex;flex-direction:column;gap:10px;margin:20px 0}
+        .modal-content .radio-label{display:flex;align-items:center;gap:10px;font-size:18px}
+        .modal-content .radio-label input[type="radio"]{width:auto;cursor:pointer}
+        .modal-content button{margin-top:20px;padding:12px 24px;font-size:18px;background:#28a745;color:white;border:none;border-radius:5px;cursor:pointer;width:100%;transition:background 0.2s}
         .modal-content button:hover{background:#218838}
         .table-container{margin-top:20px;overflow-x:auto}
         table{width:100%;font-size:14px;border-collapse:collapse}
@@ -38,13 +41,13 @@
         .editable-row:hover{background:#d9edf7}
         .highlighted-row{background:#ffffcc!important}
         .greyed-out{background:#c0c0c0;cursor:not-allowed}
-        @media(max-width:768px){.task-btn{width:100%;margin-bottom:10px}.modal-content{width:95%}}
+        @media(max-width:768px){.task-btn{width:100%;margin-bottom:10px}.modal-content{width:95%;max-width:350px}}
     </style>
 </head>
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.1</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-05 19:10:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.2</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-06 10:00:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -143,26 +146,24 @@
             safeOpenModal('loadMethod');
             document.getElementById('modalTitle').textContent = 'Select Load Method';
             document.getElementById('modalForm').innerHTML = `
-                <label>Select Load Method</label>
-                <select id="loadMethod" required>
-                    <option value="">Select</option>
-                    <option value="fileFinder">File Finder</option>
-                    <option value="dropbox">Dropbox</option>
-                </select>
+                <div class="radio-group">
+                    <label class="radio-label"><input type="radio" name="loadMethod" value="fileFinder"> File Finder</label>
+                    <label class="radio-label"><input type="radio" name="loadMethod" value="dropbox"> Dropbox</label>
+                </div>
                 <button type="button" onclick="handleLoadMethod()">Proceed</button>
             `;
         }
 
         async function handleLoadMethod() {
-            const loadMethod = document.getElementById('loadMethod').value;
+            const loadMethod = document.querySelector('input[name="loadMethod"]:checked');
             if (!loadMethod) {
                 safeShowError('Please select a load method.');
                 return;
             }
             safeCloseModal();
-            if (loadMethod === 'fileFinder') {
+            if (loadMethod.value === 'fileFinder') {
                 document.getElementById('textFile').click();
-            } else if (loadMethod === 'dropbox') {
+            } else if (loadMethod.value === 'dropbox') {
                 loadFromDropbox();
             }
         }
@@ -192,16 +193,26 @@
                 }
 
                 if (debugMode) console.log(`Found file: ${fileEntry.path_display}`);
-                document.getElementById('fileStatus').textContent = `Selected: ${fileEntry.name}`;
-                originalFileName = fileEntry.name;
-
+                
                 // Download the file
                 const fileResponse = await dbx.filesDownload({ path: fileEntry.path_display });
                 const buffer = await fileResponse.result.fileBlob.arrayBuffer();
                 if (debugMode) console.log(`Downloaded file, size: ${buffer.byteLength} bytes`);
 
+                // Get original filename from CSV inside ZIP
+                const zip = await JSZip.loadAsync(buffer, { createFolders: true });
+                const csvEntry = Object.values(zip.files).find(f => f.name.endsWith('.csv'));
+                if (!csvEntry) {
+                    safeShowError('No CSV found in ZIP');
+                    resetSession();
+                    return;
+                }
+                originalFileName = csvEntry.name.replace(/\.csv$/, '.zip');
+                document.getElementById('fileStatus').textContent = `Selected: ${originalFileName}`;
+                if (debugMode) console.log(`Original filename: ${originalFileName}`);
+
                 // Prompt for decryption passphrase
-                decryptionPassphrase = await askPassphrase(fileEntry.name);
+                decryptionPassphrase = await askPassphrase(originalFileName);
                 if (!decryptionPassphrase) {
                     resetSession();
                     return;
@@ -212,7 +223,7 @@
                 const plainZip = decryptBlob(buffer, decryptionPassphrase);
                 if (debugMode) console.log(`Decrypted ZIP, length: ${plainZip.length} bytes`);
                 await loadZipFromBinary(plainZip);
-                finishLoad(`Decrypted ZIP from Dropbox: ${fileEntry.name}`);
+                finishLoad(`Decrypted ZIP from Dropbox: ${originalFileName}`);
             } catch (err) {
                 if (debugMode) console.error(`Dropbox error: ${err.message}`);
                 safeShowError(`Failed to load from Dropbox: ${err.message}`);
@@ -455,7 +466,7 @@
             } else {
                 if (debugMode) console.log(`Generating ZIP with CSV: ${csv.length} bytes`);
                 const zip = new JSZip();
-                const csvFileName = `updated_${originalFileName.replace(/\.zip.*$/i, '')}.csv`;
+                const csvFileName = `edited_${originalFileName.replace(/\.zip.*$/i, '')}.csv`;
                 zip.file(csvFileName, csv);
                 const zipBin = await zip.generateAsync({ type: 'uint8array' });
                 if (debugMode) console.log(`ZIP generated: ${zipBin.length} bytes`);
@@ -478,7 +489,7 @@
                     if (debugMode) console.log(`Uploading updated file to ${dropboxPath}`);
                     await dbx.filesUpload({ contents: blob, path: dropboxPath, mode: 'overwrite' });
                     if (debugMode) console.log(`Successfully uploaded to ${dropboxPath}`);
-                    showPopup(`Updated file saved to Dropbox as ${dropboxPath.split('/').pop()}.`);
+                    showPopup(`Updated file saved to Dropbox as edited_${originalFileName}.`);
                 } catch (err) {
                     if (debugMode) console.error(`Dropbox upload error: ${err.message}`);
                     safeShowError(`Failed to upload to Dropbox: ${err.message}`);
@@ -552,7 +563,7 @@
                 const date = Date.parse(dateStr + 'T00:00:00');
                 if (isNaN(date)) return false;
                 const parsedDate = new Date(date);
-                return parsedDate.getFullYear() == parts[0] && (parsedDate.getMonth() + 1) == parts[1] && parsedDate.getDate() == parts[2];
+                return parsedDate.getFull showFullYear() == parts[0] && (parsedDate.getMonth() + 1) == parts[1] && parsedDate.getDate() == parts[2];
             }
             return false;
         }
