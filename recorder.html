@@ -47,7 +47,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.2</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-06 10:00:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.3/span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-06 11:26:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -237,7 +237,7 @@
                 document.getElementById('modalTitle').textContent = 'Enter Dropbox Passphrase';
                 document.getElementById('modalForm').innerHTML = `
                     <label>Exchange Passphrase</label>
-                    <input type="text" id="exchangePp" autofocus onkeydown="if(event.key === 'Enter'){event.preventDefault();resolveExchangePass();}">
+                    <input type="text" id="exchangePp" autocomplete="off" autofocus onkeydown="if(event.key === 'Enter'){event.preventDefault();resolveExchangePass();}">
                     <button type="button" onclick="resolveExchangePass()">Submit</button>
                 `;
                 window.resolveExchangePass = () => {
@@ -252,7 +252,7 @@
                 };
             });
         }
-
+        
         function resetSession() {
             records = [];
             decryptionPassphrase = null;
