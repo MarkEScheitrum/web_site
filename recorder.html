@@ -47,7 +47,7 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.4</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-06 11:43:00 PDT</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.3</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-07 00:04:00 PDT</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
@@ -120,28 +120,6 @@
             }
         }
 
-        function dateToTimestamp(dateStr) {
-            if (!dateStr) return Infinity;
-            const parts = dateStr.split('-').map(Number);
-            if (parts.length === 1) return parts[0] * 10000 * 100;
-            if (parts.length === 2) return parts[0] * 10000 * 100 + parts[1] * 100;
-            return parts[0] * 10000 * 100 + parts[1] * 100 + parts[2];
-        }
-
-        window.addEventListener('beforeunload', e => {
-            if (modalMode) {
-                e.preventDefault();
-                e.returnValue = '';
-            }
-        });
-
-        window.addEventListener('error', e => {
-            if (e.message.includes('runtime.lastError')) {
-                e.preventDefault();
-                return false;
-            }
-        });
-
         function selectAndLoadFile() {
             safeOpenModal('loadMethod');
             document.getElementById('modalTitle').textContent = 'Select Load Method';
@@ -197,10 +175,28 @@
                 // Download the file
                 const fileResponse = await dbx.filesDownload({ path: fileEntry.path_display });
                 const buffer = await fileResponse.result.fileBlob.arrayBuffer();
-                if (debugMode) console.log(`Downloaded file, size: ${buffer.byteLength} bytes`);
+                if (debugMode) {
+                    console.log(`Downloaded file, size: ${buffer.byteLength} bytes`);
+                    const uint8 = new Uint8Array(buffer.slice(0, 20));
+                    console.log('Buffer sample (first 20 bytes):', Array.from(uint8).map(b => b.toString(16).padStart(2, '0')).join(' '));
+                }
 
-                // Get original filename from CSV inside ZIP
-                const zip = await JSZip.loadAsync(buffer, { createFolders: true });
+                // Prompt for decryption passphrase
+                decryptionPassphrase = await askPassphrase('encrypted file');
+                if (!decryptionPassphrase) {
+                    resetSession();
+                    return;
+                }
+
+                // Decrypt the file
+                const plainZip = decryptBlob(buffer, decryptionPassphrase);
+                if (debugMode) {
+                    console.log(`Decrypted plainZip length: ${plainZip.length} bytes`);
+                    console.log('PlainZip sample (first 20 chars):', plainZip.substring(0, 20));
+                }
+
+                // Parse ZIP to get CSV filename
+                const zip = await JSZip.loadAsync(plainZip, { createFolders: true });
                 const csvEntry = Object.values(zip.files).find(f => f.name.endsWith('.csv'));
                 if (!csvEntry) {
                     safeShowError('No CSV found in ZIP');
@@ -211,17 +207,8 @@
                 document.getElementById('fileStatus').textContent = `Selected: ${originalFileName}`;
                 if (debugMode) console.log(`Original filename: ${originalFileName}`);
 
-                // Prompt for decryption passphrase
-                decryptionPassphrase = await askPassphrase(originalFileName);
-                if (!decryptionPassphrase) {
-                    resetSession();
-                    return;
-                }
-
-                // Decrypt and process the file
+                // Process the ZIP
                 isEncryptedZip = true;
-                const plainZip = decryptBlob(buffer, decryptionPassphrase);
-                if (debugMode) console.log(`Decrypted ZIP, length: ${plainZip.length} bytes`);
                 await loadZipFromBinary(plainZip);
                 finishLoad(`Decrypted ZIP from Dropbox: ${originalFileName}`);
             } catch (err) {
@@ -236,9 +223,11 @@
                 safeOpenModal('exchangePassphrase');
                 document.getElementById('modalTitle').textContent = 'Enter Dropbox Passphrase';
                 document.getElementById('modalForm').innerHTML = `
-                    <label>Exchange Passphrase</label>
-                    <input type="text" id="exchangePp" autocomplete="off" autofocus onkeydown="if(event.key === 'Enter'){event.preventDefault();resolveExchangePass();}">
-                    <button type="button" onclick="resolveExchangePass()">Submit</button>
+                    <form autocomplete="off">
+                        <label>Exchange Passphrase</label>
+                        <input type="text" id="exchangePp" autocomplete="new-password" autofocus onkeydown="if(event.key === 'Enter'){event.preventDefault();resolveExchangePass();}">
+                        <button type="button" onclick="resolveExchangePass()">Submit</button>
+                    </form>
                 `;
                 window.resolveExchangePass = () => {
                     const pp = document.getElementById('exchangePp').value;
@@ -252,7 +241,7 @@
                 };
             });
         }
-        
+
         function resetSession() {
             records = [];
             decryptionPassphrase = null;
@@ -315,12 +304,17 @@
 
         async function loadZipFromBinary(binaryString) {
             if (debugMode) console.log(`Loading ZIP, length: ${binaryString.length} bytes`);
-            const zip = await JSZip.loadAsync(binaryString, { createFolders: true });
-            const csvEntry = Object.values(zip.files).find(f => f.name.endsWith('.csv'));
-            if (!csvEntry) throw new Error("No CSV found in ZIP");
-            if (debugMode) console.log(`Found CSV in ZIP: ${csvEntry.name}`);
-            const text = await csvEntry.async('text');
-            records = parseCSV(text);
+            try {
+                const zip = await JSZip.loadAsync(binaryString, { createFolders: true });
+                const csvEntry = Object.values(zip.files).find(f => f.name.endsWith('.csv'));
+                if (!csvEntry) throw new Error("No CSV found in ZIP");
+                if (debugMode) console.log(`Found CSV in ZIP: ${csvEntry.name}`);
+                const text = await csvEntry.async('text');
+                records = parseCSV(text);
+            } catch (err) {
+                if (debugMode) console.error(`JSZip parsing error: ${err.message}`);
+                throw err;
+            }
         }
 
         function askPassphrase(fileName) {
@@ -328,9 +322,11 @@
                 safeOpenModal('passphrase');
                 document.getElementById('modalTitle').textContent = `Passphrase for ${fileName}`;
                 document.getElementById('modalForm').innerHTML = `
-                    <label>Passphrase</label>
-                    <input type="password" id="pp" autofocus onkeydown="if(event.key === 'Enter'){event.preventDefault();resolvePass();}">
-                    <button type="button" onclick="resolvePass()">Submit</button>
+                    <form autocomplete="off">
+                        <label>Passphrase</label>
+                        <input type="password" id="pp" autocomplete="new-password" autofocus onkeydown="if(event.key === 'Enter'){event.preventDefault();resolvePass();}">
+                        <button type="button" onclick="resolvePass()">Submit</button>
+                    </form>
                 `;
                 window.resolvePass = () => {
                     const pp = document.getElementById('pp').value;
@@ -345,208 +341,11 @@
             });
         }
 
-        function finishLoad(msg) {
-            enableButtonsAfterLoad();
-            debounceDisplayRecords();
-            document.getElementById('fileStatus').textContent = msg;
-            if (debugMode) console.log(msg);
-        }
-
-        function deriveKey(passphrase, salt) {
-            if (debugMode) console.log(`Deriving key with passphrase length: ${passphrase.length}, salt: ${salt.toString(CryptoJS.enc.Hex)}`);
-            return CryptoJS.PBKDF2(passphrase, salt, { keySize: 8, iterations: 100000, hasher: CryptoJS.algo.SHA256 });
-        }
-
-        function decryptBlob(arrayBuffer, passphrase) {
-            try {
-                const data = new Uint8Array(arrayBuffer);
-                if (debugMode) console.log(`DecryptBlob input: ${data.length} bytes`);
-                if (data.length < 32) throw new Error("File too short for salt and IV");
-                const salt = CryptoJS.lib.WordArray.create(data.slice(0, 16));
-                const iv = CryptoJS.lib.WordArray.create(data.slice(16, 32));
-                const ct = CryptoJS.lib.WordArray.create(data.slice(32));
-                if (debugMode) console.log(`Salt: ${salt.toString(CryptoJS.enc.Hex)}, IV: ${iv.toString(CryptoJS.enc.Hex)}, Ciphertext: ${ct.sigBytes} bytes`);
-                const key = deriveKey(passphrase, salt);
-                const decrypted = CryptoJS.AES.decrypt({ ciphertext: ct }, key, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding });
-                if (debugMode) console.log(`Decryption completed, WordArray length: ${decrypted.sigBytes} bytes`);
-                const decryptedBytes = CryptoJS.enc.Latin1.stringify(decrypted);
-                if (!decryptedBytes) {
-                    if (debugMode) console.log("Decrypted bytes empty");
-                    throw new Error("Decryption failed, likely incorrect passphrase");
-                }
-                if (debugMode) console.log(`Decrypted bytes length: ${decryptedBytes.length}`);
-                const padLen = decryptedBytes.charCodeAt(decryptedBytes.length - 1);
-                if (debugMode) console.log(`Padding length: ${padLen}`);
-                if (padLen < 1 || padLen > 16 || !decryptedBytes.slice(-padLen).split('').every(c => c.charCodeAt(0) === padLen)) {
-                    if (debugMode) console.log(`Invalid padding, padLen: ${padLen}, last bytes: ${decryptedBytes.slice(-padLen)}`);
-                    throw new Error("Invalid padding");
-                }
-                const result = decryptedBytes.slice(0, -padLen);
-                if (debugMode) console.log(`Final decrypted length: ${result.length} bytes`);
-                return result;
-            } catch (err) {
-                if (debugMode) console.error(`DecryptBlob error: ${err.message}`);
-                throw new Error("Decryption failed: " + (err.message.includes("padding") || err.message.includes("passphrase") ? "Invalid passphrase or corrupted file" : err.message));
-            }
-        }
-
-        function encryptBlob(zipBinaryString, passphrase) {
-            const salt = CryptoJS.lib.WordArray.random(16);
-            const iv = CryptoJS.lib.WordArray.random(16);
-            const key = deriveKey(passphrase, salt);
-            const len = zipBinaryString.length;
-            const padLen = 16 - (len % 16);
-            let padded = zipBinaryString;
-            for (let i = 0; i < padLen; i++) padded += String.fromCharCode(padLen);
-            if (debugMode) console.log(`Encrypting: plaintext=${len}B, padded=${padded.length}B`);
-            const wordArray = CryptoJS.enc.Latin1.parse(padded);
-            const encrypted = CryptoJS.AES.encrypt(wordArray, key, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding });
-            const result = salt.concat(iv).concat(encrypted.ciphertext);
-            if (debugMode) console.log(`Encryption complete: ciphertext=${result.sigBytes}B`);
-            return result;
-        }
-
-        function escapeCSVField(f) {
-            if (typeof f !== 'string') f = String(f);
-            if (f.includes('"') || f.includes(',')) return `"${f.replace(/"/g, '""')}"`;
-            return f;
-        }
-
-        function parseCSV(text) {
-            if (debugMode) console.log(`Parsing CSV, length: ${text.length} bytes`);
-            const lines = text.replace(/\r\n|\r/g, '\n').split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
-            const headers = parseCSVLine(lines[0]);
-            const recs = [];
-            for (let i = 1; i < lines.length; i++) {
-                const fields = parseCSVLine(lines[i]);
-                if (fields.length === headers.length) {
-                    const r = {};
-                    headers.forEach((h, j) => r[h] = fields[j].trim());
-                    recs.push(r);
-                } else {
-                    if (debugMode) console.log(`Skipped line ${i + 1}: field count mismatch (${fields.length} vs ${headers.length})`);
-                }
-            }
-            if (debugMode) console.log(`Parsed ${recs.length} records`);
-            return recs;
-        }
-
-        function parseCSVLine(line) {
-            const fields = [];
-            let field = '';
-            let inQuotes = false;
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                if (char === '"') { inQuotes = !inQuotes; continue; }
-                if (char === ',' && !inQuotes) { fields.push(field); field = ''; continue; }
-                field += char;
-            }
-            fields.push(field);
-            return fields;
-        }
-
-        function buildCSV() {
-            if (!records.length) return '';
-            const headers = Object.keys(records[0]);
-            const rows = [headers.map(escapeCSVField)];
-            records.forEach(r => rows.push(headers.map(h => escapeCSVField(r[h] || ''))));
-            return rows.join('\r\n') + '\r\n';
-        }
-
-        async function downloadCSV() {
-            if (!records.length) return safeShowError('No data to save');
-            if (!isInputCsv && !decryptionPassphrase) return safeShowError('No passphrase available');
-            if (!exchangePassphrase && isEncryptedZip) return safeShowError('Exchange passphrase required for Dropbox upload');
-            if (debugMode) console.log(`Building CSV for upload`);
-            const csv = buildCSV();
-            let blob;
-            if (isInputCsv) {
-                if (debugMode) console.log(`Generating CSV output: ${csv.length} bytes`);
-                blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-            } else {
-                if (debugMode) console.log(`Generating ZIP with CSV: ${csv.length} bytes`);
-                const zip = new JSZip();
-                const csvFileName = `edited_${originalFileName.replace(/\.zip.*$/i, '')}.csv`;
-                zip.file(csvFileName, csv);
-                const zipBin = await zip.generateAsync({ type: 'uint8array' });
-                if (debugMode) console.log(`ZIP generated: ${zipBin.length} bytes`);
-                const encrypted = encryptBlob(String.fromCharCode.apply(null, zipBin), decryptionPassphrase);
-                const uint8 = new Uint8Array(encrypted.sigBytes);
-                for (let i = 0; i < encrypted.sigBytes; i++) {
-                    const w = encrypted.words[Math.floor(i / 4)];
-                    uint8[i] = (w >>> (24 - (i % 4) * 8)) & 0xFF;
-                }
-                blob = new Blob([uint8], { type: 'application/octet-stream' });
-            }
-            
-            if (isEncryptedZip) {
-                try {
-                    const accessToken = await getAccessToken();
-                    const dbx = new Dropbox.Dropbox({ accessToken });
-                    const fileHash = CryptoJS.SHA256(exchangePassphrase).toString();
-                    const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
-                    const dropboxPath = `${DROPBOX_FOLDER}/${fileHash}_${timestamp}.zip`;
-                    if (debugMode) console.log(`Uploading updated file to ${dropboxPath}`);
-                    await dbx.filesUpload({ contents: blob, path: dropboxPath, mode: 'overwrite' });
-                    if (debugMode) console.log(`Successfully uploaded to ${dropboxPath}`);
-                    showPopup(`Updated file saved to Dropbox as edited_${originalFileName}.`);
-                } catch (err) {
-                    if (debugMode) console.error(`Dropbox upload error: ${err.message}`);
-                    safeShowError(`Failed to upload to Dropbox: ${err.message}`);
-                    return;
-                }
-            } else {
-                safeShowError('Dropbox upload only supported for encrypted ZIP files.');
-                return;
-            }
-            resetSession();
-        }
-
-        function enableButtonsAfterLoad() {
-            ['addChildBtn', 'addSpouseBtn', 'updateRecordBtn', 'recordDeathBurialBtn', 'viewTableBtn'].forEach(id => 
-                document.getElementById(id).classList.remove('disabled-btn'));
-            document.getElementById('selectLoadBtn').style.display = 'none';
-            document.getElementById('returnUpdatesBtn').style.display = 'block';
-            if (debugMode) console.log('Enabled task buttons');
-        }
-
-        function safeOpenModal(mode) {
-            if (window.location.search && !window.location.search.includes('debug=1')) 
-                window.history.replaceState({}, document.title, window.location.pathname);
-            modalMode = mode;
-            const modal = document.getElementById('modal');
-            modal.style.display = 'block';
-            const modalForm = document.getElementById('modalForm');
-            modalForm.innerHTML = '';
-            modalForm.addEventListener('submit', e => {
-                e.preventDefault();
-                e.stopPropagation();
-                return false;
-            });
-            if (debugMode) console.log(`Opened modal for ${mode}`);
-        }
-
         function safeCloseModal() {
             document.getElementById('modal').style.display = 'none';
             modalMode = null;
             document.getElementById('modalForm').innerHTML = '';
             if (debugMode) console.log('Closed modal');
-        }
-
-        function safeShowError(message) {
-            if (debugMode) console.error(`Error: ${message}`);
-            const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px;border-radius:5px;z-index:2000;max-width:300px;box-shadow:0 2px 10px rgba(0,0,0,0.2);font-size:14px';
-            errorDiv.innerHTML = `<strong>Error</strong><br>${message}<button onclick="this.parentElement.remove()" style="margin-left:10px;background:none;border:none;color:white;cursor:pointer;float:right">&times;</button>`;
-            document.body.appendChild(errorDiv);
-            setTimeout(() => errorDiv.remove(), 5000);
-        }
-
-        function showPopup(html) {
-            const div = document.createElement('div');
-            div.style = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border:1px solid #000;z-index:10000';
-            div.innerHTML = html + '<br><button onclick="this.parentElement.remove()">Close</button>';
-            document.body.appendChild(div);
         }
 
         function isValidDate(dateStr) {
@@ -652,7 +451,7 @@
                     modalForm.appendChild(input);
                 }
             });
-            const submitBlk = document.createElement('button');
+            const submitBtn = document.createElement('button');
             submitBtn.type = 'button';
             submitBtn.textContent = 'Save';
             submitBtn.onclick = () => {
@@ -797,7 +596,7 @@
                 } else if (mode === 'addSpouse') {
                     if (!data.name || !data.partner || !data.relationship) { safeShowError('Name, Select Genealogical Partner, and Relationship are required.'); return; }
                     const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
-                    if (!parent) { safeShowError('Invalid partner selected.'); return; }
+                    if (!partner) { safeShowError('Invalid partner selected.'); return; }
                     if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
                     if (data.marriage_date && !isValidDate(data.marriage_date)) { safeShowError('Invalid marriage date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
                     const newRecord = {
