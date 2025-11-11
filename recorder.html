@@ -47,12 +47,12 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.6</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-11 12:19:00 PST</span></p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.7</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-11 12:58:00 PST</span></p>
         <p class="warning">Hit "Select/Load File" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
     <div class="task-buttons">
-        <button onclick="selectAndLoadFile()" class="task-btn" id="selectLoadBtn">Select/Load File 📂</button>
+        <button onclick="loadFromDropbox()" class="task-btn" id="selectLoadBtn">Select/Load File 📂</button>
         <button onclick="openModal('addChild')" class="task-btn disabled-btn" id="addChildBtn">Add Child 👶</button>
         <button onclick="openModal('addSpouse')" class="task-btn disabled-btn" id="addSpouseBtn">Add Partner 💍</button>
         <button onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn">Update Record ✏️</button>
@@ -153,30 +153,6 @@
             div.innerHTML = html + '<br><button onclick="this.parentElement.remove()">Close</button>';
             document.body.appendChild(div);
         }
-        function selectAndLoadFile() {
-            safeOpenModal('loadMethod');
-            document.getElementById('modalTitle').textContent = 'Select Load Method';
-            document.getElementById('modalForm').innerHTML = `
-                <div class="radio-group">
-                    <label class="radio-label"><input type="radio" name="loadMethod" value="fileFinder"> File Finder</label>
-                    <label class="radio-label"><input type="radio" name="loadMethod" value="dropbox"> Dropbox</label>
-                </div>
-                <button type="button" onclick="handleLoadMethod()">Proceed</button>
-            `;
-        }
-        async function handleLoadMethod() {
-            const loadMethod = document.querySelector('input[name="loadMethod"]:checked');
-            if (!loadMethod) {
-                safeShowError('Please select a load method.');
-                return;
-            }
-            safeCloseModal();
-            if (loadMethod.value === 'fileFinder') {
-                document.getElementById('textFile').click();
-            } else if (loadMethod.value === 'dropbox') {
-                loadFromDropbox();
-            }
-        }
         async function loadFromDropbox() {
             const passphrase = await askPassphrase('File Retrieval');
             if (!passphrase) {
@@ -190,20 +166,20 @@
                 const dbx = new Dropbox.Dropbox({ accessToken });
                 const fileHash = CryptoJS.SHA256(passphrase).toString();
                 if (debugMode) console.log(`Hashed passphrase: ${fileHash}`);
-               
+              
                 // List files in the Dropbox app folder
                 const response = await dbx.filesListFolder({ path: DROPBOX_FOLDER });
                 const fileEntry = response.result.entries
                     .filter(entry => entry.name.startsWith(fileHash) && entry.name.endsWith('.zip'))
                     .sort((a, b) => b.name.localeCompare(a.name))[0]; // Get latest file
-               
+              
                 if (!fileEntry) {
                     safeShowError('No file found in Dropbox for the provided passphrase.');
                     resetSession();
                     return;
                 }
                 if (debugMode) console.log(`Found file: ${fileEntry.path_display}`);
-               
+              
                 // Download the file
                 const fileResponse = await dbx.filesDownload({ path: fileEntry.path_display });
                 const buffer = await fileResponse.result.fileBlob.arrayBuffer();
@@ -466,7 +442,7 @@
                 }
                 blob = new Blob([uint8], { type: 'application/octet-stream' });
             }
-           
+          
             if (isEncryptedZip) {
                 try {
                     const accessToken = await getAccessToken();
