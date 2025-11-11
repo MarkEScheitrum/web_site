@@ -178,7 +178,7 @@
             }
         }
         async function loadFromDropbox() {
-            const passphrase = await askPassphrase('Dropbox file retrieval and decryption');
+            const passphrase = await askPassphrase('File retrieval');
             if (!passphrase) {
                 resetSession();
                 return;
