@@ -128,23 +128,6 @@
             border-radius: 3px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-        .test-link {
-            position: absolute;
-            bottom: 50px; /* Positioned above version-legend */
-            left: 20px;
-            font-size: 12px;
-            color: #666;
-            background: #f9f9f9;
-            padding: 5px 10px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            text-decoration: none;
-            display: inline-block;
-        }
-        .test-link:hover {
-            background: #e0e0e0; /* Slight hover effect to indicate interactivity */
-        }
         @media (max-width: 600px) {
             #issue-submission {
                 position: static;
@@ -169,11 +152,6 @@
                 margin: 10px auto;
                 text-align: center;
             }
-            .test-link {
-                position: static;
-                margin: 10px auto;
-                text-align: center;
-            }
         }
     </style>
 </head>
@@ -186,9 +164,8 @@
     <div class="instructions">
         <h2>How to Use the Genealogy Recorder</h2>
         <ol>
-            <li>Save the attached encrypted records file from the email to your <strong>Downloads folder</strong> on your computer.</li>
-            <li>Click this <a href="recorder4.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one"><strong>Genealogy Recorder</strong></a> link to open the recorder page.</li>
-            <li>In the recorder, click the <strong>"Select/Load File"</strong> button and use your file finder to select the file saved in step 1.</li>
+            <li>Click this <a href="recorder.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one"><strong>Genealogy Recorder</strong></a> link to open the recorder page.</li>
+            <li>In the recorder, click the <strong>"Select/Load File".</strong></li>
             <li>When the <strong>Passphrase dialog box</strong> appears, enter the <strong>Passphrase</strong> from the email. It is <strong>case sensitive</strong>.</li>
             <li>Edit records with this guidance:
                 <ul>
@@ -198,8 +175,7 @@
                 </ul>
             </li>
             <li>Review the resulting changes in the table.</li>
-            <li>If satisfied, click the <strong>"Return Updates"</strong> button. This generates a file in your <strong>Downloads folder</strong> and composes an email to me. If no email is created, follow the instructions to do it manually in your email app.</li>
-            <li>Attach the edited file from your <strong>Downloads folder</strong> to the email and send it.</li>
+            <li>If satisfied, click the <strong>"Return Updates"</strong> button.</li>
             <li>Feedback welcome! Use the <strong>Report an Issue</strong> form to share issues or suggest improvements.</li>
         </ol>
     </div>
@@ -213,8 +189,7 @@
         </form>
         <p id="issue-feedback" style="display:none;"></p>
     </div>
-    <a href="recorder.html" class="test-link">Test</a>
-    <div class="version-legend">Version 1.0.2</div>
+    <div class="version-legend">Version 1.0.3</div>
     <script>
         // Existing issue submission script
         document.getElementById('issue-form').addEventListener('submit', (e) => {
@@ -260,3 +235,4 @@
     </script>
 </body>
 </html>
+
