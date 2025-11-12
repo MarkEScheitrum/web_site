@@ -47,22 +47,22 @@
 <body>
     <h2>Genealogy Recorder</h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.8</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-12 12:17:00 PST</span></p>
-        <p class="warning">Hit "Select/Load File" to start.</p>
+        <p><strong>Version:</strong> <span id="pageVersion">1.0.9</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-12 12:48:00 PST</span></p>
+        <p class="warning">Hit "Load Records" to start.</p>
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
     <div class="task-buttons">
-        <button onclick="loadFromDropbox()" class="task-btn" id="selectLoadBtn">Select/Load File 📂</button>
+        <button onclick="loadFromDropbox()" class="task-btn" id="selectLoadBtn">Load Records 📂</button>
         <button onclick="openModal('addChild')" class="task-btn disabled-btn" id="addChildBtn">Add Child 👶</button>
         <button onclick="openModal('addSpouse')" class="task-btn disabled-btn" id="addSpouseBtn">Add Partner 💍</button>
         <button onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn">Update Record ✏️</button>
         <button onclick="openModal('recordDeathBurial')" class="task-btn disabled-btn" id="recordDeathBurialBtn">Record Death/Burial ⚰️</button>
         <button onclick="toggleTable()" class="task-btn disabled-btn" id="viewTableBtn">View Table 📋</button>
         <button onclick="downloadCSV()" class="task-btn" id="returnUpdatesBtn" style="display:none;">Return Updates 📤</button>
-        <button onclick="resetSession()" class="task-btn" id="exitBtn" style="display:none;">Exit 🚪</button>
+        <button onclick="exitApp()" class="task-btn" id="exitBtn" style="display:none;">Exit 🚪</button>
     </div>
     <div class="file-status">
-        <span id="fileStatus">No file selected</span>
+        <span id="fileStatus">No records loaded</span>
     </div>
     <input type="file" id="textFile" accept=".zip,.csv" style="display:none;" onchange="handleFileSelect()">
     <div id="tableContainer" class="table-container" style="display:none;">
@@ -259,7 +259,7 @@
             isEncryptedZip = false;
             isInputCsv = false;
             hasReturnedUpdates = false;
-            document.getElementById('fileStatus').textContent = 'No file selected';
+            document.getElementById('fileStatus').textContent = 'No records loaded';
             document.getElementById('textFile').value = '';
             document.getElementById('selectLoadBtn').style.display = 'block';
             document.getElementById('returnUpdatesBtn').style.display = 'none';
@@ -269,6 +269,10 @@
             document.getElementById('tableContainer').style.display = 'none';
             document.getElementById('recordBody').innerHTML = '';
             if (debugMode) console.log('Session reset');
+        }
+        function exitApp() {
+            resetSession();
+            window.close();
         }
         function handleFileSelect() {
             const file = document.getElementById('textFile').files[0];
@@ -463,7 +467,7 @@
                     showPopup(`Updated file saved to Dropbox as edited_${originalFileName}`);
                     hasReturnedUpdates = true;
                     document.getElementById('exitBtn').style.display = 'block';
-                    document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Loaded Records Returned`;
+                    document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Returned`;
                 } catch (err) {
                     if (debugMode) console.error(`Dropbox upload error: ${err.message}`);
                     safeShowError(`Failed to upload to Dropbox: ${err.message}`);
