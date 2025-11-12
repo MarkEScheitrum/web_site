@@ -47,7 +47,7 @@
 </head>
 <body>
     <div class="title-container">
-        <h2>Genealogy Recorder <span style="font-size: 14px;">Version: <span id="pageVersion">1.0.11</span></span></h2>
+        <h2>Genealogy Recorder <span style="font-size: 14px;">Version: <span id="pageVersion">1.0.12</span></span></h2>
         <span class="file-status" id="fileStatus">No records loaded</span>
     </div>
     <div class="info">
@@ -358,7 +358,7 @@
                 const padLen = decryptedBytes.charCodeAt(decryptedBytes.length - 1);
                 if (debugMode) console.log(`Padding length: ${padLen}`);
                 if (padLen < 1 || padLen > 16 || !decryptedBytes.slice(-padLen).split('').every(c => c.charCodeAt(0) === padLen)) {
-                    if (debugMode) console.log(`Invalid padding, padLen: ${padLen}, last bytes: ${decryptedBytes.slice(-padLen)}`);
+                    if (debugMode) console.error(`Invalid padding, padLen: ${padLen}, last bytes: ${decryptedBytes.slice(-padLen)}`);
                     throw new Error("Invalid padding");
                 }
                 const result = decryptedBytes.slice(0, -padLen);
@@ -883,4 +883,153 @@
                     toggleButton.onclick = () => toggleColumn(header);
                     th.appendChild(toggleButton);
                 }
-                const headerText = препарат
+                const headerText = document.createElement('span');
+                headerText.textContent = header === 'record_type' ? 'record' : header === 'sex' ? 'sex' : header;
+                headerText.className = 'header-text';
+                th.appendChild(headerText);
+                if (vestigialColumns.has(header) && !['record_type', 'gen', 'name', 'sex'].includes(header)) th.className += ' vestigial';
+                headerRow.appendChild(th);
+            });
+            table.appendChild(headerRow);
+            records.forEach((record, index) => {
+                const tr = document.createElement('tr');
+                if (index === highlightedRow) tr.className = 'highlighted-row';
+                tr.className += ' editable-row';
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.className = header;
+                    const cellContent = document.createElement('span');
+                    const displayValue = header === 'record_type' && record[header].toLowerCase() === 'spouse' ? 'Partner' : header === 'sex' ? (record[header] || '') : record[header] || '';
+                    cellContent.textContent = displayValue;
+                    cellContent.className = 'cell-content';
+                    td.appendChild(cellContent);
+                    const isEditable = isFieldEditable(record.record_type, header);
+                    const isGrey = isFieldGreyedOut(record.record_type, header);
+                    if (isEditable && !vestigialColumns.has(header)) {
+                        td.className += ' editable';
+                        td.addEventListener('click', e => {
+                            if (editingIndex === null) {
+                                startEditing(index, header, td, cellContent.textContent);
+                                e.stopPropagation();
+                                if (debugMode) console.log(`Cell clicked: record ${index + 1}, field ${header}`);
+                            }
+                        });
+                    } else if (isGrey) {
+                        td.className += ' greyed-out';
+                    }
+                    if (vestigialColumns.has(header) && !['record_type', 'gen', 'name', 'sex'].includes(header)) td.className += ' vestigial';
+                    tr.appendChild(td);
+                });
+                tr.addEventListener('click', e => {
+                    if (editingIndex === null && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') {
+                        highlightedRow = (highlightedRow === index) ? null : index;
+                        if (debugMode) console.log(`Row ${highlightedRow !== null ? highlightedRow + 1 : 'none'} highlighted`);
+                        debounceDisplayRecords();
+                    }
+                });
+                table.appendChild(tr);
+            });
+            recordBody.appendChild(table);
+            if (debugMode) console.log(`Displayed ${records.length} records`);
+        }
+        function startEditing(index, field, td, currentValue) {
+            editingIndex = index;
+            editingField = field;
+            td.innerHTML = '';
+            if (field === 'relationship' && records[index].record_type.toLowerCase() === 'spouse') {
+                const select = document.createElement('select');
+                select.className = 'edit-select';
+                ['', 'spouse', 'partner', 'other'].forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt || '(Select)';
+                    if (opt === currentValue) option.selected = true;
+                    select.appendChild(option);
+                });
+                td.appendChild(select);
+                select.focus();
+                if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field} with dropdown`);
+                select.onchange = () => saveEdit(index, field, select.value, td, currentValue);
+                select.onblur = () => saveEdit(index, field, select.value, td, currentValue);
+                select.onkeydown = e => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveEdit(index, field, select.value, td, currentValue);
+                    } else if (e.key === 'Escape') {
+                        cancelEdit(td, currentValue);
+                    }
+                };
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.className = 'edit-textarea';
+                textarea.value = currentValue;
+                textarea.rows = Math.max(2, currentValue.split('\n').length);
+                td.appendChild(textarea);
+                textarea.focus();
+                if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field} with textarea`);
+                textarea.onblur = () => saveEdit(index, field, textarea.value, td, currentValue);
+                textarea.onkeydown = e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        saveEdit(index, field, textarea.value, td, currentValue);
+                    } else if (e.key === 'Escape') {
+                        cancelEdit(td, currentValue);
+                    }
+                };
+            }
+        }
+        function saveEdit(index, field, value, td, currentValue) {
+            const trimmedValue = value.trim();
+            if (dateFields.includes(field) && trimmedValue && trimmedValue !== 'true' && !isValidDate(trimmedValue)) {
+                safeShowError(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD.`);
+                cancelEdit(td, currentValue);
+                return;
+            }
+            if (field === 'relationship' && !['', 'spouse', 'partner', 'other'].includes(trimmedValue)) {
+                safeShowError('Relationship must be "spouse", "partner", or "other".');
+                cancelEdit(td, currentValue);
+                return;
+            }
+            if (trimmedValue !== currentValue) {
+                records[index][field] = trimmedValue;
+                if (debugMode) console.log(`Saved edit: record ${index + 1}, field ${field}, value ${trimmedValue}`);
+            }
+            editingIndex = null;
+            editingField = null;
+            td.innerHTML = '';
+            const cellContent = document.createElement('span');
+            cellContent.textContent = trimmedValue;
+            cellContent.className = 'cell-content';
+            td.appendChild(cellContent);
+            debounceDisplayRecords();
+        }
+        function cancelEdit(td, currentValue) {
+            editingIndex = null;
+            editingField = null;
+            td.innerHTML = '';
+            const cellContent = document.createElement('span');
+            cellContent.textContent = currentValue;
+            cellContent.className = 'cell-content';
+            td.appendChild(cellContent);
+            if (debugMode) console.log('Cancelled edit');
+            debounceDisplayRecords();
+        }
+        function initDebug() {
+            if (window.location.search.includes('debug=1')) {
+                (async () => {
+                    const pp = await askPassphrase('DEBUG');
+                    if (CryptoJS.SHA256(pp).toString() === debugPassphraseHash) {
+                        debugMode = true;
+                        console.log('DEBUG MODE ON');
+                        document.getElementById('textFile').setAttribute('accept', '.zip,.csv');
+                    } else {
+                        console.log('Debug mode disabled - incorrect passphrase');
+                    }
+                    decryptionPassphrase = null;
+                })();
+            }
+        }
+        initDebug();
+    </script>
+</body>
+</html>
