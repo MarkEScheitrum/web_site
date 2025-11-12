@@ -45,11 +45,9 @@
     </style>
 </head>
 <body>
-    <h2>Genealogy Recorder</h2>
+    <h2>Genealogy Recorder <span style="font-size: 14px;">Version: <span id="pageVersion">1.0.10</span></span></h2>
     <div class="info">
-        <p><strong>Version:</strong> <span id="pageVersion">1.0.9</span> <strong>Last Updated:</strong> <span id="pageDate">2025-11-12 12:48:00 PST</span></p>
-        <p class="warning">Hit "Load Records" to start.</p>
-        <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
+        <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes! <span id="fileStatus">No records loaded</span></p>
     </div>
     <div class="task-buttons">
         <button onclick="loadFromDropbox()" class="task-btn" id="selectLoadBtn">Load Records 📂</button>
@@ -60,9 +58,6 @@
         <button onclick="toggleTable()" class="task-btn disabled-btn" id="viewTableBtn">View Table 📋</button>
         <button onclick="downloadCSV()" class="task-btn" id="returnUpdatesBtn" style="display:none;">Return Updates 📤</button>
         <button onclick="exitApp()" class="task-btn" id="exitBtn" style="display:none;">Exit 🚪</button>
-    </div>
-    <div class="file-status">
-        <span id="fileStatus">No records loaded</span>
     </div>
     <input type="file" id="textFile" accept=".zip,.csv" style="display:none;" onchange="handleFileSelect()">
     <div id="tableContainer" class="table-container" style="display:none;">
@@ -750,7 +745,7 @@
                 } else if (mode === 'addSpouse') {
                     if (!data.name || !data.partner || !data.relationship) { safeShowError('Name, Select Genealogical Partner, and Relationship are required.'); return; }
                     const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
-                    if (!partner) { safeShowError('Invalid partner selected.'); return; }
+                    if (!parent) { safeShowError('Invalid partner selected.'); return; }
                     if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
                     if (data.marriage_date && !isValidDate(data.marriage_date)) { safeShowError('Invalid marriage date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
                     const newRecord = {
