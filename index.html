@@ -23,9 +23,6 @@
             text-decoration: underline;
         }
         #issue-submission {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
             width: 300px;
             background: #f9f9f9;
             padding: 15px;
@@ -91,7 +88,6 @@
         .instructions {
             text-align: left;
             max-width: 740px;
-            margin: 16px auto;
             padding: 16px;
             background: #f9f9f9;
             border: 1px solid #ccc;
@@ -117,9 +113,6 @@
             color: #0066cc;
         }
         .version-legend {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
             font-size: 12px;
             color: #666;
             background: #f9f9f9;
@@ -127,13 +120,34 @@
             border: 1px solid #ccc;
             border-radius: 3px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-top: 10px;
+            width: 300px;
+            text-align: center;
+        }
+        .content-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            max-width: 1080px;
+            margin: 16px auto;
+            flex-wrap: wrap;
+        }
+        .issue-version-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        @media (max-width: 1080px) {
+            .content-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            #issue-submission, .version-legend {
+                width: 100%;
+                max-width: 740px;
+            }
         }
         @media (max-width: 600px) {
-            #issue-submission {
-                position: static;
-                width: 100%;
-                margin-top: 20px;
-            }
             .photo-frame {
                 margin: 10px;
             }
@@ -147,11 +161,6 @@
             .instructions {
                 padding: 15px;
             }
-            .version-legend {
-                position: static;
-                margin: 10px auto;
-                text-align: center;
-            }
         }
     </style>
 </head>
@@ -161,35 +170,39 @@
         <img src="img/tabernacle bridge2.jpg" alt="Tabernacle Bridge circa 1960">
         <p>Tabernacle Bridge, Lewistown Valley, Tamaqua PA circa 1960</p>
     </div>
-    <div class="instructions">
-        <h2>How to Use the Genealogy Recorder</h2>
-        <ol>
-            <li>Click this <a href="recorder.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one"><strong>Genealogy Recorder</strong></a> link to open the recorder page.</li>
-            <li>In the recorder, click the <strong>"Load Records"</strong> Action Button.</li>
-            <li>Enter the <strong>Passphrase</strong> from the email. It is <strong>case sensitive</strong>.</li>
-            <li>Edit records with this guidance:
-                <ul>
-                    <li><strong>View Table</strong> to see the current extracted information (from the Leiby Genealogy Book, 2016 edition).</li>
-                    <li>Use the <strong>action buttons</strong> to add spouses/partners, children, or record deaths as needed.</li>
-                    <li>Use the <strong>"Update Record"</strong> button to fix typos or omissions in editable fields.</li>
-                </ul>
-            </li>
-            <li>Review the resulting changes in the table.</li>
-            <li>If satisfied, click the <strong>"Return Updates"</strong> button.</li>
-            <li>Feedback welcome! Use the <strong>Report an Issue</strong> form to share issues or suggest improvements.</li>
-        </ol>
+    <div class="content-container">
+        <div class="instructions">
+            <h2>How to Use the Genealogy Recorder</h2>
+            <ol>
+                <li>Click this <a href="recorder.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one"><strong>Genealogy Recorder</strong></a> link to open the recorder page.</li>
+                <li>In the recorder, click the <strong>"Load Records"</strong> Action Button.</li>
+                <li>Enter the <strong>Passphrase</strong> from the email. It is <strong>case sensitive</strong>.</li>
+                <li>Edit records with this guidance:
+                    <ul>
+                        <li><strong>View Table</strong> to see the current extracted information (from the Leiby Genealogy Book, 2016 edition).</li>
+                        <li>Use the <strong>action buttons</strong> to add spouses/partners, children, or record deaths as needed.</li>
+                        <li>Use the <strong>"Update Record"</strong> button to fix typos or omissions in editable fields.</li>
+                    </ul>
+                </li>
+                <li>Review the resulting changes in the table.</li>
+                <li>If satisfied, click the <strong>"Return Updates"</strong> button.</li>
+                <li>Feedback welcome! Use the <strong>Report an Issue</strong> form to share issues or suggest improvements.</li>
+            </ol>
+        </div>
+        <div class="issue-version-container">
+            <div id="issue-submission">
+                <h3>Report an Issue</h3>
+                <form id="issue-form">
+                    <input type="text" id="issue-title" placeholder="Issue Title" required>
+                    <textarea id="issue-body" placeholder="Describe the issue" required></textarea>
+                    <button type="submit">Submit Issue</button>
+                </form>
+                <p id="issue-feedback" style="display:none;"></p>
+            </div>
+            <div class="version-legend">Version 1.0.5</div>
+        </div>
     </div>
     <p id="popupWarning" style="display:none;color:red;">Please allow popups for this site to open the editor.</p>
-    <div id="issue-submission">
-        <h3>Report an Issue</h3>
-        <form id="issue-form">
-            <input type="text" id="issue-title" placeholder="Issue Title" required>
-            <textarea id="issue-body" placeholder="Describe the issue" required></textarea>
-            <button type="submit">Submit Issue</button>
-        </form>
-        <p id="issue-feedback" style="display:none;"></p>
-    </div>
-    <div class="version-legend">Version 1.0.4</div>
     <script>
         // Existing issue submission script
         document.getElementById('issue-form').addEventListener('submit', (e) => {
@@ -235,7 +248,3 @@
     </script>
 </body>
 </html>
-
-
-
-
