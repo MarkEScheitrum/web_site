@@ -53,8 +53,23 @@
     <div class="info">
         <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
     </div>
+        <style>
+        /* Slightly smaller, cleaner buttons as you requested (~10% reduction) */
+        .task-btn {
+            font-size: 16.2px !important;     /* was ~18px */
+            padding: 6.5px 13px !important;  /* was 7.2px 14.4px */
+            min-width: 122px !important;     /* was ~135px */
+        }
+        @media(max-width:768px) {
+            .task-btn { width: 100%; margin-bottom: 9px; }
+        }
+    </style>
+
     <div class="task-buttons">
         <button onclick="loadFromDropbox()" class="task-btn" id="selectLoadBtn">Load Records 📂</button>
+        <button onclick="openRequestModal()" class="task-btn" id="requestEditBtn">Request Edit Package ✉️</button>
+        
+        <!-- All the normal editing buttons stay exactly as they were -->
         <button onclick="openModal('addChild')" class="task-btn disabled-btn" id="addChildBtn">Add Child 👶</button>
         <button onclick="openModal('addSpouse')" class="task-btn disabled-btn" id="addSpouseBtn">Add Partner 💍</button>
         <button onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn">Update Record ✏️</button>
