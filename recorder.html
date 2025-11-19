@@ -572,9 +572,13 @@
         }
 
         function toggleTable() {
-            const tableContainer = document.getElementById('tableContainer');
-            tableContainer.style.display = tableContainer.style.display === 'none' ? 'block' : 'none';
-            if (tableContainer.style.display === 'block') debounceDisplayRecords();
+            const container = document.getElementById('tableContainer');
+            if (container.style.display === 'none' || container.style.display === '') {
+                container.style.display = 'block';
+                debounceDisplayRecords();
+            } else {
+                container.style.display = 'none';
+            }
         }
 
         function debounceDisplayRecords() {
@@ -582,8 +586,66 @@
             renderTimeout = setTimeout(displayRecords, 16);
         }
 
+        function toggleColumn(column) {
+            if (vestigialColumns.has(column)) {
+                vestigialColumns.delete(column);
+            } else {
+                vestigialColumns.add(column);
+            }
+            debounceDisplayRecords();
+        }
+
+        function isFieldEditable(recordType, field) {
+            const type = recordType.toLowerCase();
+            const restrictions = fieldRestrictions[type];
+            if (!restrictions) return false;
+            return restrictions.editable.includes(field);
+        }
+
         function displayRecords() {
-            // Full table rendering logic — present and complete
+            const body = document.getElementById('recordBody');
+            body.innerHTML = '';
+            if (records.length === 0) return;
+
+            const table = document.createElement('table');
+            const headers = Object.keys(records[0]).filter(h => !vestigialColumns.has(h));
+
+            // Header row
+            const hr = document.createElement('tr');
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h;
+                if (!['record_type','gen','name','sex'].includes(h)) {
+                    const eye = document.createElement('span');
+                    eye.textContent = vestigialColumns.has(h) ? '👁️‍🗨️' : '👁️';
+                    eye.style.cursor = 'pointer';
+                    eye.style.marginLeft = '8px';
+                    eye.onclick = (e) => { e.stopPropagation(); toggleColumn(h); };
+                    th.appendChild(eye);
+                }
+                hr.appendChild(th);
+            });
+            table.appendChild(hr);
+
+            // Data rows
+            records.forEach((rec, idx) => {
+                const tr = document.createElement('tr');
+                headers.forEach(h => {
+                    const td = document.createElement('td');
+                    let value = rec[h] || '';
+                    if (h === 'record_type' && value.toLowerCase() === 'spouse') value = 'Partner';
+                    td.textContent = value;
+                    if (isFieldEditable(rec.record_type, h)) {
+                        td.style.cursor = 'pointer';
+                        td.title = 'Click to edit';
+                        td.onclick = () => alert('Inline editing not implemented in this minimal version — use the modal buttons');
+                    }
+                    tr.appendChild(td);
+                });
+                table.appendChild(tr);
+            });
+
+            body.appendChild(table);
         }
 
         function initDebug() {
