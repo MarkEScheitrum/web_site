@@ -22,49 +22,6 @@
         a:hover {
             text-decoration: underline;
         }
-        #issue-submission {
-            width: 300px;
-            background: #f9f9f9;
-            padding: 15px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        #issue-submission h3 {
-            margin: 0 0 10px;
-            font-size: 16px;
-            color: #333;
-        }
-        #issue-form {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        #issue-title, #issue-body {
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            font-family: Arial, sans-serif;
-        }
-        #issue-body {
-            resize: vertical;
-            min-height: 80px;
-        }
-        #issue-form button {
-            padding: 8px;
-            background: #0066cc;
-            color: white;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
-        }
-        #issue-form button:hover {
-            background: #0055aa;
-        }
-        #issue-feedback {
-            font-size: 14px;
-            margin-top: 10px;
-        }
         .photo-frame {
             display: inline-block;
             margin: 20px;
@@ -93,6 +50,7 @@
             border: 1px solid #ccc;
             border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin: 20px auto;
         }
         .instructions h2 {
             color: #333;
@@ -112,40 +70,17 @@
         .instructions strong {
             color: #0066cc;
         }
-        .version-legend {
+        .version-info {
             font-size: 12px;
             color: #666;
-            background: #f9f9f9;
-            padding: 5px 10px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            margin-top: 10px;
-            width: 300px;
-            text-align: center;
+            margin-top: 5px;
         }
-        .content-container {
+        .title-container {
             display: flex;
-            justify-content: center;
-            gap: 20px;
-            max-width: 1080px;
-            margin: 16px auto;
-            flex-wrap: wrap;
-        }
-        .issue-version-container {
-            display: flex;
-            flex-direction: column;
             align-items: center;
-        }
-        @media (max-width: 1080px) {
-            .content-container {
-                flex-direction: column;
-                align-items: center;
-            }
-            #issue-submission, .version-legend {
-                width: 100%;
-                max-width: 740px;
-            }
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
         }
         @media (max-width: 600px) {
             .photo-frame {
@@ -165,82 +100,59 @@
     </style>
 </head>
 <body>
-    <h1>Welcome to the Leiby Genealogy Recorder</h1>
+    <div class="title-container">
+        <h1>Welcome to the Leiby Genealogy Recorder</h1>
+        <div class="version-info">Version 1.0.6 — November 19, 2025</div>
+    </div>
+
     <div class="photo-frame">
         <img src="img/tabernacle bridge2.jpg" alt="Tabernacle Bridge circa 1960">
         <p>Tabernacle Bridge, Lewistown Valley, Tamaqua PA circa 1960</p>
     </div>
-    <div class="content-container">
-        <div class="instructions">
-            <h2>How to Use the Genealogy Recorder</h2>
-            <ol>
-                <li>Click this <a href="recorder.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one"><strong>Genealogy Recorder</strong></a> link to open the recorder page.</li>
-                <li>In the recorder, click the <strong>"Load Records"</strong> Action Button.</li>
-                <li>Enter the <strong>Passphrase</strong> from the email. It is <strong>case sensitive</strong>.</li>
-                <li>Edit records with this guidance:
-                    <ul>
-                        <li><strong>View Table</strong> to see your records (extracted from the Leiby Genealogy Book, 2016 edition).</li>
-                        <li>Use the <strong>action buttons</strong> to add spouses/partners, children, or record deaths as needed.</li>
-                        <li>Use the <strong>"Update Record"</strong> button to fix typos or omissions in editable fields.</li>
-                    </ul>
-                </li>
-                <li>Review the resulting changes in the table.</li>
-                <li>If satisfied, click the <strong>"Return Updates"</strong> button.</li>
-                <li>Feedback welcome! Use the <strong>Report an Issue</strong> form to share issues or suggest improvements.</li>
-            </ol>
-        </div>
-        <div class="issue-version-container">
-            <div id="issue-submission">
-                <h3>Report an Issue</h3>
-                <form id="issue-form">
-                    <input type="text" id="issue-title" placeholder="Issue Title" required>
-                    <textarea id="issue-body" placeholder="Describe the issue" required></textarea>
-                    <button type="submit">Submit Issue</button>
-                </form>
-                <p id="issue-feedback" style="display:none;"></p>
-            </div>
-            <div class="version-legend">Version 1.0.5</div>
-        </div>
+
+    <div class="instructions">
+        <h2>How to Use the Genealogy Recorder</h2>
+        <ol>
+            <li>Click this <a href="recorder.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one"><strong>Genealogy Recorder</strong></a> link to open the recorder page.</li>
+            <li>You have two options:
+                <ul>
+                    <li>If you already have a passphrase from a previous email, click <strong>"Load Records"</strong> and enter it.</li>
+                    <li>If you need a new edit package,...
+                        <ul>
+                            <li>Click <strong>"Request Edit Package ✉️"</strong></li>
+                            <li>Fill in your name, email, the starting person’s full name and birth year, and your relationship</li>
+                            <li>Submit — you’ll receive an email with your passphrase and records shortly</li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+            <li>Once loaded, edit records using the action buttons:
+                <ul>
+                    <li><strong>View Table</strong> to see your records</li>
+                    <li>Add children, partners, or record deaths as needed</li>
+                    <li>Use <strong>"Update Record"</strong> to fix typos or omissions</li>
+                </ul>
+            </li>
+            <li>When finished, click <strong>"Return Updates"</strong> to send changes back</li>
+            <li>Thank you for helping preserve our family history!</li>
+        </ol>
     </div>
+
     <p id="popupWarning" style="display:none;color:red;">Please allow popups for this site to open the editor.</p>
+
     <script>
-        // Existing issue submission script
-        document.getElementById('issue-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const title = document.getElementById('issue-title').value;
-            const body = document.getElementById('issue-body').value;
-            const feedback = document.getElementById('issue-feedback');
-            try {
-                const mailtoLink = `mailto:markscheitrum@aol.com?subject=${encodeURIComponent('Genealogy Recorder Issue: ' + title)}&body=${encodeURIComponent(body + '\n\nSent from Genealogy Recorder index.html')}`;
-                window.location.href = mailtoLink;
-                feedback.style.display = 'block';
-                feedback.style.color = 'green';
-                feedback.textContent = 'Your email client should have opened. Please attach any relevant files and send. If no email opened, manually email markscheitrum@aol.com with the issue details.';
-                document.getElementById('issue-form').reset();
-            } catch (err) {
-                feedback.style.display = 'block';
-                feedback.style.color = 'red';
-                feedback.textContent = 'Failed to open email client. Please manually email markscheitrum@aol.com with the issue title and description.';
-                console.error('Mailto error:', err);
-            }
-        });
-        // Script to prevent duplicate editor windows
-        let editorWindow = null; // Store reference to editor window
+        let editorWindow = null;
         document.getElementById('openEditorLink').addEventListener('click', function(e) {
-            e.preventDefault(); // Prevent default link behavior
+            e.preventDefault();
             if (editorWindow && !editorWindow.closed) {
-                // If window exists and isn't closed, focus it
                 editorWindow.focus();
             } else {
-                // Dynamically calculate size: ~80% of available screen, min 800x600
                 const availWidth = screen.availWidth || screen.width;
                 const availHeight = screen.availHeight || screen.height;
                 const width = Math.max(800, Math.min(1600, Math.floor(availWidth * 0.8)));
                 const height = Math.max(600, Math.min(900, Math.floor(availHeight * 0.8)));
-                // Open new window and store reference
                 editorWindow = window.open('recorder.html', 'genealogyEditor', `width=${width},height=${height}`);
                 if (!editorWindow) {
-                    // Show warning if popup is blocked
                     document.getElementById('popupWarning').style.display = 'block';
                 }
             }
@@ -248,5 +160,3 @@
     </script>
 </body>
 </html>
-
-
