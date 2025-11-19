@@ -45,7 +45,7 @@
     <div class="title-container">
         <h2>Genealogy Recorder 
             <span style="font-size:14px;">
-                Version: <span id="pageVersion">1.0.17</span> — November 18, 2025
+                Version: <span id="pageVersion">1.0.18</span> — November 18, 2025
             </span>
         </h2>
         <span class="file-status" id="fileStatus">No records loaded</span>
@@ -339,7 +339,7 @@
                 const datePart = now.toISOString().slice(0,10).replace(/-/g,'');
                 const timePart = now.toTimeString().slice(0,8).replace(/:/g,'');
                 const safeName = data.requestor_name.replace(/[^a-zA-Z0-9]/g, '_').slice(0,20);
-                const filename = `requests/${datePart}_${timePart}_${safeName}.json`;
+                const filename = `requests/request_${datePart}_${timePart}_${safeName}.json`;
         
                 await dbx.filesUpload({
                     contents: JSON.stringify(data, null, 2),
