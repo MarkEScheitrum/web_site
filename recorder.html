@@ -307,13 +307,19 @@
             const inputs = document.querySelectorAll('#modalForm input');
             const now = new Date();
         
-            // Format: "2025-11-18 14:27:33 PST" (or local timezone abbreviation)
-            const options = { timeZoneName: 'short' };
-            const formattedDateTime = now.toLocaleString('en-US', options).replace(',', '');
+            // Format exactly as you want: "2025-11-08 20:26:28 PST"
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const tz = now.toLocaleTimeString('en-us', { timeZoneName: 'short' }).split(' ')[2]; // PST/PDT etc.
+        
+            const formattedTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${tz}`;
         
             const data = {
-                request_date_time: formattedDateTime,                  // ← NEW FIELD
-                timestamp: now.toISOString(),                          // kept for machine use
+                timestamp: formattedTimestamp,                          // ← Now in your exact desired format
                 requestor_name: inputs[0].value.trim(),
                 requestor_email: inputs[1].value.trim(),
                 starting_person: inputs[2].value.trim(),
@@ -321,7 +327,7 @@
                 relationship: inputs[4].value.trim()
             };
         
-            if (Object.values(data).some(v => v === '' || v === undefined)) {
+            if (Object.values(data).some(v => v === '')) {
                 safeShowError('Please fill in all required fields.');
                 return;
             }
@@ -345,15 +351,14 @@
                 safeCloseModal();
                 showPopup(`
                     <h3 style="color:green">✓ Request Submitted Successfully!</h3>
-                    <p><strong>Date/Time:</strong> ${formattedDateTime}</p>
+                    <p><strong>Request Time:</strong> ${formattedTimestamp}</p>
                     <p>Your request has been saved as:<br><b>${filename}</b></p>
                     <p>I will prepare your edit package and send you a passphrase by email shortly.</p>
                 `);
             } catch (err) {
                 safeShowError('Failed to submit request: ' + err.message);
             }
-        }
-        
+        }        
         // ------------------------------------------------------------------
         // All the rest of your existing functions (encryption, CSV handling, table display, etc.)
         // are unchanged and included below — they are exactly the same as in your last working version.
