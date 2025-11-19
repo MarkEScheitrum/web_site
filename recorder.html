@@ -305,39 +305,47 @@
 
         async function submitEditRequest() {
             const inputs = document.querySelectorAll('#modalForm input');
+            const now = new Date();
+        
+            // Format: "2025-11-18 14:27:33 PST" (or local timezone abbreviation)
+            const options = { timeZoneName: 'short' };
+            const formattedDateTime = now.toLocaleString('en-US', options).replace(',', '');
+        
             const data = {
+                request_date_time: formattedDateTime,                  // ← NEW FIELD
+                timestamp: now.toISOString(),                          // kept for machine use
                 requestor_name: inputs[0].value.trim(),
                 requestor_email: inputs[1].value.trim(),
                 starting_person: inputs[2].value.trim(),
                 starting_person_birth_year: inputs[3].value.trim(),
                 relationship: inputs[4].value.trim()
             };
-
-            if (Object.values(data).some(v => v === '')) {
+        
+            if (Object.values(data).some(v => v === '' || v === undefined)) {
                 safeShowError('Please fill in all required fields.');
                 return;
             }
-
+        
             try {
                 const accessToken = await getAccessToken();
                 const dbx = new Dropbox.Dropbox({ accessToken });
-
-                const now = new Date();
+        
                 const datePart = now.toISOString().slice(0,10).replace(/-/g,'');
                 const timePart = now.toTimeString().slice(0,8).replace(/:/g,'');
                 const safeName = data.requestor_name.replace(/[^a-zA-Z0-9]/g, '_').slice(0,20);
                 const filename = `requests/${datePart}_${timePart}_${safeName}.json`;
-
+        
                 await dbx.filesUpload({
                     contents: JSON.stringify(data, null, 2),
                     path: DROPBOX_FOLDER + '/' + filename,
                     mode: { '.tag': 'add' },
                     autorename: true
                 });
-
+        
                 safeCloseModal();
                 showPopup(`
                     <h3 style="color:green">✓ Request Submitted Successfully!</h3>
+                    <p><strong>Date/Time:</strong> ${formattedDateTime}</p>
                     <p>Your request has been saved as:<br><b>${filename}</b></p>
                     <p>I will prepare your edit package and send you a passphrase by email shortly.</p>
                 `);
@@ -345,7 +353,7 @@
                 safeShowError('Failed to submit request: ' + err.message);
             }
         }
-
+        
         // ------------------------------------------------------------------
         // All the rest of your existing functions (encryption, CSV handling, table display, etc.)
         // are unchanged and included below — they are exactly the same as in your last working version.
