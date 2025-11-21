@@ -32,8 +32,7 @@
         table{width:100%;font-size:16px;border-collapse:collapse;min-width:1600px}
         th,td{padding:10px;border:1px solid #ccc;white-space:normal;box-sizing:border-box;text-align:left}
         th.vestigial,td.vestigial{width:36px!important;max-width:36px!important;min-width:36px!important;overflow:hidden;text-align:center;padding:4px!important}
-        th.vestigial .eye, td.vestigial .eye{display:inline}
-        th.vestigial > *:not(.eye), td.vestigial > *{display:none}
+        th.vestigial > *:not(.eye), td.vestigial > *{display:none!important}
         th.record_type,td.record_type{width:80px}
         th.gen,td.gen{width:60px;text-align:center}
         th.sex,td.sex{width:60px;text-align:center}
@@ -52,7 +51,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.32</span> — November 21, 2025
+                    Version: <span id="pageVersion">1.0.33</span> — November 21, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -297,7 +296,7 @@
             if (!records.length) return safeShowError('No data to save');
 
             const output = {
-                header: { generator: "recorder.html", version: "1.0.32", date: new Date().toISOString() },
+                header: { generator: "recorder.html", version: "1.0.33", date: new Date().toISOString() },
                 data: records
             };
 
@@ -494,6 +493,7 @@
         }
 
         function toggleColumn(column) {
+            console.log(`toggleColumn called for: ${column} — current state: ${vestigialColumns.has(column) ? 'hidden' : 'visible'}`);
             if (vestigialColumns.has(column)) {
                 vestigialColumns.delete(column);
             } else {
@@ -524,13 +524,19 @@
                 th.textContent = h === 'generation' ? 'gen' : h.replace(/_/g, ' ');
                 // No eye icon on gen column
                 if (h !== 'gen' && h !== 'generation' && !['record_type','name','sex'].includes(h)) {
+                    console.log(`Adding eye icon for column: ${h}`);
                     const eye = document.createElement('span');
-                    eye.className = 'eye';
                     eye.textContent = vestigialColumns.has(h) ? '👁️‍🗨️' : '👁️';
                     eye.style.cursor = 'pointer';
                     eye.style.marginLeft = '8px';
-                    eye.onclick = e => { e.stopPropagation(); toggleColumn(h); };
+                    eye.onclick = e => { 
+                        e.stopPropagation(); 
+                        console.log(`Eye clicked on column: ${h}`);
+                        toggleColumn(h); 
+                    };
                     th.appendChild(eye);
+                } else {
+                    console.log(`NO eye icon for column: ${h}`);
                 }
                 hr.appendChild(th);
             });
@@ -737,7 +743,7 @@
             if (window.location.search.includes('debug=1')) {
                 (async () => {
                     const pp = await askPassphrase('DEBUG');
-                    if (CryptoJS.SHA256(pp).toString() === '0be92202d097843cfc6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5') {
+                    if (CryptoJS.SHA256(pp).toString() === '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5') {
                         debugMode = true;
                         console.log('DEBUG MODE ON');
                         document.getElementById('textFile').setAttribute('accept', '.zip');
