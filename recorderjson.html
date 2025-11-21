@@ -31,12 +31,12 @@
         .table-container::-webkit-scrollbar-thumb:hover{background:#555}
         table{width:100%;font-size:16px;border-collapse:collapse;min-width:1600px}
         th,td{padding:10px;border:1px solid #ccc;white-space:normal;box-sizing:border-box;text-align:left}
-        th.vestigial{padding:4px}
+        th.vestigial,td.vestigial{width:36px!important;max-width:36px!important;min-width:36px!important;overflow:hidden;text-align:center;padding:4px!important}
+        th.vestigial .eye, td.vestigial .eye{display:inline}
+        th.vestigial > *:not(.eye), td.vestigial > *{display:none}
         th.record_type,td.record_type{width:80px}
         th.gen,td.gen{width:60px;text-align:center}
         th.sex,td.sex{width:60px;text-align:center}
-        .vestigial{width:36px!important;max-width:36px!important;min-width:36px!important;overflow:hidden;text-align:center}
-        .vestigial .header-text,.vestigial .cell-content{display:none}
         .editable-row:hover{background:#d9edf7}
         .highlighted-row{background:#ffffcc!important}
         .greyed-out{background:#c0c0c0;cursor:not-allowed}
@@ -45,20 +45,6 @@
         .title-left{flex:1}
         .title-right{text-align:right}
         .status-line{margin-top:8px;font-size:16px;color:#333;display:block}
-        .vestigial th, .vestigial td {
-            width: 36px !important;
-            max-width: 36px !important;
-            min-width: 36px !important;
-            overflow: hidden;
-            text-align: center;
-            padding: 4px !important;
-        }
-        .vestigial .eye-only {
-            display: inline;
-        }
-        .vestigial .header-text, .vestigial td:not(:first-child) {
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -66,7 +52,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.31</span> — November 21, 2025
+                    Version: <span id="pageVersion">1.0.32</span> — November 21, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -203,13 +189,8 @@
                 if (!jsonEntry) throw new Error('No records JSON found in ZIP');
 
                 originalFileName = fileEntry.name;
-                console.log('Dropbox file name:', originalFileName);
-                console.log('Internal JSON file name:', jsonEntry.name);
-
                 const match = jsonEntry.name.match(/records_(\d{5})\.json/);
                 ticketNumber = match ? match[1] : 'Unknown';
-                console.log('Extracted ticket number:', ticketNumber);
-
                 document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Loaded`;
 
                 const text = await jsonEntry.async('text');
@@ -316,7 +297,7 @@
             if (!records.length) return safeShowError('No data to save');
 
             const output = {
-                header: { generator: "recorder.html", version: "1.0.30", date: new Date().toISOString() },
+                header: { generator: "recorder.html", version: "1.0.32", date: new Date().toISOString() },
                 data: records
             };
 
@@ -349,7 +330,7 @@
             }
         }
 
-        // ==================== MODALS (FULLY RESTORED) ====================
+        // ==================== MODALS ====================
         function openModal(mode) {
             safeOpenModal(mode);
             const modalTitle = document.getElementById('modalTitle');
@@ -385,7 +366,7 @@
                     { name: 'field', label: 'Field to Update', type: 'select', options: [''] },
                     { name: 'value', label: 'New Value', type: 'text', required: true }
                 ];
-            } else if (mode === 'recordDeathBur and Burial') {
+            } else if (mode === 'recordDeathBurial') {
                 modalTitle.textContent = 'Record Death/Burial';
                 fields = [
                     { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map((r, i) => `${i}: ${r.name || '(no name)'}`)], required: true },
@@ -542,21 +523,14 @@
                 th.className = h;
                 th.textContent = h === 'generation' ? 'gen' : h.replace(/_/g, ' ');
                 // No eye icon on gen column
-                // No eye icon on gen column — explicitly exclude both 'gen' and 'generation'
                 if (h !== 'gen' && h !== 'generation' && !['record_type','name','sex'].includes(h)) {
-                    console.log(`Adding eye icon for column: ${h}`); // Debug: confirm which columns get eyes
                     const eye = document.createElement('span');
+                    eye.className = 'eye';
                     eye.textContent = vestigialColumns.has(h) ? '👁️‍🗨️' : '👁️';
                     eye.style.cursor = 'pointer';
                     eye.style.marginLeft = '8px';
-                    eye.onclick = e => { 
-                        e.stopPropagation(); 
-                        console.log(`Eye clicked on column: ${h} — current state: ${vestigialColumns.has(h) ? 'hidden' : 'visible'}`);
-                        toggleColumn(h); 
-                    };
+                    eye.onclick = e => { e.stopPropagation(); toggleColumn(h); };
                     th.appendChild(eye);
-                } else {
-                    console.log(`NO eye icon added for column: ${h}`); // Debug: confirm gen is skipped
                 }
                 hr.appendChild(th);
             });
@@ -566,6 +540,7 @@
                 const tr = document.createElement('tr');
                 headers.forEach(h => {
                     const td = document.createElement('td');
+                    if (vestigialColumns.has(h)) td.classList.add('vestigial');
                     td.textContent = rec[h] || '';
                     if (isFieldEditable(rec, h)) {
                         td.style.cursor = 'pointer';
@@ -581,6 +556,7 @@
                     ptr.style.backgroundColor = '#f8f8f8';
                     headers.forEach(h => {
                         const td = document.createElement('td');
+                        if (vestigialColumns.has(h)) td.classList.add('vestigial');
                         if (h === 'record_type') td.textContent = 'Partner';
                         else if (h === 'name') td.textContent = partner.name || '';
                         else td.textContent = partner[h] || '';
@@ -761,7 +737,7 @@
             if (window.location.search.includes('debug=1')) {
                 (async () => {
                     const pp = await askPassphrase('DEBUG');
-                    if (CryptoJS.SHA256(pp).toString() === '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5') {
+                    if (CryptoJS.SHA256(pp).toString() === '0be92202d097843cfc6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5') {
                         debugMode = true;
                         console.log('DEBUG MODE ON');
                         document.getElementById('textFile').setAttribute('accept', '.zip');
