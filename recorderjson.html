@@ -52,7 +52,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.26</span> — November 21, 2025
+                    Version: <span id="pageVersion">1.0.27</span> — November 21, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -94,7 +94,7 @@
     <script>
         let records = [], decryptionPassphrase = null, exchangePassphrase = null, originalFileName = 'records.zip';
         let debugMode = false, isEncryptedZip = false;
-        let modalMode = null, editingIndex = null, editingField = null, highlightedRow = null;
+        let modalMode = null;
         let vestigialColumns = new Set(['notes', 'unprocessed_items', 'hash_id', 'record_id', 'parent_ids', 'children_no_other_parent']);
         let renderTimeout = null;
         let ticketNumber = null;
@@ -189,6 +189,7 @@
                 if (!jsonEntry) throw new Error('No records JSON found in ZIP');
 
                 originalFileName = fileEntry.name;
+                // Correct ticket extraction — works with your actual filenames
                 const match = originalFileName.match(/_(\d{5})_/);
                 ticketNumber = match ? match[1] : 'Unknown';
                 document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Loaded`;
@@ -297,7 +298,7 @@
             if (!records.length) return safeShowError('No data to save');
 
             const output = {
-                header: { generator: "recorder.html", version: "1.0.26", date: new Date().toISOString() },
+                header: { generator: "recorder.html", version: "1.0.27", date: new Date().toISOString() },
                 data: records
             };
 
