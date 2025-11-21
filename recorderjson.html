@@ -45,6 +45,20 @@
         .title-left{flex:1}
         .title-right{text-align:right}
         .status-line{margin-top:8px;font-size:16px;color:#333;display:block}
+        .vestigial th, .vestigial td {
+            width: 36px !important;
+            max-width: 36px !important;
+            min-width: 36px !important;
+            overflow: hidden;
+            text-align: center;
+            padding: 4px !important;
+        }
+        .vestigial .eye-only {
+            display: inline;
+        }
+        .vestigial .header-text, .vestigial td:not(:first-child) {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -52,7 +66,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.30</span> — November 21, 2025
+                    Version: <span id="pageVersion">1.0.31</span> — November 21, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -528,13 +542,21 @@
                 th.className = h;
                 th.textContent = h === 'generation' ? 'gen' : h.replace(/_/g, ' ');
                 // No eye icon on gen column
-                if (h !== 'gen' && !['record_type','name','sex'].includes(h)) {
+                // No eye icon on gen column — explicitly exclude both 'gen' and 'generation'
+                if (h !== 'gen' && h !== 'generation' && !['record_type','name','sex'].includes(h)) {
+                    console.log(`Adding eye icon for column: ${h}`); // Debug: confirm which columns get eyes
                     const eye = document.createElement('span');
                     eye.textContent = vestigialColumns.has(h) ? '👁️‍🗨️' : '👁️';
                     eye.style.cursor = 'pointer';
                     eye.style.marginLeft = '8px';
-                    eye.onclick = e => { e.stopPropagation(); toggleColumn(h); };
+                    eye.onclick = e => { 
+                        e.stopPropagation(); 
+                        console.log(`Eye clicked on column: ${h} — current state: ${vestigialColumns.has(h) ? 'hidden' : 'visible'}`);
+                        toggleColumn(h); 
+                    };
                     th.appendChild(eye);
+                } else {
+                    console.log(`NO eye icon added for column: ${h}`); // Debug: confirm gen is skipped
                 }
                 hr.appendChild(th);
             });
