@@ -52,7 +52,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.27</span> — November 21, 2025
+                    Version: <span id="pageVersion">1.0.28</span> — November 21, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -94,7 +94,7 @@
     <script>
         let records = [], decryptionPassphrase = null, exchangePassphrase = null, originalFileName = 'records.zip';
         let debugMode = false, isEncryptedZip = false;
-        let modalMode = null;
+        let modalMode = null, editingIndex = null, editingField = null, highlightedRow = null;
         let vestigialColumns = new Set(['notes', 'unprocessed_items', 'hash_id', 'record_id', 'parent_ids', 'children_no_other_parent']);
         let renderTimeout = null;
         let ticketNumber = null;
@@ -189,7 +189,7 @@
                 if (!jsonEntry) throw new Error('No records JSON found in ZIP');
 
                 originalFileName = fileEntry.name;
-                // Correct ticket extraction — works with your actual filenames
+                // Correct ticket extraction for your filenames (e.g., "a1b2c3d4e5_records_12345_edited_20251121.zip")
                 const match = originalFileName.match(/_(\d{5})_/);
                 ticketNumber = match ? match[1] : 'Unknown';
                 document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Loaded`;
@@ -298,7 +298,7 @@
             if (!records.length) return safeShowError('No data to save');
 
             const output = {
-                header: { generator: "recorder.html", version: "1.0.27", date: new Date().toISOString() },
+                header: { generator: "recorder.html", version: "1.0.28", date: new Date().toISOString() },
                 data: records
             };
 
@@ -329,157 +329,6 @@
             } catch (err) {
                 safeShowError(`Failed to upload: ${err.message}`);
             }
-        }
-
-        // ==================== MODALS ====================
-        function openModal(mode) {
-            safeOpenModal(mode);
-            const modalTitle = document.getElementById('modalTitle');
-            const modalForm = document.getElementById('modalForm');
-            let fields = [];
-
-            if (mode === 'addChild') {
-                modalTitle.textContent = 'Add Child';
-                const selectablePeople = records.filter(r => !r.record_type || r.record_type.toLowerCase() === 'person');
-                fields = [
-                    { name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name || '(no name)')], required: true },
-                    { name: 'name', label: 'Name', type: 'text', required: true },
-                    { name: 'sex', label: 'Sex', type: 'select', options: ['', 'male', 'female'] },
-                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
-                    { name: 'birth_location', label: 'Birth Location', type: 'text' }
-                ];
-            } else if (mode === 'addSpouse') {
-                modalTitle.textContent = 'Add Partner';
-                const selectablePeople = records.filter(r => !r.record_type || r.record_type.toLowerCase() === 'person');
-                fields = [
-                    { name: 'partner', label: 'Select Genealogical Partner', type: 'select', options: ['', ...selectablePeople.map(r => r.name || '(no name)')], required: true },
-                    { name: 'relationship', label: 'Relationship', type: 'select', options: ['', 'spouse', 'partner', 'other'], required: true },
-                    { name: 'name', label: 'Name', type: 'text', required: true },
-                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
-                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
-                    { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
-                    { name: 'parents', label: 'Parents', type: 'text' }
-                ];
-            } else if (mode === 'updateRecord') {
-                modalTitle.textContent = 'Update Record';
-                fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map((r, i) => `${i}: ${r.name || '(no name)'}`)], required: true },
-                    { name: 'field', label: 'Field to Update', type: 'select', options: [''] },
-                    { name: 'value', label: 'New Value', type: 'text', required: true }
-                ];
-            } else if (mode === 'recordDeathBurial') {
-                modalTitle.textContent = 'Record Death/Burial';
-                fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map((r, i) => `${i}: ${r.name || '(no name)'}`)], required: true },
-                    { name: 'death_date', label: 'Death Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
-                    { name: 'death_location', label: 'Death Location', type: 'text' },
-                    { name: 'burial_location', label: 'Burial Location', type: 'text' }
-                ];
-            }
-
-            fields.forEach(field => {
-                const label = document.createElement('label');
-                label.textContent = field.label;
-                if (field.required) label.innerHTML += ' <span style="color:red">*</span>';
-                modalForm.appendChild(label);
-                if (field.type === 'select') {
-                    const select = document.createElement('select');
-                    select.name = field.name;
-                    if (field.required) select.required = true;
-                    field.options.forEach(opt => {
-                        const option = document.createElement('option');
-                        option.value = opt;
-                        option.textContent = opt || '(Select)';
-                        select.appendChild(option);
-                    });
-                    modalForm.appendChild(select);
-                } else {
-                    const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
-                    input.type = field.type;
-                    input.name = field.name;
-                    if (field.required) input.required = true;
-                    modalForm.appendChild(input);
-                }
-            });
-
-            const submitBtn = document.createElement('button');
-            submitBtn.type = 'button';
-            submitBtn.textContent = 'Save';
-            submitBtn.onclick = () => saveModalData(mode);
-            modalForm.appendChild(submitBtn);
-        }
-
-        function closeModal() { safeCloseModal(); }
-
-        function saveModalData(mode) {
-            const form = document.getElementById('modalForm');
-            const data = {};
-            for (let input of form.elements) {
-                if (input.name && input.type !== 'button') data[input.name] = input.value || '';
-            }
-
-            if (mode === 'addChild') {
-                if (!data.name || !data.parents) return safeShowError('Name and Parent required');
-                const parentRec = records.find(r => r.name === data.parents);
-                if (!parentRec) return safeShowError('Parent not found');
-                const newRec = {
-                    record_type: 'Person',
-                    gen: (parseInt(parentRec.gen) || 0) + 1 + '',
-                    name: data.name,
-                    sex: data.sex || '',
-                    birth_date: data.birth_date || '',
-                    birth_location: data.birth_location || '',
-                    death_date: '',
-                    death_location: '',
-                    burial_location: '',
-                    burial_notes: '',
-                    service: '',
-                    marriage_date: '',
-                    relationship: '',
-                    divorce: '',
-                    parents: '',
-                    attributes: '',
-                    unprocessed_items: '',
-                    notes: '',
-                    partners: []
-                };
-                records.push(newRec);
-            } else if (mode === 'addSpouse') {
-                if (!data.name || !data.partner) return safeShowError('Name and Partner required');
-                const partnerRec = records.find(r => r.name === data.partner);
-                if (!partnerRec) return safeShowError('Partner not found');
-                const newPartner = {
-                    name: data.name,
-                    birth_date: data.birth_date || '',
-                    birth_location: data.birth_location || '',
-                    death_date: '',
-                    death_location: '',
-                    burial_location: '',
-                    burial_notes: '',
-                    service: '',
-                    marriage_date: data.marriage_date || '',
-                    relationship: data.relationship || 'spouse',
-                    divorce: '',
-                    divorced: false,
-                    parents: data.parents || '',
-                    children: []
-                };
-                if (!partnerRec.partners) partnerRec.partners = [];
-                partnerRec.partners.push(newPartner);
-            } else if (mode === 'updateRecord') {
-                const idx = parseInt(data.record.split(':')[0]);
-                if (isNaN(idx)) return safeShowError('Invalid record');
-                records[idx][data.field] = data.value;
-            } else if (mode === 'recordDeathBurial') {
-                const idx = parseInt(data.record.split(':')[0]);
-                if (isNaN(idx)) return safeShowError('Invalid record');
-                if (data.death_date) records[idx].death_date = data.death_date;
-                if (data.death_location) records[idx].death_location = data.death_location;
-                if (data.burial_location) records[idx].burial_location = data.burial_location;
-            }
-
-            safeCloseModal();
-            debounceDisplayRecords();
         }
 
         // ==================== TABLE & EDITING ====================
@@ -600,7 +449,7 @@
             td.innerHTML = oldValue;
         }
 
-        // ==================== PROVIDE FEEDBACK ====================
+        // Provide Feedback (blue button, saves to /feedback/)
         function openIssueModal() {
             safeOpenModal('issue');
             document.getElementById('modalTitle').textContent = 'Provide Feedback';
@@ -661,7 +510,7 @@
             }
         }
 
-        // ==================== REQUEST EDIT PACKAGE ====================
+        // Request Edit Package
         function openRequestModal() {
             safeOpenModal('requestEdit');
             document.getElementById('modalTitle').textContent = 'Request New Edit Package';
