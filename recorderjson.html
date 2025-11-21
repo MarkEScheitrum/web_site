@@ -94,7 +94,7 @@
     <script>
         let records = [], decryptionPassphrase = null, exchangePassphrase = null, originalFileName = 'records.zip';
         let debugMode = false, isEncryptedZip = false;
-        let modalMode = null, editingIndex = null, editingField = null, highlightedRow = null;
+        let modalMode = null;
         let vestigialColumns = new Set(['notes', 'unprocessed_items', 'hash_id', 'record_id', 'parent_ids', 'children_no_other_parent']);
         let renderTimeout = null;
         let ticketNumber = null;
@@ -189,9 +189,14 @@
                 if (!jsonEntry) throw new Error('No records JSON found in ZIP');
 
                 originalFileName = fileEntry.name;
-                // Fixed ticket extraction — matches your actual filename format
-                const match = originalFileName.match(/records_(\d{5})\.json/);
-                ticketNumber = match ? match[1] : 'Unknown';
+                console.log('Dropbox file name:', originalFileName);
+                console.log('Internal JSON file name:', jsonEntry.name);
+
+                // Extract ticket number from internal JSON filename (records_20364.json)
+                const internalMatch = jsonEntry.name.match(/records_(\d{5})\.json/);
+                ticketNumber = internalMatch ? internalMatch[1] : 'Unknown';
+                console.log('Extracted ticket number:', ticketNumber);
+
                 document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Loaded`;
 
                 const text = await jsonEntry.async('text');
@@ -273,7 +278,11 @@
             const iv = CryptoJS.lib.WordArray.create(data.slice(16, 32));
             const ct = CryptoJS.lib.WordArray.create(data.slice(32));
             const key = deriveKey(passphrase, salt);
-            const decrypted = CryptoJS.AES.decrypt({ ciphertext: ct }, key, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding });
+            const decrypted = CryptoJS.AES.decrypt({ ciphertext: ct }, key, {
+                iv: iv,
+                mode: CryptoJS.mode.CBC,
+                padding: CryptoJS.pad.NoPadding
+            });
             const decryptedBytes = CryptoJS.enc.Latin1.stringify(decrypted);
             const padLen = decryptedBytes.charCodeAt(decryptedBytes.length - 1);
             if (padLen < 1 || padLen > 16) throw new Error("Invalid padding");
@@ -502,7 +511,7 @@
                 showPopup(`
                     <h3 style="color:green">✓ Feedback Submitted</h3>
                     <p>Thank you! Your feedback has been saved as:</p>
-                    <b>${filename}</b>
+                   ))<b>${filename}</b>
                     <p>We appreciate your help improving the editor.</p>
                 `);
             } catch (err) {
