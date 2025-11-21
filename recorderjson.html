@@ -25,17 +25,17 @@
         .modal-content button:hover{background:#218838}
         .note{font-size:15px;color:#555;margin-top:20px;line-height:1.4;background:#f8f9fa;padding:12px;border-radius:6px}
         .table-container{margin-top:20px;overflow-x:auto;display:block;width:100%;border:1px solid #ddd;border-radius:4px}
-        .table-container::-webkit-scrollbar {height:12px}
-        .table-container::-webkit-scrollbar-track {background:#f1f1f1;border-radius:10px}
-        .table-container::-webkit-scrollbar-thumb {background:#888;border-radius:10px}
-        .table-container::-webkit-scrollbar-thumb:hover {background:#555}
-        table{width:100%;font-size:16px;border-collapse:collapse;min-width:1400px}
+        .table-container::-webkit-scrollbar{height:12px}
+        .table-container::-webkit-scrollbar-track{background:#f1f1f1;border-radius:10px}
+        .table-container::-webkit-scrollbar-thumb{background:#888;border-radius:10px}
+        .table-container::-webkit-scrollbar-thumb:hover{background:#555}
+        table{width:100%;font-size:16px;border-collapse:collapse;min-width:1600px}
         th,td{padding:10px;border:1px solid #ccc;white-space:normal;box-sizing:border-box;text-align:left}
         th.vestigial{padding:4px}
         th.record_type,td.record_type{width:80px}
-        th.gen,td.gen{width:50px;text-align:center}
+        th.gen,td.gen{width:60px;text-align:center}
         th.sex,td.sex{width:60px;text-align:center}
-        .vestigial{width:36px!important;max-width:36px!important;min-width:0!important;overflow:hidden}
+        .vestigial{width:36px!important;max-width:36px!important;min-width:36px!important;overflow:hidden;text-align:center}
         .vestigial .header-text,.vestigial .cell-content{display:none}
         .editable-row:hover{background:#d9edf7}
         .highlighted-row{background:#ffffcc!important}
@@ -52,7 +52,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.25</span> — November 21, 2025
+                    Version: <span id="pageVersion">1.0.26</span> — November 21, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -101,7 +101,6 @@
         let hasReturnedUpdates = false;
         const DROPBOX_FOLDER = '';
 
-        // Field restrictions
         const fieldRestrictions = {
             person: {
                 editable: ['name', 'sex', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'attributes', 'parents'],
@@ -147,7 +146,7 @@
 
         function safeShowError(message) {
             const div = document.createElement('div');
-            div.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px;border-radius:5px;z-index:2000;max-width:300px;box-shadow:0 2pxpreuve 10px rgba(0,0,0,0.2);font-size:14px';
+            div.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px;border-radius:5px;z-index:2000;max-width:300px;box-shadow:0 2px 10px rgba(0,0,0,0.2);font-size:14px';
             div.innerHTML = `<strong>Error</strong><br>${message}<button onclick="this.parentElement.remove()" style="margin-left:10px;background:none;border:none;color:white;cursor:pointer;float:right">×</button>`;
             document.body.appendChild(div);
             setTimeout(() => div.remove(), 6000);
@@ -190,7 +189,6 @@
                 if (!jsonEntry) throw new Error('No records JSON found in ZIP');
 
                 originalFileName = fileEntry.name;
-                // Fixed ticket extraction
                 const match = originalFileName.match(/_(\d{5})_/);
                 ticketNumber = match ? match[1] : 'Unknown';
                 document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Loaded`;
@@ -299,7 +297,7 @@
             if (!records.length) return safeShowError('No data to save');
 
             const output = {
-                header: { generator: "recorder.html", version: "1.0.25", date: new Date().toISOString() },
+                header: { generator: "recorder.html", version: "1.0.26", date: new Date().toISOString() },
                 data: records
             };
 
@@ -332,6 +330,157 @@
             }
         }
 
+        // ==================== MODALS ====================
+        function openModal(mode) {
+            safeOpenModal(mode);
+            const modalTitle = document.getElementById('modalTitle');
+            const modalForm = document.getElementById('modalForm');
+            let fields = [];
+
+            if (mode === 'addChild') {
+                modalTitle.textContent = 'Add Child';
+                const selectablePeople = records.filter(r => !r.record_type || r.record_type.toLowerCase() === 'person');
+                fields = [
+                    { name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name || '(no name)')], required: true },
+                    { name: 'name', label: 'Name', type: 'text', required: true },
+                    { name: 'sex', label: 'Sex', type: 'select', options: ['', 'male', 'female'] },
+                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
+                    { name: 'birth_location', label: 'Birth Location', type: 'text' }
+                ];
+            } else if (mode === 'addSpouse') {
+                modalTitle.textContent = 'Add Partner';
+                const selectablePeople = records.filter(r => !r.record_type || r.record_type.toLowerCase() === 'person');
+                fields = [
+                    { name: 'partner', label: 'Select Genealogical Partner', type: 'select', options: ['', ...selectablePeople.map(r => r.name || '(no name)')], required: true },
+                    { name: 'relationship', label: 'Relationship', type: 'select', options: ['', 'spouse', 'partner', 'other'], required: true },
+                    { name: 'name', label: 'Name', type: 'text', required: true },
+                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
+                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
+                    { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
+                    { name: 'parents', label: 'Parents', type: 'text' }
+                ];
+            } else if (mode === 'updateRecord') {
+                modalTitle.textContent = 'Update Record';
+                fields = [
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map((r, i) => `${i}: ${r.name || '(no name)'}`)], required: true },
+                    { name: 'field', label: 'Field to Update', type: 'select', options: [''] },
+                    { name: 'value', label: 'New Value', type: 'text', required: true }
+                ];
+            } else if (mode === 'recordDeathBurial') {
+                modalTitle.textContent = 'Record Death/Burial';
+                fields = [
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map((r, i) => `${i}: ${r.name || '(no name)'}`)], required: true },
+                    { name: 'death_date', label: 'Death Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
+                    { name: 'death_location', label: 'Death Location', type: 'text' },
+                    { name: 'burial_location', label: 'Burial Location', type: 'text' }
+                ];
+            }
+
+            fields.forEach(field => {
+                const label = document.createElement('label');
+                label.textContent = field.label;
+                if (field.required) label.innerHTML += ' <span style="color:red">*</span>';
+                modalForm.appendChild(label);
+                if (field.type === 'select') {
+                    const select = document.createElement('select');
+                    select.name = field.name;
+                    if (field.required) select.required = true;
+                    field.options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.textContent = opt || '(Select)';
+                        select.appendChild(option);
+                    });
+                    modalForm.appendChild(select);
+                } else {
+                    const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
+                    input.type = field.type;
+                    input.name = field.name;
+                    if (field.required) input.required = true;
+                    modalForm.appendChild(input);
+                }
+            });
+
+            const submitBtn = document.createElement('button');
+            submitBtn.type = 'button';
+            submitBtn.textContent = 'Save';
+            submitBtn.onclick = () => saveModalData(mode);
+            modalForm.appendChild(submitBtn);
+        }
+
+        function closeModal() { safeCloseModal(); }
+
+        function saveModalData(mode) {
+            const form = document.getElementById('modalForm');
+            const data = {};
+            for (let input of form.elements) {
+                if (input.name && input.type !== 'button') data[input.name] = input.value || '';
+            }
+
+            if (mode === 'addChild') {
+                if (!data.name || !data.parents) return safeShowError('Name and Parent required');
+                const parentRec = records.find(r => r.name === data.parents);
+                if (!parentRec) return safeShowError('Parent not found');
+                const newRec = {
+                    record_type: 'Person',
+                    gen: (parseInt(parentRec.gen) || 0) + 1 + '',
+                    name: data.name,
+                    sex: data.sex || '',
+                    birth_date: data.birth_date || '',
+                    birth_location: data.birth_location || '',
+                    death_date: '',
+                    death_location: '',
+                    burial_location: '',
+                    burial_notes: '',
+                    service: '',
+                    marriage_date: '',
+                    relationship: '',
+                    divorce: '',
+                    parents: '',
+                    attributes: '',
+                    unprocessed_items: '',
+                    notes: '',
+                    partners: []
+                };
+                records.push(newRec);
+            } else if (mode === 'addSpouse') {
+                if (!data.name || !data.partner) return safeShowError('Name and Partner required');
+                const partnerRec = records.find(r => r.name === data.partner);
+                if (!partnerRec) return safeShowError('Partner not found');
+                const newPartner = {
+                    name: data.name,
+                    birth_date: data.birth_date || '',
+                    birth_location: data.birth_location || '',
+                    death_date: '',
+                    death_location: '',
+                    burial_location: '',
+                    burial_notes: '',
+                    service: '',
+                    marriage_date: data.marriage_date || '',
+                    relationship: data.relationship || 'spouse',
+                    divorce: '',
+                    divorced: false,
+                    parents: data.parents || '',
+                    children: []
+                };
+                if (!partnerRec.partners) partnerRec.partners = [];
+                partnerRec.partners.push(newPartner);
+            } else if (mode === 'updateRecord') {
+                const idx = parseInt(data.record.split(':')[0]);
+                if (isNaN(idx)) return safeShowError('Invalid record');
+                records[idx][data.field] = data.value;
+            } else if (mode === 'recordDeathBurial') {
+                const idx = parseInt(data.record.split(':')[0]);
+                if (isNaN(idx)) return safeShowError('Invalid record');
+                if (data.death_date) records[idx].death_date = data.death_date;
+                if (data.death_location) records[idx].death_location = data.death_location;
+                if (data.burial_location) records[idx].burial_location = data.burial_location;
+            }
+
+            safeCloseModal();
+            debounceDisplayRecords();
+        }
+
         // ==================== TABLE & EDITING ====================
         function toggleTable() {
             const container = document.getElementById('tableContainer');
@@ -345,8 +494,11 @@
         }
 
         function toggleColumn(column) {
-            if (vestigialColumns.has(column)) vestigialColumns.delete(column);
-            else vestigialColumns.add(column);
+            if (vestigialColumns.has(column)) {
+                vestigialColumns.delete(column);
+            } else {
+                vestigialColumns.add(column);
+            }
             debounceDisplayRecords();
         }
 
@@ -368,8 +520,10 @@
             const hr = document.createElement('tr');
             headers.forEach(h => {
                 const th = document.createElement('th');
+                th.className = h;
                 th.textContent = h === 'generation' ? 'gen' : h.replace(/_/g, ' ');
-                if (!['record_type','gen','name','sex'].includes(h)) {
+                // No eye icon on gen column
+                if (h !== 'gen' && !['record_type','name','sex'].includes(h)) {
                     const eye = document.createElement('span');
                     eye.textContent = vestigialColumns.has(h) ? '👁️‍🗨️' : '👁️';
                     eye.style.cursor = 'pointer';
@@ -503,6 +657,76 @@
                 `);
             } catch (err) {
                 safeShowError('Failed to submit feedback: ' + err.message);
+            }
+        }
+
+        // ==================== REQUEST EDIT PACKAGE ====================
+        function openRequestModal() {
+            safeOpenModal('requestEdit');
+            document.getElementById('modalTitle').textContent = 'Request New Edit Package';
+            document.getElementById('modalForm').innerHTML = `
+                <label>Your Full Name <span style="color:red">*</span></label>
+                <input type="text" required>
+                <label>Your Email <span style="color:red">*</span></label>
+                <input type="email" required>
+                <label>Starting Person Full Name (exactly as in the tree) <span style="color:red">*</span></label>
+                <input type="text" required>
+                <label>Starting Person Birth Year (e.g. 1946) <span style="color:red">*</span></label>
+                <input type="text" pattern="[0-9]{4}" placeholder="e.g. 1946" required>
+                <label>Your Relationship to This Person (e.g. grandson, niece, self) <span style="color:red">*</span></label>
+                <input type="text" required>
+                <div class="note">
+                    An acknowledgement email containing a passphrase will be sent to the email address above.
+                </div>
+                <button type="button" onclick="submitEditRequest()">Submit Request</button>
+            `;
+        }
+
+        async function submitEditRequest() {
+            const inputs = document.querySelectorAll('#modalForm input');
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const tz = now.toLocaleTimeString('en-us', { timeZoneName: 'short' }).split(' ')[2];
+            const formattedTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${tz}`;
+            const data = {
+                timestamp: formattedTimestamp,
+                requestor_name: inputs[0].value.trim(),
+                requestor_email: inputs[1].value.trim(),
+                starting_person: inputs[2].value.trim(),
+                starting_person_birth_year: inputs[3].value.trim(),
+                relationship: inputs[4].value.trim()
+            };
+            if (Object.values(data).some(v => v === '')) {
+                safeShowError('Please fill in all required fields.');
+                return;
+            }
+            try {
+                const accessToken = await getAccessToken();
+                const dbx = new Dropbox.Dropbox({ accessToken });
+                const datePart = now.toISOString().slice(0,10).replace(/-/g,'');
+                const timePart = now.toTimeString().slice(0,8).replace(/:/g,'');
+                const safeName = data.requestor_name.replace(/[^a-zA-Z0-9]/g, '_').slice(0,20);
+                const filename = `requests/request_${datePart}_${timePart}_${safeName}.json`;
+                await dbx.filesUpload({
+                    contents: JSON.stringify(data, null, 2),
+                    path: DROPBOX_FOLDER + '/' + filename,
+                    mode: { '.tag': 'add' },
+                    autorename: true
+                });
+                safeCloseModal();
+                showPopup(`
+                    <h3 style="color:green">✓ Request Submitted Successfully!</h3>
+                    <p><strong>Request Time:</strong> ${formattedTimestamp}</p>
+                    <p>Your request has been saved as:<br><b>${filename}</b></p>
+                    <p>I will prepare your edit package and send you a passphrase by email shortly.</p>
+                `);
+            } catch (err) {
+                safeShowError('Failed to submit request: ' + err.message);
             }
         }
 
