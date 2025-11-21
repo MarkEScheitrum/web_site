@@ -24,8 +24,8 @@
         .modal-content button{margin-top:20px;padding:12px 24px;font-size:18px;background:#28a745;color:white;border:none;border-radius:5px;cursor:pointer;width:100%;transition:background 0.2s}
         .modal-content button:hover{background:#218838}
         .note{font-size:15px;color:#555;margin-top:20px;line-height:1.4;background:#f8f9fa;padding:12px;border-radius:6px}
-        .table-container{margin-top:20px;overflow-x:auto}
-        table{width:100%;font-size:14px;border-collapse:collapse}
+        .table-container{margin-top:20px;overflow-x:auto;display:block;width:100%}
+        table{width:100%;font-size:14px;border-collapse:collapse;min-width:1200px}
         th,td{padding:8px;border:1px solid #ccc;white-space:normal;box-sizing:border-box}
         th.vestigial{padding:4px}
         th.record_type,td.record_type{width:60px}
@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.23</span> — November 21, 2025
+                    Version: <span id="pageVersion">1.0.24</span> — November 21, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -96,6 +96,18 @@
         let ticketNumber = null;
         let hasReturnedUpdates = false;
         const DROPBOX_FOLDER = '';
+
+        // Field restrictions — moved to top to avoid reference error
+        const fieldRestrictions = {
+            person: {
+                editable: ['name', 'sex', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'attributes', 'parents'],
+                greyedOut: ['gen', 'marriage_date', 'relationship', 'divorced', 'divorce date']
+            },
+            spouse: {
+                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorce', 'parents'],
+                greyedOut: ['gen', 'sex']
+            }
+        };
 
         async function getAccessToken() {
             try {
@@ -244,138 +256,7 @@
             }
         }
 
-        // ==================== REQUEST EDIT PACKAGE ====================
-        function openRequestModal() {
-            safeOpenModal('requestEdit');
-            document.getElementById('modalTitle').textContent = 'Request New Edit Package';
-            document.getElementById('modalForm').innerHTML = `
-                <label>Your Full Name <span style="color:red">*</span></label>
-                <input type="text" required>
-                <label>Your Email <span style="color:red">*</span></label>
-                <input type="email" required>
-                <label>Starting Person Full Name (exactly as in the tree) <span style="color:red">*</span></label>
-                <input type="text" required>
-                <label>Starting Person Birth Year (e.g. 1946) <span style="color:red">*</span></label>
-                <input type="text" pattern="[0-9]{4}" placeholder="e.g. 1946" required>
-                <label>Your Relationship to This Person (e.g. grandson, niece, self) <span style="color:red">*</span></label>
-                <input type="text" required>
-                <div class="note">
-                    An acknowledgement email containing a passphrase will be sent to the email address above.
-                </div>
-                <button type="button" onclick="submitEditRequest()">Submit Request</button>
-            `;
-        }
-
-        async function submitEditRequest() {
-            const inputs = document.querySelectorAll('#modalForm input');
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const tz = now.toLocaleTimeString('en-us', { timeZoneName: 'short' }).split(' ')[2];
-            const formattedTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${tz}`;
-            const data = {
-                timestamp: formattedTimestamp,
-                requestor_name: inputs[0].value.trim(),
-                requestor_email: inputs[1].value.trim(),
-                starting_person: inputs[2].value.trim(),
-                starting_person_birth_year: inputs[3].value.trim(),
-                relationship: inputs[4].value.trim()
-            };
-            if (Object.values(data).some(v => v === '')) {
-                safeShowError('Please fill in all required fields.');
-                return;
-            }
-            try {
-                const accessToken = await getAccessToken();
-                const dbx = new Dropbox.Dropbox({ accessToken });
-                const datePart = now.toISOString().slice(0,10).replace(/-/g,'');
-                const timePart = now.toTimeString().slice(0,8).replace(/:/g,'');
-                const safeName = data.requestor_name.replace(/[^a-zA-Z0-9]/g, '_').slice(0,20);
-                const filename = `requests/request_${datePart}_${timePart}_${safeName}.json`;
-                await dbx.filesUpload({
-                    contents: JSON.stringify(data, null, 2),
-                    path: DROPBOX_FOLDER + '/' + filename,
-                    mode: { '.tag': 'add' },
-                    autorename: true
-                });
-                safeCloseModal();
-                showPopup(`
-                    <h3 style="color:green">✓ Request Submitted Successfully!</h3>
-                    <p><strong>Request Time:</strong> ${formattedTimestamp}</p>
-                    <p>Your request has been saved as:<br><b>${filename}</b></p>
-                    <p>I will prepare your edit package and send you a passphrase by email shortly.</p>
-                `);
-            } catch (err) {
-                safeShowError('Failed to submit request: ' + err.message);
-            }
-        }
-
-        // ==================== REPORT AN ISSUE ====================
-        function openIssueModal() {
-            safeOpenModal('issue');
-            document.getElementById('modalTitle').textContent = 'Report an Issue';
-            document.getElementById('modalForm').innerHTML = `
-                <label>Issue Title <span style="color:red">*</span></label>
-                <input type="text" id="issueTitle" required>
-                <label>Description <span style="color:red">*</span></label>
-                <textarea id="issueDesc" rows="6" required></textarea>
-                <button type="button" onclick="submitIssue()">Submit Issue</button>
-            `;
-        }
-
-        async function submitIssue() {
-            const title = document.getElementById('issueTitle').value.trim();
-            const desc = document.getElementById('issueDesc').value.trim();
-            if (!title || !desc) {
-                safeShowError('Both title and description are required');
-                return;
-            }
-
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const timestamp = `${year}${month}${day}_${hours}${minutes}${seconds}`;
-
-            const data = {
-                timestamp: `${year}-${month}-${day} ${hours}:${minutes}:${seconds} PST`,
-                ticket_number: ticketNumber || "none",
-                issue_title: title,
-                issue_description: desc
-            };
-
-            try {
-                const accessToken = await getAccessToken();
-                const dbx = new Dropbox.Dropbox({ accessToken });
-                const filename = `issues/issue_${timestamp}_${ticketNumber || 'none'}.json`;
-
-                await dbx.filesUpload({
-                    contents: JSON.stringify(data, null, 2),
-                    path: DROPBOX_FOLDER + '/' + filename,
-                    mode: { '.tag': 'add' },
-                    autorename: true
-                });
-
-                safeCloseModal();
-                showPopup(`
-                    <h3 style="color:green">✓ Issue Reported</h3>
-                    <p>Thank you! Your issue has been saved as:</p>
-                    <b>${filename}</b>
-                    <p>We will review it shortly.</p>
-                `);
-            } catch (err) {
-                safeShowError('Failed to submit issue: ' + err.message);
-            }
-        }
-
-        // ==================== ENCRYPTION / DECRYPTION (RESTORED) ====================
+        // ==================== ENCRYPTION / DECRYPTION ====================
         function deriveKey(passphrase, salt) {
             return CryptoJS.PBKDF2(passphrase, salt, { keySize: 8, iterations: 100000, hasher: CryptoJS.algo.SHA256 });
         }
@@ -412,7 +293,7 @@
             if (!records.length) return safeShowError('No data to save');
 
             const output = {
-                header: { generator: "recorder.html", version: "1.0.23", date: new Date().toISOString() },
+                header: { generator: "recorder.html", version: "1.0.24", date: new Date().toISOString() },
                 data: records
             };
 
@@ -566,6 +447,137 @@
 
         function cancelEdit(td, oldValue) {
             td.innerHTML = oldValue;
+        }
+
+        // ==================== REQUEST EDIT PACKAGE ====================
+        function openRequestModal() {
+            safeOpenModal('requestEdit');
+            document.getElementById('modalTitle').textContent = 'Request New Edit Package';
+            document.getElementById('modalForm').innerHTML = `
+                <label>Your Full Name <span style="color:red">*</span></label>
+                <input type="text" required>
+                <label>Your Email <span style="color:red">*</span></label>
+                <input type="email" required>
+                <label>Starting Person Full Name (exactly as in the tree) <span style="color:red">*</span></label>
+                <input type="text" required>
+                <label>Starting Person Birth Year (e.g. 1946) <span style="color:red">*</span></label>
+                <input type="text" pattern="[0-9]{4}" placeholder="e.g. 1946" required>
+                <label>Your Relationship to This Person (e.g. grandson, niece, self) <span style="color:red">*</span></label>
+                <input type="text" required>
+                <div class="note">
+                    An acknowledgement email containing a passphrase will be sent to the email address above.
+                </div>
+                <button type="button" onclick="submitEditRequest()">Submit Request</button>
+            `;
+        }
+
+        async function submitEditRequest() {
+            const inputs = document.querySelectorAll('#modalForm input');
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const tz = now.toLocaleTimeString('en-us', { timeZoneName: 'short' }).split(' ')[2];
+            const formattedTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${tz}`;
+            const data = {
+                timestamp: formattedTimestamp,
+                requestor_name: inputs[0].value.trim(),
+                requestor_email: inputs[1].value.trim(),
+                starting_person: inputs[2].value.trim(),
+                starting_person_birth_year: inputs[3].value.trim(),
+                relationship: inputs[4].value.trim()
+            };
+            if (Object.values(data).some(v => v === '')) {
+                safeShowError('Please fill in all required fields.');
+                return;
+            }
+            try {
+                const accessToken = await getAccessToken();
+                const dbx = new Dropbox.Dropbox({ accessToken });
+                const datePart = now.toISOString().slice(0,10).replace(/-/g,'');
+                const timePart = now.toTimeString().slice(0,8).replace(/:/g,'');
+                const safeName = data.requestor_name.replace(/[^a-zA-Z0-9]/g, '_').slice(0,20);
+                const filename = `requests/request_${datePart}_${timePart}_${safeName}.json`;
+                await dbx.filesUpload({
+                    contents: JSON.stringify(data, null, 2),
+                    path: DROPBOX_FOLDER + '/' + filename,
+                    mode: { '.tag': 'add' },
+                    autorename: true
+                });
+                safeCloseModal();
+                showPopup(`
+                    <h3 style="color:green">✓ Request Submitted Successfully!</h3>
+                    <p><strong>Request Time:</strong> ${formattedTimestamp}</p>
+                    <p>Your request has been saved as:<br><b>${filename}</b></p>
+                    <p>I will prepare your edit package and send you a passphrase by email shortly.</p>
+                `);
+            } catch (err) {
+                safeShowError('Failed to submit request: ' + err.message);
+            }
+        }
+
+        // ==================== REPORT AN ISSUE ====================
+        function openIssueModal() {
+            safeOpenModal('issue');
+            document.getElementById('modalTitle').textContent = 'Report an Issue';
+            document.getElementById('modalForm').innerHTML = `
+                <label>Issue Title <span style="color:red">*</span></label>
+                <input type="text" id="issueTitle" required>
+                <label>Description <span style="color:red">*</span></label>
+                <textarea id="issueDesc" rows="6" required></textarea>
+                <button type="button" onclick="submitIssue()">Submit Issue</button>
+            `;
+        }
+
+        async function submitIssue() {
+            const title = document.getElementById('issueTitle').value.trim();
+            const desc = document.getElementById('issueDesc').value.trim();
+            if (!title || !desc) {
+                safeShowError('Both title and description are required');
+                return;
+            }
+
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const timestamp = `${year}${month}${day}_${hours}${minutes}${seconds}`;
+
+            const data = {
+                timestamp: `${year}-${month}-${day} ${hours}:${minutes}:${seconds} PST`,
+                ticket_number: ticketNumber || "none",
+                issue_title: title,
+                issue_description: desc
+            };
+
+            try {
+                const accessToken = await getAccessToken();
+                const dbx = new Dropbox.Dropbox({ accessToken });
+                const filename = `issues/issue_${timestamp}_${ticketNumber || 'none'}.json`;
+
+                await dbx.filesUpload({
+                    contents: JSON.stringify(data, null, 2),
+                    path: DROPBOX_FOLDER + '/' + filename,
+                    mode: { '.tag': 'add' },
+                    autorename: true
+                });
+
+                safeCloseModal();
+                showPopup(`
+                    <h3 style="color:green">✓ Issue Reported</h3>
+                    <p>Thank you! Your issue has been saved as:</p>
+                    <b>${filename}</b>
+                    <p>We will review it shortly.</p>
+                `);
+            } catch (err) {
+                safeShowError('Failed to submit issue: ' + err.message);
+            }
         }
 
         function initDebug() {
