@@ -24,13 +24,17 @@
         .modal-content button{margin-top:20px;padding:12px 24px;font-size:18px;background:#28a745;color:white;border:none;border-radius:5px;cursor:pointer;width:100%;transition:background 0.2s}
         .modal-content button:hover{background:#218838}
         .note{font-size:15px;color:#555;margin-top:20px;line-height:1.4;background:#f8f9fa;padding:12px;border-radius:6px}
-        .table-container{margin-top:20px;overflow-x:auto;display:block;width:100%}
-        table{width:100%;font-size:14px;border-collapse:collapse;min-width:1200px}
-        th,td{padding:8px;border:1px solid #ccc;white-space:normal;box-sizing:border-box}
+        .table-container{margin-top:20px;overflow-x:auto;display:block;width:100%;border:1px solid #ddd;border-radius:4px}
+        .table-container::-webkit-scrollbar {height:12px}
+        .table-container::-webkit-scrollbar-track {background:#f1f1f1;border-radius:10px}
+        .table-container::-webkit-scrollbar-thumb {background:#888;border-radius:10px}
+        .table-container::-webkit-scrollbar-thumb:hover {background:#555}
+        table{width:100%;font-size:16px;border-collapse:collapse;min-width:1400px}
+        th,td{padding:10px;border:1px solid #ccc;white-space:normal;box-sizing:border-box;text-align:left}
         th.vestigial{padding:4px}
-        th.record_type,td.record_type{width:60px}
-        th.gen,td.gen{width:40px}
-        th.sex,td.sex{width:40px}
+        th.record_type,td.record_type{width:80px}
+        th.gen,td.gen{width:50px;text-align:center}
+        th.sex,td.sex{width:60px;text-align:center}
         .vestigial{width:36px!important;max-width:36px!important;min-width:0!important;overflow:hidden}
         .vestigial .header-text,.vestigial .cell-content{display:none}
         .editable-row:hover{background:#d9edf7}
@@ -48,13 +52,13 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.24</span> — November 21, 2025
+                    Version: <span id="pageVersion">1.0.25</span> — November 21, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
         </div>
         <div class="title-right">
-            <button onclick="openIssueModal()" class="task-btn" style="background:#dc3545;font-size:15px;padding:6px 12px;min-width:auto">Report an Issue 🐛</button>
+            <button onclick="openIssueModal()" class="task-btn" style="background:#0066cc;font-size:16px;padding:8px 16px;min-width:auto">Provide Feedback 🗨️</button>
         </div>
     </div>
 
@@ -97,7 +101,7 @@
         let hasReturnedUpdates = false;
         const DROPBOX_FOLDER = '';
 
-        // Field restrictions — moved to top to avoid reference error
+        // Field restrictions
         const fieldRestrictions = {
             person: {
                 editable: ['name', 'sex', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'attributes', 'parents'],
@@ -143,7 +147,7 @@
 
         function safeShowError(message) {
             const div = document.createElement('div');
-            div.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px;border-radius:5px;z-index:2000;max-width:300px;box-shadow:0 2px 10px rgba(0,0,0,0.2);font-size:14px';
+            div.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px;border-radius:5px;z-index:2000;max-width:300px;box-shadow:0 2pxpreuve 10px rgba(0,0,0,0.2);font-size:14px';
             div.innerHTML = `<strong>Error</strong><br>${message}<button onclick="this.parentElement.remove()" style="margin-left:10px;background:none;border:none;color:white;cursor:pointer;float:right">×</button>`;
             document.body.appendChild(div);
             setTimeout(() => div.remove(), 6000);
@@ -186,7 +190,9 @@
                 if (!jsonEntry) throw new Error('No records JSON found in ZIP');
 
                 originalFileName = fileEntry.name;
-                ticketNumber = originalFileName.match(/records_(\d+)/)?.[1] || 'Unknown';
+                // Fixed ticket extraction
+                const match = originalFileName.match(/_(\d{5})_/);
+                ticketNumber = match ? match[1] : 'Unknown';
                 document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Loaded`;
 
                 const text = await jsonEntry.async('text');
@@ -293,7 +299,7 @@
             if (!records.length) return safeShowError('No data to save');
 
             const output = {
-                header: { generator: "recorder.html", version: "1.0.24", date: new Date().toISOString() },
+                header: { generator: "recorder.html", version: "1.0.25", date: new Date().toISOString() },
                 data: records
             };
 
@@ -329,12 +335,8 @@
         // ==================== TABLE & EDITING ====================
         function toggleTable() {
             const container = document.getElementById('tableContainer');
-            if (container.style.display === 'none' || container.style.display === '') {
-                container.style.display = 'block';
-                debounceDisplayRecords();
-            } else {
-                container.style.display = 'none';
-            }
+            container.style.display = container.style.display === 'none' || container.style.display === '' ? 'block' : 'none';
+            if (container.style.display === 'block') debounceDisplayRecords();
         }
 
         function debounceDisplayRecords() {
@@ -343,11 +345,8 @@
         }
 
         function toggleColumn(column) {
-            if (vestigialColumns.has(column)) {
-                vestigialColumns.delete(column);
-            } else {
-                vestigialColumns.add(column);
-            }
+            if (vestigialColumns.has(column)) vestigialColumns.delete(column);
+            else vestigialColumns.add(column);
             debounceDisplayRecords();
         }
 
@@ -369,14 +368,13 @@
             const hr = document.createElement('tr');
             headers.forEach(h => {
                 const th = document.createElement('th');
-                th.className = h;
-                th.textContent = h.replace(/_/g, ' ');
+                th.textContent = h === 'generation' ? 'gen' : h.replace(/_/g, ' ');
                 if (!['record_type','gen','name','sex'].includes(h)) {
                     const eye = document.createElement('span');
                     eye.textContent = vestigialColumns.has(h) ? '👁️‍🗨️' : '👁️';
                     eye.style.cursor = 'pointer';
                     eye.style.marginLeft = '8px';
-                    eye.onclick = (e) => { e.stopPropagation(); toggleColumn(h); };
+                    eye.onclick = e => { e.stopPropagation(); toggleColumn(h); };
                     th.appendChild(eye);
                 }
                 hr.appendChild(th);
@@ -438,9 +436,7 @@
 
         function saveEdit(rec, field, value, td, oldValue) {
             const trimmed = value.trim();
-            if (trimmed !== oldValue) {
-                rec[field] = trimmed;
-            }
+            if (trimmed !== oldValue) rec[field] = trimmed;
             td.innerHTML = trimmed;
             debounceDisplayRecords();
         }
@@ -449,86 +445,16 @@
             td.innerHTML = oldValue;
         }
 
-        // ==================== REQUEST EDIT PACKAGE ====================
-        function openRequestModal() {
-            safeOpenModal('requestEdit');
-            document.getElementById('modalTitle').textContent = 'Request New Edit Package';
-            document.getElementById('modalForm').innerHTML = `
-                <label>Your Full Name <span style="color:red">*</span></label>
-                <input type="text" required>
-                <label>Your Email <span style="color:red">*</span></label>
-                <input type="email" required>
-                <label>Starting Person Full Name (exactly as in the tree) <span style="color:red">*</span></label>
-                <input type="text" required>
-                <label>Starting Person Birth Year (e.g. 1946) <span style="color:red">*</span></label>
-                <input type="text" pattern="[0-9]{4}" placeholder="e.g. 1946" required>
-                <label>Your Relationship to This Person (e.g. grandson, niece, self) <span style="color:red">*</span></label>
-                <input type="text" required>
-                <div class="note">
-                    An acknowledgement email containing a passphrase will be sent to the email address above.
-                </div>
-                <button type="button" onclick="submitEditRequest()">Submit Request</button>
-            `;
-        }
-
-        async function submitEditRequest() {
-            const inputs = document.querySelectorAll('#modalForm input');
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const tz = now.toLocaleTimeString('en-us', { timeZoneName: 'short' }).split(' ')[2];
-            const formattedTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${tz}`;
-            const data = {
-                timestamp: formattedTimestamp,
-                requestor_name: inputs[0].value.trim(),
-                requestor_email: inputs[1].value.trim(),
-                starting_person: inputs[2].value.trim(),
-                starting_person_birth_year: inputs[3].value.trim(),
-                relationship: inputs[4].value.trim()
-            };
-            if (Object.values(data).some(v => v === '')) {
-                safeShowError('Please fill in all required fields.');
-                return;
-            }
-            try {
-                const accessToken = await getAccessToken();
-                const dbx = new Dropbox.Dropbox({ accessToken });
-                const datePart = now.toISOString().slice(0,10).replace(/-/g,'');
-                const timePart = now.toTimeString().slice(0,8).replace(/:/g,'');
-                const safeName = data.requestor_name.replace(/[^a-zA-Z0-9]/g, '_').slice(0,20);
-                const filename = `requests/request_${datePart}_${timePart}_${safeName}.json`;
-                await dbx.filesUpload({
-                    contents: JSON.stringify(data, null, 2),
-                    path: DROPBOX_FOLDER + '/' + filename,
-                    mode: { '.tag': 'add' },
-                    autorename: true
-                });
-                safeCloseModal();
-                showPopup(`
-                    <h3 style="color:green">✓ Request Submitted Successfully!</h3>
-                    <p><strong>Request Time:</strong> ${formattedTimestamp}</p>
-                    <p>Your request has been saved as:<br><b>${filename}</b></p>
-                    <p>I will prepare your edit package and send you a passphrase by email shortly.</p>
-                `);
-            } catch (err) {
-                safeShowError('Failed to submit request: ' + err.message);
-            }
-        }
-
-        // ==================== REPORT AN ISSUE ====================
+        // ==================== PROVIDE FEEDBACK ====================
         function openIssueModal() {
             safeOpenModal('issue');
-            document.getElementById('modalTitle').textContent = 'Report an Issue';
+            document.getElementById('modalTitle').textContent = 'Provide Feedback';
             document.getElementById('modalForm').innerHTML = `
-                <label>Issue Title <span style="color:red">*</span></label>
+                <label>Feedback Title <span style="color:red">*</span></label>
                 <input type="text" id="issueTitle" required>
                 <label>Description <span style="color:red">*</span></label>
                 <textarea id="issueDesc" rows="6" required></textarea>
-                <button type="button" onclick="submitIssue()">Submit Issue</button>
+                <button type="button" onclick="submitIssue()">Submit Feedback</button>
             `;
         }
 
@@ -552,14 +478,14 @@
             const data = {
                 timestamp: `${year}-${month}-${day} ${hours}:${minutes}:${seconds} PST`,
                 ticket_number: ticketNumber || "none",
-                issue_title: title,
-                issue_description: desc
+                feedback_title: title,
+                feedback_description: desc
             };
 
             try {
                 const accessToken = await getAccessToken();
                 const dbx = new Dropbox.Dropbox({ accessToken });
-                const filename = `issues/issue_${timestamp}_${ticketNumber || 'none'}.json`;
+                const filename = `feedback/feedback_${ticketNumber || 'none'}_${timestamp}.json`;
 
                 await dbx.filesUpload({
                     contents: JSON.stringify(data, null, 2),
@@ -570,13 +496,13 @@
 
                 safeCloseModal();
                 showPopup(`
-                    <h3 style="color:green">✓ Issue Reported</h3>
-                    <p>Thank you! Your issue has been saved as:</p>
+                    <h3 style="color:green">✓ Feedback Submitted</h3>
+                    <p>Thank you! Your feedback has been saved as:</p>
                     <b>${filename}</b>
-                    <p>We will review it shortly.</p>
+                    <p>We appreciate your help improving the editor.</p>
                 `);
             } catch (err) {
-                safeShowError('Failed to submit issue: ' + err.message);
+                safeShowError('Failed to submit feedback: ' + err.message);
             }
         }
 
