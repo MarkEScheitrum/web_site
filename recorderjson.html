@@ -511,11 +511,12 @@
             const body = document.getElementById('recordBody');
             body.innerHTML = '';
             if (!records.length) return;
-
+        
             const table = document.createElement('table');
             const sample = records[0];
-            const headers = Object.keys(sample).filter(h => !vestigialColumns.has(h) && h !== 'partners');
-
+            // Always include all headers — never filter them out
+            const headers = Object.keys(sample).filter(h => h !== 'partners');
+        
             const hr = document.createElement('tr');
             headers.forEach(h => {
                 const th = document.createElement('th');
@@ -534,7 +535,7 @@
                 hr.appendChild(th);
             });
             table.appendChild(hr);
-
+        
             records.forEach(rec => {
                 const tr = document.createElement('tr');
                 headers.forEach(h => {
@@ -549,7 +550,7 @@
                     tr.appendChild(td);
                 });
                 table.appendChild(tr);
-
+        
                 rec.partners?.forEach(partner => {
                     const ptr = document.createElement('tr');
                     ptr.style.backgroundColor = '#f8f8f8';
@@ -568,10 +569,10 @@
                     table.appendChild(ptr);
                 });
             });
-
+        
             body.appendChild(table);
         }
-
+        
         function startEditing(rec, field, td, currentValue) {
             td.innerHTML = '';
             const textarea = document.createElement('textarea');
