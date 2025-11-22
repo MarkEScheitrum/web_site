@@ -51,7 +51,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.37</span> — November 21, 2025
+                    Version: <span id="pageVersion">1.0.38</span> — November 21, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -296,7 +296,7 @@
             if (!records.length) return safeShowError('No data to save');
 
             const output = {
-                header: { generator: "recorder.html", version: "1.0.37", date: new Date().toISOString() },
+                header: { generator: "recorder.html", version: "1.0.38", date: new Date().toISOString() },
                 data: records
             };
 
@@ -368,7 +368,7 @@
             } else if (mode === 'recordDeathBurial') {
                 modalTitle.textContent = 'Record Death/Burial';
                 fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map((r, i) => `${i}: ${r.name || '(no name)'}`)], required: true },
+                    { name: 'record',365 label: 'Select Record', type: 'select', options: ['', ...records.map((r, i) => `${i}: ${r.name || '(no name)'}`)], required: true },
                     { name: 'death_date', label: 'Death Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
                     { name: 'death_location', label: 'Death Location', type: 'text' },
                     { name: 'burial_location', label: 'Burial Location', type: 'text' }
@@ -511,19 +511,22 @@
             const body = document.getElementById('recordBody');
             body.innerHTML = '';
             if (!records.length) return;
-        
+
             const table = document.createElement('table');
-            const sample = records[0];
-            // Always include all headers — never filter them out
-            const headers = Object.keys(sample).filter(h => h !== 'partners');
-        
+            // Hard-coded columns — exactly the old CSV version
+            const headers = [
+                'gen', 'name', 'sex', 'birth_date', 'birth_location',
+                'death_date', 'death_location', 'burial_location', 'burial_notes', 'service',
+                'marriage_date', 'relationship', 'divorce', 'parents', 'attributes', 'notes'
+            ];
+
             const hr = document.createElement('tr');
             headers.forEach(h => {
                 const th = document.createElement('th');
                 th.className = h;
-                th.textContent = h === 'generation' ? 'gen' : h.replace(/_/g, ' ');
-                // No eye icon on gen column
-                if (h !== 'gen' && h !== 'generation' && !['record_type','name','sex'].includes(h)) {
+                th.textContent = h.replace(/_/g, ' ');
+                // No eye on gen column
+                if (h !== 'gen' && !['name','sex'].includes(h)) {
                     const eye = document.createElement('span');
                     eye.className = 'eye';
                     eye.textContent = vestigialColumns.has(h) ? '👁️‍🗨️' : '👁️';
@@ -535,13 +538,14 @@
                 hr.appendChild(th);
             });
             table.appendChild(hr);
-        
+
             records.forEach(rec => {
                 const tr = document.createElement('tr');
                 headers.forEach(h => {
                     const td = document.createElement('td');
                     if (vestigialColumns.has(h)) td.classList.add('vestigial');
-                    td.textContent = rec[h] || '';
+                    if (h === 'gen') td.textContent = rec.generation || '';
+                    else td.textContent = rec[h] || '';
                     if (isFieldEditable(rec, h)) {
                         td.style.cursor = 'pointer';
                         td.title = 'Click to edit';
@@ -550,7 +554,7 @@
                     tr.appendChild(td);
                 });
                 table.appendChild(tr);
-        
+
                 rec.partners?.forEach(partner => {
                     const ptr = document.createElement('tr');
                     ptr.style.backgroundColor = '#f8f8f8';
@@ -559,6 +563,9 @@
                         if (vestigialColumns.has(h)) td.classList.add('vestigial');
                         if (h === 'record_type') td.textContent = 'Partner';
                         else if (h === 'name') td.textContent = partner.name || '';
+                        else if (h === 'marriage_date') td.textContent = partner.marriage_date || '';
+                        else if (h === 'relationship') td.textContent = partner.relationship || '';
+                        else if (h === 'divorce') td.textContent = partner.divorced ? 'Yes' : (partner.divorce_date || '');
                         else td.textContent = partner[h] || '';
                         if (isFieldEditable({record_type: 'spouse'}, h)) {
                             td.style.cursor = 'pointer';
@@ -569,10 +576,10 @@
                     table.appendChild(ptr);
                 });
             });
-        
+
             body.appendChild(table);
         }
-        
+
         function startEditing(rec, field, td, currentValue) {
             td.innerHTML = '';
             const textarea = document.createElement('textarea');
