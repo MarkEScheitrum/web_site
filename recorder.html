@@ -687,27 +687,27 @@
             const headers = Object.keys(records[0]);
             const hr = document.createElement('tr');
             headers.forEach(h => {
-                if (vestigialColumns.has(h)) return;
                 const th = document.createElement('th');
-                if (['record_type','gen','name','sex'].includes(h)) {
-                    th.textContent = h;
-                } else {
-                    th.textContent = h;
+                th.textContent = h;
+                if (!['record_type','gen','name','sex'].includes(h)) {
                     const eye = document.createElement('span');
-                    eye.textContent = vestigialColumns.has(h) ? 'Closed Eye' : 'Open Eye';
+                    eye.textContent = vestigialColumns.has(h) ? 'Eye' : 'Open Eye';
                     eye.style.cursor = 'pointer';
                     eye.style.marginLeft = '8px';
                     eye.onclick = (e) => { e.stopPropagation(); toggleColumn(h); };
                     th.appendChild(eye);
                 }
+                if (vestigialColumns.has(h)) th.classList.add('vestigial');
                 hr.appendChild(th);
             });
             table.appendChild(hr);
             records.forEach((rec, idx) => {
                 const tr = document.createElement('tr');
                 headers.forEach(h => {
-                    if (vestigialColumns.has(h)) return;
                     const td = document.createElement('td');
+                    if (vestigialColumns.has(h)) {
+                        td.classList.add('vestigial');
+                    }
                     let value = rec[h] || '';
                     if (h === 'record_type' && value.toLowerCase() === 'spouse') value = 'Partner';
                     td.textContent = value;
