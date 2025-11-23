@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.21</span> — November 22, 2025
+                    Version: <span id="pageVersion">1.0.22</span> — November 22, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -63,15 +63,15 @@
     </div>
 
     <div class="task-buttons" id="taskButtons">
-        <button onclick="loadFromDropbox()" class="task-btn" id="selectLoadBtn">Load Records</button>
-        <button onclick="openRequestModal()" class="task-btn" id="requestEditBtn">Request Edit Package</button>
-        <button onclick="openModal('addChild')" class="task-btn disabled-btn" id="addChildBtn" style="display:none">Add Child</button>
-        <button onclick="openModal('addSpouse')" class="task-btn disabled-btn" id="addSpouseBtn" style="display:none">Add Partner</button>
-        <button onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn" style="display:none">Update Record</button>
-        <button onclick="openModal('recordDeathBurial')" class="task-btn disabled-btn" id="recordDeathBurialBtn" style="display:none">Record Death/Burial</button>
-        <button onclick="toggleTable()" class="task-btn disabled-btn" id="viewTableBtn" style="display:none">View Table</button>
-        <button onclick="downloadCSV()" class="task-btn" id="returnUpdatesBtn" style="display:none">Return Updates</button>
-        <button onclick="exitApp()" class="task-btn" id="exitBtn" style="display:none">Exit</button>
+        <button onclick="loadFromDropbox()" class="task-btn" id="selectLoadBtn">Load Records 📂</button>
+        <button onclick="openRequestModal()" class="task-btn" id="requestEditBtn">Request Edit Package ✉️</button>
+        <button onclick="openModal('addChild')" class="task-btn disabled-btn" id="addChildBtn" style="display:none">Add Child 👶</button>
+        <button onclick="openModal('addSpouse')" class="task-btn disabled-btn" id="addSpouseBtn" style="display:none">Add Partner 💍</button>
+        <button onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn" style="display:none">Update Record ✏️</button>
+        <button onclick="openModal('recordDeathBurial')" class="task-btn disabled-btn" id="recordDeathBurialBtn" style="display:none">Record Death/Burial ⚰️</button>
+        <button onclick="toggleTable()" class="task-btn disabled-btn" id="viewTableBtn" style="display:none">View Table 📋</button>
+        <button onclick="downloadCSV()" class="task-btn" id="returnUpdatesBtn" style="display:none">Return Updates 📤</button>
+        <button onclick="exitApp()" class="task-btn" id="exitBtn" style="display:none">Exit 🚪</button>
     </div>
 
     <input type="file" id="textFile" accept=".zip,.csv" style="display:none;" onchange="handleFileSelect()">
@@ -213,7 +213,7 @@
 
                 safeCloseModal();
                 showPopup(`
-                    <h3 style="color:green">Feedback Submitted</h3>
+                    <h3 style="color:green">✓ Feedback Submitted</h3>
                     <p>Thank you! Your feedback has been saved as:</p>
                     <b>${filename}</b>
                     <p>We appreciate your input.</p>
@@ -375,7 +375,7 @@
                 });
                 safeCloseModal();
                 showPopup(`
-                    <h3 style="color:green">Request Submitted Successfully!</h3>
+                    <h3 style="color:green">✓ Request Submitted Successfully!</h3>
                     <p><strong>Request Time:</strong> ${formattedTimestamp}</p>
                     <p>Your request has been saved as:<br><b>${filename}</b></p>
                     <p>I will prepare your edit package and send you a passphrase by email shortly.</p>
@@ -684,16 +684,17 @@
             body.innerHTML = '';
             if (records.length === 0) return;
             const table = document.createElement('table');
-            const headers = Object.keys(records[0]);
+            const headers = Object.keys(records[0]).filter(h => !vestigialColumns.has(h));
             const hr = document.createElement('tr');
             headers.forEach(h => {
                 const th = document.createElement('th');
                 th.textContent = h;
                 if (!['record_type','gen','name','sex'].includes(h)) {
                     const eye = document.createElement('span');
-                    eye.textContent = vestigialColumns.has(h) ? 'Eye' : 'Open Eye';
+                    eye.textContent = vestigialColumns.has(h) ? '👁️‍🗨️' : '👁️';
                     eye.style.cursor = 'pointer';
                     eye.style.marginLeft = '8px';
+                    eye.style.userSelect = 'none';
                     eye.onclick = (e) => { e.stopPropagation(); toggleColumn(h); };
                     th.appendChild(eye);
                 }
@@ -705,9 +706,7 @@
                 const tr = document.createElement('tr');
                 headers.forEach(h => {
                     const td = document.createElement('td');
-                    if (vestigialColumns.has(h)) {
-                        td.classList.add('vestigial');
-                    }
+                    if (vestigialColumns.has(h)) td.classList.add('vestigial');
                     let value = rec[h] || '';
                     if (h === 'record_type' && value.toLowerCase() === 'spouse') value = 'Partner';
                     td.textContent = value;
