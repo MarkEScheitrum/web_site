@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.1</span> — November 22, 2025
+                    Version: <span id="pageVersion">1.0.2</span> — November 22, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1049,9 +1049,6 @@
                 <label>Your Relationship to This Person (e.g. grandson, niece, self) <span style="color:red">*</span></label>
                 <input type="text" required>
 
-                <label>Desired Passphrase (optional – leave blank and I will choose one)</label>
-                <input type="text" placeholder="e.g. Banana42">
-
                 <button type="button" onclick="submitEditRequest()">Submit Request</button>
             `;
         }
@@ -1064,7 +1061,6 @@
                 requestor_email: inputs[1].value.trim(),
                 starting_person: inputs[2].value.trim(),
                 relationship: inputs[3].value.trim(),
-                desired_passphrase: inputs[4].value.trim() || null
             };
 
             if (!data.requestor_name || !data.requestor_email || !data.starting_person || !data.relationship) {
@@ -1096,7 +1092,7 @@
                     <h3 style="color:green">✓ Request Submitted Successfully!</h3>
                     <p>Your request has been saved as:<br><b>${filename}</b></p>
                     <p>I will prepare your personal edit package shortly.<br>
-                    ${data.desired_passphrase ? 'I will use your chosen passphrase.' : 'I will email you the passphrase when ready.'}</p>
+                    'I will email you the passphrase when ready.'}</p>
                 `);
 
             } catch (err) {
