@@ -113,7 +113,7 @@
     <div class="instructions">
         <h2>How to Use the Genealogy Recorder</h2>
         <ol>
-            <li>Click this <a href="recorder.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one"><strong>Genealogy Recorder</strong></a> link to open the recorder page.</li>
+            <li>Click this <a href="recordercsv.html" id="openEditorLink" aria-label="Open genealogy editor in a new window or focus existing one"><strong>Genealogy Recorder</strong></a> link to open the recorder page.</li>
             <li>You have two options:
                 <ul>
                     <li>If you already have a passphrase from a previous email, click <strong>"Load Records"</strong> and enter it.</li>
@@ -151,7 +151,7 @@
                 const availHeight = screen.availHeight || screen.height;
                 const width = Math.max(800, Math.min(1600, Math.floor(availWidth * 0.8)));
                 const height = Math.max(600, Math.min(900, Math.floor(availHeight * 0.8)));
-                editorWindow = window.open('recorder.html', 'genealogyEditor', `width=${width},height=${height}`);
+                editorWindow = window.open('recordercsv.html', 'genealogyEditor', `width=${width},height=${height}`);
                 if (!editorWindow) {
                     document.getElementById('popupWarning').style.display = 'block';
                 }
@@ -160,3 +160,4 @@
     </script>
 </body>
 </html>
+
