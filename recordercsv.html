@@ -1030,76 +1030,7 @@
             if (debugMode) console.log('Cancelled edit');
             debounceDisplayRecords();
         }
-        // ──────────────────────────────────────────────────────────────
-        // NEW: Request New Edit Package (self-service)
-        // ──────────────────────────────────────────────────────────────
-        function openRequestModal() {
-            safeOpenModal('requestEdit');
-            document.getElementById('modalTitle').textContent = 'Request New Edit Package';
-            document.getElementById('modalForm').innerHTML = `
-                <label>Your Full Name <span style="color:red">*</span></label>
-                <input type="text" required>
 
-                <label>Your Email <span style="color:red">*</span></label>
-                <input type="email" required>
-
-                <label>Starting Person Full Name (exactly as in the tree) <span style="color:red">*</span></label>
-                <input type="text" required>
-
-                <label>Your Relationship to This Person (e.g. grandson, niece, self) <span style="color:red">*</span></label>
-                <input type="text" required>
-
-                <button type="button" onclick="submitEditRequest()">Submit Request</button>
-            `;
-        }
-
-        async function submitEditRequest() {
-            const inputs = document.querySelectorAll('#modalForm input');
-            const data = {
-                timestamp: new Date().toISOString(),
-                requestor_name: inputs[0].value.trim(),
-                requestor_email: inputs[1].value.trim(),
-                starting_person: inputs[2].value.trim(),
-                relationship: inputs[3].value.trim(),
-            };
-
-            if (!data.requestor_name || !data.requestor_email || !data.starting_person || !data.relationship) {
-                safeShowError('Please fill in all required fields.');
-                return;
-            }
-
-            try {
-                const accessToken = await getAccessToken();
-                const dbx = new Dropbox.Dropbox({ accessToken });
-
-                const now = new Date();
-                const datePart = now.toISOString().slice(0,10).replace(/-/g,'');
-                const timePart = now.toTimeString().slice(0,8).replace(/:/g,'');
-                const safeName = data.requestor_name.replace(/[^a-zA-Z0-9]/g, '_').slice(0,20);
-                const filename = `requests/${datePart}_${timePart}_${safeName}.json`;
-
-                const content = JSON.stringify(data, null, 2);
-
-                await dbx.filesUpload({
-                    contents: content,
-                    path: DROPBOX_FOLDER + '/' + filename,
-                    mode: { '.tag': 'add' },
-                    autorename: true
-                });
-
-                safeCloseModal();
-                showPopup(`
-                    <h3 style="color:green">✓ Request Submitted Successfully!</h3>
-                    <p>Your request has been saved as:<br><b>${filename}</b></p>
-                    <p>I will prepare your personal edit package shortly.<br>
-                    'I will email you the passphrase when ready.'}</p>
-                `);
-
-            } catch (err) {
-                safeShowError('Failed to submit request: ' + err.message);
-                console.error(err);
-            }
-        }
         function initDebug() {
             if (window.location.search.includes('debug=1')) {
                 (async () => {
