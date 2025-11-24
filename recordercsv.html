@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.2</span> — November 22, 2025
+                    Version: <span id="pageVersion">1.0.3</span> — November 23, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -66,7 +66,7 @@
         <button onclick="loadFromDropbox()" class="task-btn" id="selectLoadBtn">Load Records 📂</button>
         <button onclick="openRequestModal()" class="task-btn" id="requestEditBtn">Request Edit Package ✉️</button>
         <button onclick="openModal('addChild')" class="task-btn disabled-btn" id="addChildBtn" style="display:none">Add Child 👶</button>
-        <button onclick="openModal('addSpouse')" class="task-btn disabled-btn" id="addSpouseBtn" style="display:none">Add Partner 💍</button>
+        <button onclick="openModal('addPartner')" class="task-btn disabled-btn" id="addPartnerBtn" style="display:none">Add Partner 💍</button>
         <button onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn" style="display:none">Update Record ✏️</button>
         <button onclick="openModal('recordDeathBurial')" class="task-btn disabled-btn" id="recordDeathBurialBtn" style="display:none">Record Death/Burial ⚰️</button>
         <button onclick="toggleTable()" class="task-btn disabled-btn" id="viewTableBtn" style="display:none">View Table 📋</button>
@@ -103,7 +103,7 @@
                 uneditable: ['record_type'],
                 greyedOut: ['gen', 'marriage_date', 'relationship', 'divorced', 'divorce date']
             },
-            spouse: {
+            partner: {
                 editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorce', 'parents'],
                 uneditable: ['record_type'],
                 greyedOut: ['gen', 'sex']
@@ -287,7 +287,7 @@
             hasReturnedUpdates = false;
             document.getElementById('selectLoadBtn').style.display = 'block';
             document.getElementById('requestEditBtn').style.display = 'block';
-            ['addChildBtn','addSpouseBtn','updateRecordBtn','recordDeathBurialBtn','viewTableBtn','returnUpdatesBtn','exitBtn'].forEach(id => {
+            ['addChildBtn','addPartnerBtn','updateRecordBtn','recordDeathBurialBtn','viewTableBtn','returnUpdatesBtn','exitBtn'].forEach(id => {
                 document.getElementById(id).style.display = 'none';
             });
             document.getElementById('fileStatus').textContent = 'No records loaded';
@@ -298,7 +298,7 @@
         function enableButtonsAfterLoad() {
             document.getElementById('selectLoadBtn').style.display = 'none';
             document.getElementById('requestEditBtn').style.display = 'none';
-            ['addChildBtn','addSpouseBtn','updateRecordBtn','recordDeathBurialBtn','viewTableBtn'].forEach(id => {
+            ['addChildBtn','addPartnerBtn','updateRecordBtn','recordDeathBurialBtn','viewTableBtn'].forEach(id => {
                 document.getElementById(id).style.display = 'block';
                 document.getElementById(id).classList.remove('disabled-btn');
             });
@@ -545,7 +545,7 @@
                 modalTitle.textContent = 'Add Child';
                 const selectablePeople = records.filter((r, index) => {
                     if (index === 0 && r.record_type.toLowerCase() === 'person') return false;
-                    if (r.record_type.toLowerCase() === 'spouse') {
+                    if (r.record_type.toLowerCase() === 'partner') {
                         let nextPersonIndex = records.findIndex((rec, i) => i > index && rec.record_type.toLowerCase() === 'person');
                         if (nextPersonIndex === -1) nextPersonIndex = records.length;
                         return index > 0 && index < nextPersonIndex && records[0].record_type.toLowerCase() === 'person';
@@ -559,11 +559,11 @@
                     { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
                     { name: 'birth_location', label: 'Birth Location', type: 'text' }
                 ];
-            } else if (mode === 'addSpouse') {
+            } else if (mode === 'addPartner') {
                 modalTitle.textContent = 'Add Partner';
                 const selectablePeople = records.filter((r, index) => {
                     if (index === 0 && r.record_type.toLowerCase() === 'person') return false;
-                    if (r.record_type.toLowerCase() === 'spouse') {
+                    if (r.record_type.toLowerCase() === 'partner') {
                         let nextPersonIndex = records.findIndex((rec, i) => i > index && rec.record_type.toLowerCase() === 'person');
                         if (nextPersonIndex === -1) nextPersonIndex = records.length;
                         return index > 0 && index < nextPersonIndex && records[0].record_type.toLowerCase() === 'person';
@@ -582,14 +582,14 @@
             } else if (mode === 'updateRecord') {
                 modalTitle.textContent = 'Update Record';
                 fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'partner' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
                     { name: 'field', label: 'Field to Update', type: 'select', options: [''] },
                     { name: 'value', label: 'New Value', type: 'text', required: true }
                 ];
             } else if (mode === 'recordDeathBurial') {
                 modalTitle.textContent = 'Record Death/Burial';
                 fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'partner' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
                     { name: 'death_date', label: 'Death Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
                     { name: 'death_location', label: 'Death Location', type: 'text' },
                     { name: 'burial_location', label: 'Burial Location', type: 'text' }
@@ -640,7 +640,7 @@
                         return;
                     }
                     const [recordType, name] = selectedRecord.split(': ');
-                    const cleanType = recordType.toLowerCase() === 'partner' ? 'spouse' : 'person';
+                    const cleanType = recordType.toLowerCase() === 'partner' ? 'partner' : 'person';
                     const editableFields = [...fieldRestrictions[cleanType].editable];
                     fieldSelect.innerHTML = '';
                     const emptyOption = document.createElement('option');
@@ -761,14 +761,14 @@
                     }
                     records.splice(insertIndex, 0, newRecord);
                     if (debugMode) console.log('Added child record:', newRecord, `at index ${insertIndex}`);
-                } else if (mode === 'addSpouse') {
+                } else if (mode === 'addPartner') {
                     if (!data.name || !data.partner || !data.relationship) { safeShowError('Name, Select Genealogical Partner, and Relationship are required.'); return; }
                     const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
                     if (!partner) { safeShowError('Invalid partner selected.'); return; }
                     if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
                     if (data.marriage_date && !isValidDate(data.marriage_date)) { safeShowError('Invalid marriage date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
                     const newRecord = {
-                        record_type: 'Spouse',
+                        record_type: 'Partner',
                         gen: '',
                         name: data.name,
                         sex: '',
@@ -787,31 +787,31 @@
                         notes: ''
                     };
                     let insertIndex = records.indexOf(partner) + 1;
-                    const spouses = records.slice(insertIndex).filter((r, i, arr) => r.record_type.toLowerCase() === 'spouse' && (i + insertIndex === records.length - 1 || records[i + insertIndex + 1].record_type.toLowerCase() !== 'spouse'));
-                    if (debugMode) console.log(`Found ${spouses.length} spouses for partner ${partner.name}`);
-                    if (spouses.length > 0 && data.marriage_date) {
+                    const partners = records.slice(insertIndex).filter((r, i, arr) => r.record_type.toLowerCase() === 'partner' && (i + insertIndex === records.length - 1 || records[i + insertIndex + 1].record_type.toLowerCase() !== 'partner'));
+                    if (debugMode) console.log(`Found ${partners.length} partners for partner ${partner.name}`);
+                    if (partners.length > 0 && data.marriage_date) {
                         const newTimestamp = dateToTimestamp(data.marriage_date);
-                        if (debugMode) console.log(`New spouse marriage_date: ${data.marriage_date}, timestamp: ${newTimestamp}`);
-                        const sortedSpouses = spouses.map((spouse, i) => ({ index: i + insertIndex, ts: dateToTimestamp(spouse.marriage_date) })).sort((a, b) => a.ts - b.ts);
-                        if (debugMode) console.log(`Sorted spouses:`, sortedSpouses);
-                        const insertPos = sortedSpouses.findIndex(s => s.ts > newTimestamp);
-                        insertIndex = insertPos === -1 ? sortedSpouses[sortedSpouses.length - 1].index + 1 : sortedSpouses[insertPos].index;
-                        if (debugMode) console.log(`Inserting spouse at index ${insertIndex}`);
+                        if (debugMode) console.log(`New partner marriage_date: ${data.marriage_date}, timestamp: ${newTimestamp}`);
+                        const sortedPartners = partners.map((partner, i) => ({ index: i + insertIndex, ts: dateToTimestamp(partner.marriage_date) })).sort((a, b) => a.ts - b.ts);
+                        if (debugMode) console.log(`Sorted partners:`, sortedPartners);
+                        const insertPos = sortedPartners.findIndex(s => s.ts > newTimestamp);
+                        insertIndex = insertPos === -1 ? sortedPartners[sortedPartners.length - 1].index + 1 : sortedPartners[insertPos].index;
+                        if (debugMode) console.log(`Inserting partner at index ${insertIndex}`);
                     }
                     records.splice(insertIndex, 0, newRecord);
-                    if (debugMode) console.log('Added spouse record:', newRecord, `at index ${insertIndex}`);
+                    if (debugMode) console.log('Added partner record:', newRecord, `at index ${insertIndex}`);
                 } else if (mode === 'updateRecord') {
                     if (!data.record || !data.field) { safeShowError('Please select a record and field.'); return; }
                     if (!data.value && data.field !== 'attributes' && data.field !== 'sex') { safeShowError('Please enter a value.'); return; }
                     const [recordType, name] = data.record.split(': ');
-                    const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
+                    const record = records.find(r => (r.record_type.toLowerCase() === 'partner' ? 'Partner' : r.record_type) === recordType && r.name === name);
                     if (!record) { safeShowError('Invalid record selected.'); return; }
                     if (data.field === 'relationship' && !['', 'spouse', 'partner', 'other'].includes(data.value)) { safeShowError('Relationship must be "spouse", "partner", or "other".'); return; }
                     if (data.field === 'attributes' && !['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'].includes(data.value)) { safeShowError('Attributes must be one of: None, stillborn, step, foster, adopted, continuation.'); return; }
                     if (data.field === 'sex' && !['', 'male', 'female'].includes(data.value)) { safeShowError('Sex must be one of: male, female, or empty.'); return; }
                     if (data.field === 'divorce' && data.value && data.value !== 'true' && !isValidDate(data.value)) { safeShowError('Divorce must be a valid date, "true", or empty.'); return; }
                     if (dateFields.includes(data.field) && data.value && !isValidDate(data.value)) { safeShowError('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
-                    const cleanType = recordType.toLowerCase() === 'partner' ? 'spouse' : 'person';
+                    const cleanType = recordType.toLowerCase() === 'partner' ? 'partner' : 'person';
                     const isEditable = fieldRestrictions[cleanType].editable.includes(data.field);
                     if (isEditable) {
                         const oldValue = record[data.field];
@@ -824,7 +824,7 @@
                 } else if (mode === 'recordDeathBurial') {
                     if (!data.record) { safeShowError('Please select a record.'); return; }
                     const [recordType, name] = data.record.split(': ');
-                    const record = records.find(r => (r.record_type.toLowerCase() === 'spouse' ? 'Partner' : r.record_type) === recordType && r.name === name);
+                    const record = records.find(r => (r.record_type.toLowerCase() === 'partner' ? 'Partner' : r.record_type) === recordType && r.name === name);
                     if (!record) { safeShowError('Invalid record selected.'); return; }
                     if (data.death_date && !isValidDate(data.death_date)) { safeShowError('Invalid death date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
                     let updated = false;
@@ -915,7 +915,7 @@
                     const td = document.createElement('td');
                     td.className = header;
                     const cellContent = document.createElement('span');
-                    const displayValue = header === 'record_type' && record[header].toLowerCase() === 'spouse' ? 'Partner' : header === 'sex' ? (record[header] || '') : record[header] || '';
+                    const displayValue = header === 'record_type' && record[header].toLowerCase() === 'partner' ? 'Partner' : header === 'sex' ? (record[header] || '') : record[header] || '';
                     cellContent.textContent = displayValue;
                     cellContent.className = 'cell-content';
                     td.appendChild(cellContent);
