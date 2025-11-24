@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.3</span> — November 23, 2025
+                    Version: <span id="pageVersion">1.0.4</span> — November 23, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -766,7 +766,8 @@
                     const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
                     if (!partner) { safeShowError('Invalid partner selected.'); return; }
                     if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
-                    if (data.marriage_date && !isValidDate(data.marriage_date)) { safeShowError('Invalid marriage date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
+                    if (data.marriage_date && !isValidDate(data.marriage_date)) { safeShowError('Invalid marriage date. Use YYYY-MM-DD, YYYY-MM or YYYY.'); return; }
+
                     const newRecord = {
                         record_type: 'Partner',
                         gen: '',
@@ -786,18 +787,44 @@
                         unprocessed_items: '',
                         notes: ''
                     };
+
                     let insertIndex = records.indexOf(partner) + 1;
-                    const partners = records.slice(insertIndex).filter((r, i, arr) => r.record_type.toLowerCase() === 'partner' && (i + insertIndex === records.length - 1 || records[i + insertIndex + 1].record_type.toLowerCase() !== 'partner'));
-                    if (debugMode) console.log(`Found ${partners.length} partners for partner ${partner.name}`);
-                    if (partners.length > 0 && data.marriage_date) {
-                        const newTimestamp = dateToTimestamp(data.marriage_date);
-                        if (debugMode) console.log(`New partner marriage_date: ${data.marriage_date}, timestamp: ${newTimestamp}`);
-                        const sortedPartners = partners.map((partner, i) => ({ index: i + insertIndex, ts: dateToTimestamp(partner.marriage_date) })).sort((a, b) => a.ts - b.ts);
-                        if (debugMode) console.log(`Sorted partners:`, sortedPartners);
-                        const insertPos = sortedPartners.findIndex(s => s.ts > newTimestamp);
-                        insertIndex = insertPos === -1 ? sortedPartners[sortedPartners.length - 1].index + 1 : sortedPartners[insertPos].index;
-                        if (debugMode) console.log(`Inserting partner at index ${insertIndex}`);
+
+                    // CASE 1: Check if the very next record is already a Partner of this exact person
+                    // If yes → scan consecutive partners and insert by marriage_date order
+                    if (insertIndex < records.length && 
+                        records[insertIndex].record_type.toLowerCase() === 'partner') {
+                        
+                        // Find the full consecutive block of partners (stop at first non-partner or partner of someone else)
+                        let partnerEnd = insertIndex;
+                        while (partnerEnd < records.length && 
+                               records[partnerEnd].record_type.toLowerCase() === 'partner') {
+                            partnerEnd++;
+                        }
+
+                        const partners = records.slice(insertIndex, partnerEnd);
+                        if (data.marriage_date) {
+                            const newTimestamp = dateToTimestamp(data.marriage_date);
+                            const sortedPartners = partners.map((s, i) => ({
+                                index: insertIndex + i,
+                                ts: dateToTimestamp(s.marriage_date)
+                            })).sort((a, b) => a.ts - b.ts);
+
+                            const insertPos = sortedPartners.findIndex(s => s.ts > newTimestamp);
+                            insertIndex = insertPos === -1 
+                                ? partnerEnd 
+                                : sortedPartners[insertPos].index;
+                        } else {
+                            // No marriage date → append to end of existing partner block
+                            insertIndex = partnerEnd;
+                        }
                     }
+                    // CASE 2: Next record is NOT a partner (or file ends) → insert immediately after partner
+                    // This is the correct and only behavior when no partner block exists yet
+                    else {
+                        // insertIndex is already set to partner + 1 → do nothing, insert here
+                    }
+
                     records.splice(insertIndex, 0, newRecord);
                     if (debugMode) console.log('Added partner record:', newRecord, `at index ${insertIndex}`);
                 } else if (mode === 'updateRecord') {
