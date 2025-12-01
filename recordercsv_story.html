@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.7</span> — November 23, 2025
+                    Version: <span id="pageVersion">1.0.8</span> — November 23, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -134,45 +134,98 @@
 
         function openStoryModal(preselectedIndex = null) {
             safeOpenModal('story');
-            document.getElementById('modalTitle').textContent = 'Edit Story';
+            document.getElementById('modalTitle').innerHTML = 
+                'Story Editor ' + (preselectedIndex !== null ? '' : '<small style="color:#666;font-weight:normal"> – select a person below</small>');
 
-            let optionsHtml = '<option value="">-- Select Person --</option>';
+            let optionsHtml = '<option value="">-- Select Person to Edit Story --</option>';
             records.forEach((r, i) => {
-                const label = `${r.record_type === 'Partner' ? 'Partner' : 'Person'}: ${r.name}`;
-                optionsHtml += `<option value="${i}" ${i === preselectedIndex ? 'selected' : ''}>${label}</option>`;
+                const type = r.record_type.toLowerCase() === 'partner' ? 'Partner' : 'Person';
+                const hasStory = (r.story || '').trim().length > 0;
+                const icon = hasStory ? 'open book' : 'closed book';
+                optionsHtml += `<option value="${i}" ${i === preselectedIndex ? 'selected' : ''}>${type}: ${r.name} ${icon}</option>`;
             });
 
             document.getElementById('modalForm').innerHTML = `
-                <label>Select Person</label>
-                <select id="storyPersonSelect" ${preselectedIndex !== null ? 'disabled' : ''}>
-                    ${optionsHtml}
-                </select>
+                <div style="margin-bottom:12px;">
+                    <label>Person</label>
+                    <select id="storyPersonSelect" style="width:100%;padding:10px;font-size:16px;" ${preselectedIndex !== null ? 'disabled' : ''}>
+                        ${optionsHtml}
+                    </select>
+                </div>
 
-                <label>Story (supports multiple paragraphs)</label>
-                <textarea id="storyText" rows="18" style="width:100%;font-family:serif;font-size:16px;"></textarea>
+                <div style="margin-bottom:12px;">
+                    <label>Story <span id="storyCounter" style="float:right;color:#666;font-size:14px;">0 words • 0 characters</span></label>
+                    <textarea id="storyText" rows="24" placeholder="Write the life story here… Multiple paragraphs are fully supported.&#10;You can paste from Word, Google Docs, etc."
+                            style="width:100%;font-family:Georgia,serif;font-size:17px;line-height:1.6;padding:12px;border:1px solid #999;border-radius:6px;resize:vertical;"></textarea>
+                </div>
 
-                <button type="button" onclick="saveStory()">Save Story</button>
-                <button type="button" onclick="closeModal()" style="background:#666;margin-left:10px;">Cancel</button>
+                <div style="text-align:center;margin-top:12px;">
+                    <button type="button" onclick="saveStory()" style="padding:12px 24px;font-size:17px;background:#28a745;">
+                        Save Story
+                    </button>
+                    <button type="button" onclick="copyStoryToClipboard()" style="margin:0 8px;padding:10px 18px;background:#007bff;">
+                        Copy to Clipboard
+                    </button>
+                    <button type="button" onclick="clearStoryConfirm()" style="padding:10px 18px;background:#dc3545;">
+                        Clear Story
+                    </button>
+                    <button type="button" onclick="closeModal()" style="margin-left:8px;padding:10px 18px;background:#666;">
+                        Cancel
+                    </button>
+                </div>
             `;
+
+            const textarea = document.getElementById('storyText');
+            const counter   = document.getElementById('storyCounter');
+
+            const updateCounter = () => {
+                const text = textarea.value;
+                const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+                const chars = text.length;
+                counter.textContent = `${words} word${words===1?'':'s'} • ${chars} character${chars===1?'':'s'}`;
+            };
 
             const fillStory = (idx) => {
                 if (idx === null || idx === '') {
-                    document.getElementById('storyText').value = '';
-                    return;
+                    textarea.value = '';
+                } else {
+                    textarea.value = (records[idx].story || '').trim();
                 }
-                const rec = records[idx];
-                document.getElementById('storyText').value = (rec.story || '').trim();
+                updateCounter();
+                textarea.focus();
+                textarea.setSelectionRange(textarea.value.length, textarea.value.length); // cursor at end
             };
+
+            textarea.addEventListener('input', updateCounter);
 
             if (preselectedIndex !== null) {
                 fillStory(preselectedIndex);
             } else {
-                document.getElementById('storyPersonSelect').addEventListener('change', (e) => {
-                    fillStory(e.target.value);
-                });
+                document.getElementById('storyPersonSelect').addEventListener('change', e => fillStory(e.target.value));
             }
         }
 
+        function copyStoryToClipboard() {
+            const txt = document.getElementById('storyText');
+            txt.select();
+            document.execCommand('copy');
+            const btn = event.target;
+            const old = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.style.background = '#218838';
+            setTimeout(() => {
+                btn.textContent = old;
+                btn.style.background = '#007bff';
+            }, 1500);
+        }
+
+        function clearStoryConfirm() {
+            if (confirm('Permanently delete this entire story? This cannot be undone.')) {
+                document.getElementById('storyText').value = '';
+                saveStory();  // saves the now-empty story
+            }
+        }
+        
         function saveStory() {
             const select = document.getElementById('storyPersonSelect');
             const idx = select.disabled ? select.querySelector('option[selected]')?.value || select.value : select.value;
