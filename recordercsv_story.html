@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.6</span> — November 23, 2025
+                    Version: <span id="pageVersion">1.0.7</span> — November 23, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -542,7 +542,9 @@
                 }
                 blob = new Blob([uint8], { type: 'application/octet-stream' });
             }
+
             if (isEncryptedZip) {
+                // === Normal encrypted workflow: upload edited ZIP to Dropbox ===
                 try {
                     const accessToken = await getAccessToken();
                     const dbx = new Dropbox.Dropbox({ accessToken });
@@ -557,7 +559,24 @@
                 } catch (err) {
                     safeShowError(`Failed to upload to Dropbox: ${err.message}`);
                 }
+            } else if (isInputCsv) {
+                // === Local CSV debug mode: trigger download instead of Dropbox upload ===
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `edited_${originalFileName.replace(/\.zip$/i, '')}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showPopup(`<h3 style="color:green">CSV Saved Locally</h3>
+                          <p>Your edited records have been downloaded as:</p>
+                          <b>edited_${originalFileName.replace(/\.zip$/i, '')}.csv</b>`);
+                hasReturnedUpdates = true;
+                document.getElementById('exitBtn').style.display = 'block';
+                document.getElementById('fileStatus').textContent = `Local CSV Updates Saved`;
             }
+
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -1208,6 +1227,10 @@
             }
         }
         initDebug();
+        // ──────────────────────────────────────────────────────────────
+        //  RESTORE: Connect the file input to handleFileSelect
+        // ──────────────────────────────────────────────────────────────
+        document.getElementById('textFile').addEventListener('change', handleFileSelect);
     </script>
 </body>
 </html>
