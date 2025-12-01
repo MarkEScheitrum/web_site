@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.5</span> — November 23, 2025
+                    Version: <span id="pageVersion">1.0.6</span> — November 23, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -279,6 +279,13 @@
         }
 
         async function loadFromDropbox() {
+            // === DEBUG MODE: Bypass passphrase + Dropbox entirely, go straight to file picker ===
+            if (debugMode) {
+                document.getElementById('textFile').click();  // trigger native file picker immediately
+                return;
+            }
+
+            // === NORMAL MODE: existing encrypted Dropbox flow ===
             const passphrase = await askPassphrase('File Retrieval');
             if (!passphrase) return;
             exchangePassphrase = passphrase;
@@ -313,7 +320,7 @@
                 resetSession();
             }
         }
-
+        
         function askPassphrase(promptText) {
             return new Promise(resolve => {
                 safeOpenModal('passphrase');
