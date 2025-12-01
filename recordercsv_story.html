@@ -560,6 +560,62 @@
             }
         }
 
+        // ──────────────────────────────────────────────────────────────
+        //  RESTORE MISSING: handleFileSelect() – critical for debug CSV loading
+        // ──────────────────────────────────────────────────────────────
+        function handleFileSelect() {
+            const file = document.getElementById('textFile').files[0];
+            if (!file) return;
+
+            if (file.name.endsWith('.csv')) {
+                isInputCsv = true;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        records = parseCSV(e.target.result);
+                        originalFileName = file.name.replace(/\.csv$/i, '.zip');
+                        ticketNumber = originalFileName.match(/records_(\d+)\.zip/)?.[1] || 'Local';
+                        document.getElementById('fileStatus').textContent = `Local CSV Loaded – ${file.name}`;
+                        finishLoad();
+                    } catch (err) {
+                        safeShowError('Failed to parse CSV: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+                return;
+            }
+
+            if (file.name.endsWith('.zip')) {
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const buffer = e.target.result;
+                        const passphrase = await askPassphrase('Decrypt Local ZIP');
+                        if (!passphrase) return;
+                        const plainZip = decryptBlob(buffer, passphrase);
+                        const zip = await JSZip.loadAsync(plainZip);
+                        const csvEntry = Object.values(zip.files).find(f => f.name.endsWith('.csv'));
+                        if (!csvEntry) throw new Error('No CSV found in ZIP');
+                        originalFileName = csvEntry.name.replace(/\.csv$/, '.zip');
+                        ticketNumber = originalFileName.match(/records_(\d+)\.zip/)?.[1] || 'Local';
+                        document.getElementById('fileStatus').textContent = `Local ZIP Loaded – Ticket ${ticketNumber}`;
+                        const text = await csvEntry.async('text');
+                        records = parseCSV(text);
+                        isEncryptedZip = true;
+                        decryptionPassphrase = passphrase;
+                        exchangePassphrase = passphrase;
+                        finishLoad();
+                    } catch (err) {
+                        safeShowError('Failed to load ZIP: ' + err.message);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+                return;
+            }
+
+            safeShowError('Please select a .csv or encrypted .zip file');
+        }
+
         function dateToTimestamp(dateStr) {
             if (!dateStr) return Infinity;
             const parts = dateStr.split('-').map(Number);
