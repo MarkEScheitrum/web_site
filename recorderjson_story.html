@@ -381,18 +381,21 @@ async function loadFromDropbox() {
         
         function askPassphrase(promptText) {
             return new Promise(resolve => {
-                safeOpenModal('passphrase');
-                document.getElementById('modalTitle').textContent = `Enter Passphrase for ${promptText}`;
-                document.getElementById('modalForm').innerHTML = `
-                    <label>Passphrase</label>
-                    <input type="password" id="pp" autocomplete="off" data-lpignore="true" autofocus>
-                    <button type="button" onclick="window.resolvePass()">Submit</button>
-                `;
-                window.resolvePass = () => {
-                    const val = document.getElementById('pp').value;
-                    safeCloseModal();
-                    resolve(val || null);
-                };
+                // Defer execution until next tick — ensures safeOpenModal exists
+                setTimeout(() => {
+                    safeOpenModal('passphrase');
+                    document.getElementById('modalTitle').textContent = `Enter Passphrase for ${promptText}`;
+                    document.getElementById('modalForm').innerHTML = `
+                        <label>Passphrase</label>
+                        <input type="password" id="pp" autocomplete="off" data-lpignore="true" autofocus>
+                        <button type="button" onclick="window.resolvePass()">Submit</button>
+                    `;
+                    window.resolvePass = () => {
+                        const val = document.getElementById('pp').value;
+                        safeCloseModal();
+                        resolve(val || null);
+                    };
+                }, 0);
             });
         }
 
