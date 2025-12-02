@@ -1314,7 +1314,7 @@ async function loadFromDropbox() {
                     if (CryptoJS.SHA256(pp).toString() === debugPassphraseHash) {
                         debugMode = true;
                         console.log('DEBUG MODE ON');
-                        document.getElementById('textFile').setAttribute('accept', '.zip,.csv');
+                        document.getElementById('textFile').setAttribute('accept', '.zip,.json');
                     } else {
                         console.log('Debug mode disabled - incorrect passphrase');
                     }
