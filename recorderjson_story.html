@@ -133,47 +133,33 @@
             }
         }
 
-        function openStoryModal() {
+        function openStoryModal(personIndex = null, partnerRecordId = null) {
             if (!records || records.length === 0) {
-                safeShowError('No records loaded. Please load a file first.');
+                safeShowError('No records loaded.');
                 return;
             }
 
             safeOpenModal('story');
             document.getElementById('modalTitle').textContent = 'Edit Story';
 
-            // Build full list: all main persons + all partners
+            // Build list in tree order (same as records array)
             const allPeople = [];
-            
-            records.forEach((person, personIdx) => {
-                // Add main person
-                allPeople.push({
-                    label: person.name,
-                    personIndex: personIdx,
-                    partnerId: null
-                });
-
-                // Add all partners
-                (person.partners || []).forEach(partner => {
-                    allPeople.push({
-                        label: `Partner: ${partner.name || '(unnamed)'}`,
-                        personIndex: personIdx,
-                        partnerId: partner.record_id
-                    });
+            records.forEach((person, idx) => {
+                allPeople.push({ label: person.name, personIndex: idx, partnerId: null });
+                (person.partners || []).forEach(p => {
+                    allPeople.push({ label: `└ ${p.name || '(unnamed)'}`, personIndex: idx, partnerId: p.record_id });
                 });
             });
 
-            // Sort alphabetically
-            allPeople.sort((a, b) => a.label.localeCompare(b.label));
-
-            // Build dropdown
             let optionsHtml = '<option value="">-- Select Person or Partner --</option>';
             allPeople.forEach(item => {
-                const hasStory = item.partnerId 
+                const hasStory = item.partnerId
                     ? (records[item.personIndex].partners.find(p => p.record_id === item.partnerId)?.story || '').trim().length > 0
                     : (records[item.personIndex].story || '').trim().length > 0;
                 const icon = hasStory ? 'open_book' : 'closed_book';
-                optionsHtml += `<option value="${item.personIndex}|${item.partnerId || ''}">${item.label} ${icon}</option>`;
+                const value = `${item.personIndex}|${item.partnerId || ''}`;
+                const selected = (personIndex === item.personIndex && partnerRecordId === item.partnerId) ? 'selected' : '';
+                optionsHtml += `<option value="${value}" ${selected}>${item.label} ${icon}</option>`;
             });
 
             document.getElementById('modalForm').innerHTML = `
@@ -183,26 +169,16 @@
                         ${optionsHtml}
                     </select>
                 </div>
-
                 <div style="margin-bottom:12px;">
                     <label>Story <span id="storyCounter" style="float:right;color:#666;font-size:14px;">0 words • 0 characters</span></label>
-                    <textarea id="storyText" rows="24" placeholder="Write the life story here… Multiple paragraphs are fully supported.&#10;You can paste from Word, Google Docs, etc."
+                    <textarea id="storyText" rows="24" placeholder="Write the life story here…"
                             style="width:100%;font-family:Georgia,serif;font-size:17px;line-height:1.6;padding:12px;border:1px solid #999;border-radius:6px;resize:vertical;"></textarea>
                 </div>
-
                 <div style="text-align:center;margin-top:12px;">
-                    <button type="button" onclick="saveStoryFromModal()" style="padding:12px 24px;font-size:17px;background:#28a745;">
-                        Save Story
-                    </button>
-                    <button type="button" onclick="copyStoryToClipboard()" style="margin:0 8px;padding:10px 18px;background:#007bff;">
-                        Copy to Clipboard
-                    </button>
-                    <button type="button" onclick="clearStoryFromModal()" style="padding:10px 18px;background:#dc3545;">
-                        Clear Story
-                    </button>
-                    <button type="button" onclick="closeModal()" style="margin-left:8px;padding:10px 18px;background:#666;">
-                        Cancel
-                    </button>
+                    <button type="button" onclick="saveStoryFromModal()" style="padding:12px 24px;font-size:17px;background:#28a745;">Save Story</button>
+                    <button type="button" onclick="copyStoryToClipboard()" style="margin:0 8px;padding:10px 18px;background:#007bff;">Copy</button>
+                    <button type="button" onclick="clearStoryFromModal()" style="padding:10px 18px;background:#dc3545;">Clear</button>
+                    <button type="button" onclick="closeModal()" style="margin-left:8px;padding:10px 18px;background:#666;">Cancel</button>
                 </div>
             `;
 
@@ -214,112 +190,47 @@
                 const text = textarea.value;
                 const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
                 const chars = text.length;
-                counter.textContent = `${words} word${words===1?'':'s'} • ${chars} character${chars===1?'':'s'}`;
+                counter.textContent = `${words} word${words===1?'':'s'} • ${chars} chars`;
             };
 
-            const loadSelectedStory = () => {
-                const value = select.value;
-                if (!value) {
-                    textarea.value = '';
-                    updateCounter();
-                    return;
-                }
-
-                const [personIdx, partnerId] = value.split('|');
-                const personIndex = parseInt(personIdx);
-
+            const loadStory = () => {
+                const [pIdx, pId] = select.value.split('|');
+                const idx = parseInt(pIdx);
                 let story = '';
-                if (partnerId) {
-                    const partner = records[personIndex].partners.find(p => p.record_id === partnerId);
+                if (pId) {
+                    const partner = records[idx].partners.find(p => p.record_id === pId);
                     story = partner?.story || '';
-                } else {
-                    story = records[personIndex].story || '';
+                } else if (idx >= 0) {
+                    story = records[idx].story || '';
                 }
-
                 textarea.value = story.trim();
                 updateCounter();
-                textarea.focus();
             };
 
-            select.addEventListener('change', loadSelectedStory);
+            select.addEventListener('change', loadStory);
             textarea.addEventListener('input', updateCounter);
+            loadStory();
 
-            // Global helpers for Save/Clear buttons
             window.saveStoryFromModal = () => {
-                const value = select.value;
-                if (!value) {
-                    safeShowError('Please select a person or partner.');
-                    return;
-                }
-                const [personIdx, partnerId] = value.split('|');
-                const personIndex = parseInt(personIdx);
+                const [pIdx, pId] = select.value.split('|');
+                const idx = parseInt(pIdx);
                 const story = textarea.value;
-
-                if (partnerId) {
-                    const partner = records[personIndex].partners.find(p => p.record_id === partnerId);
+                if (pId) {
+                    const partner = records[idx].partners.find(p => p.record_id === pId);
                     if (partner) partner.story = story;
                 } else {
-                    records[personIndex].story = story;
+                    records[idx].story = story;
                 }
-
                 safeCloseModal();
                 debounceDisplayRecords();
             };
 
             window.clearStoryFromModal = () => {
-                if (confirm('Permanently delete this story?')) {
+                if (confirm('Delete this story permanently?')) {
                     textarea.value = '';
                     saveStoryFromModal();
                 }
             };
-        }
-
-        function copyStoryToClipboard() {
-            const txt = document.getElementById('storyText');
-            txt.select();
-            document.execCommand('copy');
-            const btn = event.target;
-            const old = btn.textContent;
-            btn.textContent = 'Copied!';
-            btn.style.background = '#218838';
-            setTimeout(() => {
-                btn.textContent = old;
-                btn.style.background = '#007bff';
-            }, 1500);
-        }
-
-        function saveStory(personIndex, partnerRecordId = null) {
-            const story = document.getElementById('storyText').value;
-            if (partnerRecordId) {
-                const person = records[personIndex];
-                const partner = person.partners.find(p => p.record_id === partnerRecordId);
-                if (partner) partner.story = story;
-            } else {
-                records[personIndex].story = story;
-            }
-            safeCloseModal();
-            debounceDisplayRecords();
-        }
-
-        function clearStoryConfirm(personIndex, partnerRecordId = null) {
-            if (confirm('Permanently delete this entire story? This cannot be undone.')) {
-                document.getElementById('storyText').value = '';
-                saveStory(personIndex, partnerRecordId);
-            }
-        }       
-
-        function safeOpenModal(mode) {
-            if (window.location.search && !window.location.search.includes('debug=1'))
-                window.history.replaceState({}, document.title, window.location.pathname);
-            modalMode = mode;
-            document.getElementById('modal').style.display = 'block';
-            document.getElementById('modalForm').innerHTML = '';
-        }
-
-        function safeCloseModal() {
-            document.getElementById('modal').style.display = 'none';
-            modalMode = null;
-            document.getElementById('modalForm').innerHTML = '';
         }
 
         function safeShowError(message) {
@@ -890,15 +801,25 @@ async function loadFromDropbox() {
                 ];
             } else if (mode === 'updateRecord') {
                 modalTitle.textContent = 'Update Record';
+                const recordOptions = records.flatMap((person, i) => {
+                    const main = person.name || '(no name)';
+                    const partners = (person.partners || []).map(p => `Partner: ${p.name || '(no name)'}`);
+                    return [main, ...partners];
+                });
                 fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'partner' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...recordOptions], required: true },
                     { name: 'field', label: 'Field to Update', type: 'select', options: [''] },
                     { name: 'value', label: 'New Value', type: 'text', required: true }
                 ];
             } else if (mode === 'recordDeathBurial') {
                 modalTitle.textContent = 'Record Death/Burial';
+                const recordOptions = records.flatMap((person, i) => {
+                    const main = person.name || '(no name)';
+                    const partners = (person.partners || []).map(p => `Partner: ${p.name || '(no name)'}`);
+                    return [main, ...partners];
+                });
                 fields = [
-                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...records.map(r => `${r.record_type.toLowerCase() === 'partner' ? 'Partner' : r.record_type}: ${r.name}`)], required: true },
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...recordOptions], required: true },
                     { name: 'death_date', label: 'Death Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
                     { name: 'death_location', label: 'Death Location', type: 'text' },
                     { name: 'burial_location', label: 'Burial Location', type: 'text' }
@@ -1170,6 +1091,8 @@ async function loadFromDropbox() {
                     if (!updated) { safeShowError('At least one field (Death Date, Death Location, or Burial Location) must be provided and editable.'); return; }
                     if (debugMode) console.log(`Updated death/burial info for ${name}`);
                 }
+                
+                
                 safeCloseModal();
                 debounceDisplayRecords();
                 if (debugMode) console.log(`Saved ${mode} data:`, data);
@@ -1309,16 +1232,17 @@ async function loadFromDropbox() {
                     td.className = col.key;
 
                     if (col.key === 'story') {
-                        const hasStory = row.isPartner 
-                            ? (row.partnerData.story || '').trim().length > 0 
-                            : (row.story || '').trim().length > 0;td.textContent = hasStory ? '📖' : '📕';
+                        const hasStory = row.isPartner
+                            ? (row.partnerData.story || '').trim().length > 0
+                            : (row.story || '').trim().length > 0;
+                        td.textContent = hasStory ? '👁️‍🗨️' : '👁️';
                         td.style.fontSize = '20px';
                         td.style.cursor = 'pointer';
                         td.title = hasStory ? 'Click to edit story' : 'Click to add story';
-                        td.onclick = () => openStoryModal(
-                            row.personIndex,
-                            row.isPartner ? row.partnerData.record_id : null
-                        );
+                        td.onclick = (e) => {
+                            e.stopPropagation();
+                            openStoryModal(row.personIndex, row.isPartner ? row.partnerData.record_id : null);
+                        };
                     } else if (col.key === 'record_type') {
                         td.textContent = row.isPartner ? 'Partner' : 'Person';
                     } else if (col.key === 'gen') {
