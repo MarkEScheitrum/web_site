@@ -221,16 +221,65 @@
                 } else {
                     records[idx].story = story;
                 }
+
                 safeCloseModal();
                 debounceDisplayRecords();
             };
 
             window.clearStoryFromModal = () => {
-                if (confirm('Delete this story permanently?')) {
+                if (confirm('Permanently delete this story?')) {
                     textarea.value = '';
                     saveStoryFromModal();
                 }
             };
+        }
+
+        function copyStoryToClipboard() {
+            const txt = document.getElementById('storyText');
+            txt.select();
+            document.execCommand('copy');
+            const btn = event.target;
+            const old = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.style.background = '#218838';
+            setTimeout(() => {
+                btn.textContent = old;
+                btn.style.background = '#007bff';
+            }, 1500);
+        }
+
+        function saveStory(personIndex, partnerRecordId = null) {
+            const story = document.getElementById('storyText').value;
+            if (partnerRecordId) {
+                const person = records[personIndex];
+                const partner = person.partners.find(p => p.record_id === partnerRecordId);
+                if (partner) partner.story = story;
+            } else {
+                records[personIndex].story = story;
+            }
+            safeCloseModal();
+            debounceDisplayRecords();
+        }
+
+        function clearStoryConfirm(personIndex, partnerRecordId = null) {
+            if (confirm('Permanently delete this entire story? This cannot be undone.')) {
+                document.getElementById('storyText').value = '';
+                saveStory(personIndex, partnerRecordId);
+            }
+        }       
+
+        function safeOpenModal(mode) {
+            if (window.location.search && !window.location.search.includes('debug=1'))
+                window.history.replaceState({}, document.title, window.location.pathname);
+            modalMode = mode;
+            document.getElementById('modal').style.display = 'block';
+            document.getElementById('modalForm').innerHTML = '';
+        }
+
+        function safeCloseModal() {
+            document.getElementById('modal').style.display = 'none';
+            modalMode = null;
+            document.getElementById('modalForm').innerHTML = '';
         }
 
         function safeShowError(message) {
