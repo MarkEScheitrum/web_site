@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.2</span> — December 01, 2025
+                    Version: <span id="pageVersion">1.0.3</span> — December 01, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -96,6 +96,7 @@
         let renderTimeout = null;
         let ticketNumber = null;
         let hasReturnedUpdates = false;
+        let editingPartnerId = null;  // tracks which partner we're editing
         const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
         const fieldRestrictions = {
@@ -1313,88 +1314,129 @@ async function loadFromDropbox() {
             recordBody.appendChild(table);
         }
 
-        function startEditing(index, field, td, currentValue) {
-            editingIndex = index;
+        // ──────────────────────────────────────────────────────────────
+        // 1. startEditing — now supports nested partner paths
+        // ──────────────────────────────────────────────────────────────
+        function startEditing(personIndex, field, td, currentValue, partnerRecordId = null) {
+            editingIndex = personIndex;
             editingField = field;
+            editingPartnerId = partnerRecordId;  // null for main person, string for partner
+
             td.innerHTML = '';
-            if (field === 'relationship' && records[index].record_type.toLowerCase() === 'spouse') {
-                const select = document.createElement('select');
-                select.className = 'edit-select';
-                ['', 'spouse', 'partner', 'other'].forEach(opt => {
-                    const option = document.createElement('option');
-                    option.value = opt;
-                    option.textContent = opt || '(Select)';
-                    if (opt === currentValue) option.selected = true;
-                    select.appendChild(option);
-                });
+
+            // Special dropdowns
+            if (field === 'sex' && !partnerRecordId) {
+                const select = createSelect(['', 'male', 'female'], currentValue);
                 td.appendChild(select);
                 select.focus();
-                if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field} with dropdown`);
-                select.onchange = () => saveEdit(index, field, select.value, td, currentValue);
-                select.onblur = () => saveEdit(index, field, select.value, td, currentValue);
-                select.onkeydown = e => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        saveEdit(index, field, select.value, td, currentValue);
-                    } else if (e.key === 'Escape') {
-                        cancelEdit(td, currentValue);
-                    }
-                };
+                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                return;
+            }
+            if (field === 'attributes' && !partnerRecordId) {
+                const select = createSelect(['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'], currentValue);
+                td.appendChild(select);
+                select.focus();
+                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                return;
+            }
+            if (field === 'relationship' && partnerRecordId) {
+                const select = createSelect(['', 'spouse', 'partner', 'other'], currentValue);
+                td.appendChild(select);
+                select.focus();
+                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                return;
+            }
+
+            // Default: textarea
+            const textarea = document.createElement('textarea');
+            textarea.className = 'edit-textarea';
+            textarea.value = currentValue;
+            textarea.rows = Math.max(2, currentValue.split('\n').length);
+            td.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+
+            textarea.onblur = () => saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerRecordId);
+            textarea.onkeydown = e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerRecordId);
+                } else if (e.key === 'Escape') {
+                    cancelEdit(td, currentValue);
+                }
+            };
+        }
+
+        // Helper for dropdowns
+        function createSelect(options, selected) {
+            const select = document.createElement('select');
+            select.className = 'edit-select';
+            options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt || '(none)';
+                if (opt === selected) option.selected = true;
+                select.appendChild(option);
+            });
+            return select;
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 2. saveEdit — now writes to correct nested location
+        // ──────────────────────────────────────────────────────────────
+        function saveEdit(personIndex, field, value, td, oldValue, partnerRecordId = null) {
+            const trimmed = value.trim();
+
+            // Validation
+            if (dateFields.includes(field) && trimmed && !isValidDate(trimmed)) {
+                safeShowError(`Invalid date in ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD.`);
+                cancelEdit(td, oldValue);
+                return;
+            }
+            if (field === 'relationship' && partnerRecordId && !['', 'spouse', 'partner', 'other'].includes(trimmed)) {
+                safeShowError('Relationship must be spouse, partner, or other.');
+                cancelEdit(td, oldValue);
+                return;
+            }
+
+            const person = records[personIndex];
+
+            if (!partnerRecordId) {
+                // Main person record
+                if (person[field] !== trimmed) {
+                    person[field] = trimmed;
+                    console.log(`Updated person[${personIndex}].${field} → "${trimmed}"`);
+                }
             } else {
-                const textarea = document.createElement('textarea');
-                textarea.className = 'edit-textarea';
-                textarea.value = currentValue;
-                textarea.rows = Math.max(2, currentValue.split('\n').length);
-                td.appendChild(textarea);
-                textarea.focus();
-                if (debugMode) console.log(`Started editing record ${index + 1}, field: ${field} with textarea`);
-                textarea.onblur = () => saveEdit(index, field, textarea.value, td, currentValue);
-                textarea.onkeydown = e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        saveEdit(index, field, textarea.value, td, currentValue);
-                    } else if (e.key === 'Escape') {
-                        cancelEdit(td, currentValue);
+                // Partner record
+                const partner = person.partners.find(p => p.record_id === partnerRecordId);
+                if (partner) {
+                    if (partner[field] !== trimmed) {
+                        partner[field] = trimmed;
+                        console.log(`Updated person[${personIndex}].partners[${partner.record_id}].${field} → "${trimmed}"`);
                     }
-                };
+                }
             }
-        }
-        function saveEdit(index, field, value, td, currentValue) {
-            const trimmedValue = value.trim();
-            if (dateFields.includes(field) && trimmedValue && trimmedValue !== 'true' && !isValidDate(trimmedValue)) {
-                safeShowError(`Invalid date format for ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD.`);
-                cancelEdit(td, currentValue);
-                return;
-            }
-            if (field === 'relationship' && !['', 'spouse', 'partner', 'other'].includes(trimmedValue)) {
-                safeShowError('Relationship must be "spouse", "partner", or "other".');
-                cancelEdit(td, currentValue);
-                return;
-            }
-            if (trimmedValue !== currentValue) {
-                records[index][field] = trimmedValue;
-                if (debugMode) console.log(`Saved edit: record ${index + 1}, field ${field}, value ${trimmedValue}`);
-            }
+
+            // Clean up and redraw
             editingIndex = null;
             editingField = null;
-            td.innerHTML = '';
-            const cellContent = document.createElement('span');
-            cellContent.textContent = trimmedValue;
-            cellContent.className = 'cell-content';
-            td.appendChild(cellContent);
+            editingPartnerId = null;
+
+            td.innerHTML = '<span class="cell-content">' + (trimmed || '') + '</span>';
             debounceDisplayRecords();
         }
-        function cancelEdit(td, currentValue) {
+
+        function cancelEdit(td, oldValue) {
             editingIndex = null;
             editingField = null;
-            td.innerHTML = '';
-            const cellContent = document.createElement('span');
-            cellContent.textContent = currentValue;
-            cellContent.className = 'cell-content';
-            td.appendChild(cellContent);
-            if (debugMode) console.log('Cancelled edit');
-            debounceDisplayRecords();
+            editingPartnerId = null;
+            td.innerHTML = '<span class="cell-content">' + (oldValue || '') + '</span>';
         }
+
 
         function initDebug() {
             if (window.location.search.includes('debug=1')) {
