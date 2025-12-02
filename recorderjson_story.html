@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.3</span> — December 01, 2025
+                    Version: <span id="pageVersion">1.0.4</span> — December 01, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -133,23 +133,29 @@
             }
         }
 
-        function openStoryModal(preselectedIndex = null) {
+        function openStoryModal(personIndex, partnerRecordId = null) {
             safeOpenModal('story');
-            document.getElementById('modalTitle').innerHTML = 
-                'Story Editor ' + (preselectedIndex !== null ? '' : '<small style="color:#666;font-weight:normal"> – select a person below</small>');
 
+            const isPartner = partnerRecordId !== null;
+            const targetPerson = records[personIndex];
+            const partner = isPartner ? targetPerson.partners.find(p => p.record_id === partnerRecordId) : null;
+
+            const name = isPartner ? partner.name : targetPerson.name;
+            const title = `Story Editor – ${name}${isPartner ? ' (Partner)' : ''}`;
+            document.getElementById('modalTitle').innerHTML = title;
+
+            // Build dropdown — only main persons (not partners) appear in list
             let optionsHtml = '<option value="">-- Select Person to Edit Story --</option>';
             records.forEach((r, i) => {
-                const type = r.record_type.toLowerCase() === 'partner' ? 'Partner' : 'Person';
                 const hasStory = (r.story || '').trim().length > 0;
-                const icon = hasStory ? 'open book' : 'closed book';
-                optionsHtml += `<option value="${i}" ${i === preselectedIndex ? 'selected' : ''}>${type}: ${r.name} ${icon}</option>`;
+                const icon = hasStory ? 'open_book' : 'closed_book';
+                optionsHtml += `<option value="${i}" ${i === personIndex && !isPartner ? 'selected' : ''}>${r.name} ${icon}</option>`;
             });
 
             document.getElementById('modalForm').innerHTML = `
                 <div style="margin-bottom:12px;">
                     <label>Person</label>
-                    <select id="storyPersonSelect" style="width:100%;padding:10px;font-size:16px;" ${preselectedIndex !== null ? 'disabled' : ''}>
+                    <select id="storyPersonSelect" style="width:100%;padding:10px;font-size:16px;" ${partnerRecordId !== null ? 'disabled' : ''}>
                         ${optionsHtml}
                     </select>
                 </div>
@@ -161,13 +167,13 @@
                 </div>
 
                 <div style="text-align:center;margin-top:12px;">
-                    <button type="button" onclick="saveStory()" style="padding:12px 24px;font-size:17px;background:#28a745;">
+                    <button type="button" onclick="saveStory(${personIndex}, ${partnerRecordId !== null ? `'${partnerRecordId}'` : 'null'})" style="padding:12px 24px;font-size:17px;background:#28a745;">
                         Save Story
                     </button>
                     <button type="button" onclick="copyStoryToClipboard()" style="margin:0 8px;padding:10px 18px;background:#007bff;">
                         Copy to Clipboard
                     </button>
-                    <button type="button" onclick="clearStoryConfirm()" style="padding:10px 18px;background:#dc3545;">
+                    <button type="button" onclick="clearStoryConfirm(${personIndex}, ${partnerRecordId !== null ? `'${partnerRecordId}'` : 'null'})" style="padding:10px 18px;background:#dc3545;">
                         Clear Story
                     </button>
                     <button type="button" onclick="closeModal()" style="margin-left:8px;padding:10px 18px;background:#666;">
@@ -177,7 +183,7 @@
             `;
 
             const textarea = document.getElementById('storyText');
-            const counter   = document.getElementById('storyCounter');
+            const counter = document.getElementById('storyCounter');
 
             const updateCounter = () => {
                 const text = textarea.value;
@@ -186,23 +192,23 @@
                 counter.textContent = `${words} word${words===1?'':'s'} • ${chars} character${chars===1?'':'s'}`;
             };
 
-            const fillStory = (idx) => {
-                if (idx === null || idx === '') {
-                    textarea.value = '';
-                } else {
-                    textarea.value = (records[idx].story || '').trim();
-                }
+            const fillStory = () => {
+                const storyText = isPartner ? (partner.story || '') : (targetPerson.story || '');
+                textarea.value = storyText.trim();
                 updateCounter();
                 textarea.focus();
-                textarea.setSelectionRange(textarea.value.length, textarea.value.length); // cursor at end
+                textarea.setSelectionRange(textarea.value.length, textarea.value.length);
             };
 
             textarea.addEventListener('input', updateCounter);
+            fillStory();
 
-            if (preselectedIndex !== null) {
-                fillStory(preselectedIndex);
-            } else {
-                document.getElementById('storyPersonSelect').addEventListener('change', e => fillStory(e.target.value));
+            // Only allow person switching when not editing a partner
+            if (!isPartner) {
+                document.getElementById('storyPersonSelect').addEventListener('change', e => {
+                    const idx = e.target.value;
+                    if (idx !== '') openStoryModal(idx);
+                });
             }
         }
 
@@ -220,24 +226,24 @@
             }, 1500);
         }
 
-        function clearStoryConfirm() {
-            if (confirm('Permanently delete this entire story? This cannot be undone.')) {
-                document.getElementById('storyText').value = '';
-                saveStory();  // saves the now-empty story
-            }
-        }
-        
-        function saveStory() {
-            const select = document.getElementById('storyPersonSelect');
-            const idx = select.disabled ? select.querySelector('option[selected]')?.value || select.value : select.value;
-            if (idx === '' || idx === null) {
-                safeShowError('Please select a person');
-                return;
-            }
+        function saveStory(personIndex, partnerRecordId = null) {
             const story = document.getElementById('storyText').value;
-            records[idx].story = story;
+            if (partnerRecordId) {
+                const person = records[personIndex];
+                const partner = person.partners.find(p => p.record_id === partnerRecordId);
+                if (partner) partner.story = story;
+            } else {
+                records[personIndex].story = story;
+            }
             safeCloseModal();
             debounceDisplayRecords();
+        }
+
+        function clearStoryConfirm(personIndex, partnerRecordId = null) {
+            if (confirm('Permanently delete this entire story? This cannot be undone.')) {
+                document.getElementById('storyText').value = '';
+                saveStory(personIndex, partnerRecordId);
+            }
         }       
 
         function safeOpenModal(mode) {
@@ -1218,13 +1224,31 @@ async function loadFromDropbox() {
 
             columnConfig.forEach(col => {
                 if (col.key === 'story') {
-                    // Story column always shown, never vestigial
-                    const th = document.createElement('th');
-                    th.className = 'story';
-                    th.style.width = '50px';
-                    th.textContent = 'story';
-                    headerRow.appendChild(th);
-                    return;
+                    let hasStory = false;
+                    let storyOwnerIndex = personIndex;        // main person by default
+                    let storyOwnerIsPartner = false;
+                    let partnerRecordId = null;
+
+                    if (row.isPartner) {
+                        // Partner row — story belongs to the partner object
+                        const partner = row.partnerData;
+                        hasStory = (partner.story || '').trim().length > 0;
+                        storyOwnerIsPartner = true;
+                        partnerRecordId = partner.record_id;
+                    } else {
+                        // Main person row
+                        hasStory = (row.story || '').trim().length > 0;
+                    }
+
+                    td.textContent = hasStory ? 'open_book' : 'closed_book';
+                    td.style.fontSize = '20px';
+                    td.style.cursor = 'pointer';
+                    td.title = hasStory ? 'Click to edit story' : 'Click to add story';
+
+                    td.onclick = () => openStoryModal(
+                        storyOwnerIndex,
+                        storyOwnerIsPartner ? partnerRecordId : null
+                    );
                 }
 
                 const th = document.createElement('th');
