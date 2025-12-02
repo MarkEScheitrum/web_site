@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Genealogy Record Editor</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com;">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/dropbox/dist/Dropbox-sdk.min.js" crossorigin="anonymous"></script>
+    <script src="config.js"></script>
+    <style>
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:18px;padding:20px;max-width:100%;margin:0 auto}
+        .task-buttons{display:flex;flex-wrap:wrap;gap:15px;justify-content:center;margin-bottom:20px}
+        .task-btn{font-size:16.2px !important;padding:6.5px 13px !important;min-width:122px !important;border-radius:7.2px;background:#007bff;color:white;border:none;cursor:pointer;touch-action:manipulation}
+        .task-btn:hover:not(.disabled-btn){background:#0056b3}
+        .disabled-btn{background:#ccc;cursor:not-allowed;pointer-events:none}
+        .modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+        .modal-content{background:white;padding:20px;border-radius:10px;width:90%;max-width:420px;max-height:80vh;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+        .close{float:right;font-size:24px;cursor:pointer}
+        .modal-content h3{margin-top:0;font-size:24px;text-align:center}
+        .modal-content label{display:block;margin:10px 0 5px;font-size:18px}
+        .modal-content input,.modal-content select,.modal-content textarea{width:100%;padding:10px;font-size:18px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box}
+        .modal-content button{margin-top:20px;padding:12px 24px;font-size:18px;background:#28a745;color:white;border:none;border-radius:5px;cursor:pointer;width:100%;transition:background 0.2s}
+        .modal-content button:hover{background:#218838}
+        .note{font-size:15px;color:#555;margin-top:20px;line-height:1.4;background:#f8f9fa;padding:12px;border-radius:6px}
+        .table-container{margin-top:20px;overflow-x:auto}
+        table{width:100%;font-size:14px;border-collapse:collapse}
+        th,td{padding:8px;border:1px solid #ccc;white-space:normal;box-sizing:border-box}
+        th.vestigial{padding:4px}
+        th.record_type,td.record_type{width:60px}
+        th.gen,td.gen{width:40px}
+        th.sex,td.sex{width:40px}
+        .vestigial{width:36px!important;max-width:36px!important;min-width:0!important;overflow:hidden}
+        .vestigial .header-text,.vestigial .cell-content{display:none}
+        .editable-row:hover{background:#d9edf7}
+        .highlighted-row{background:#ffffcc!important}
+        .greyed-out{background:#c0c0c0;cursor:not-allowed}
+        @media(max-width:768px){.task-btn{width:100%;margin-bottom:10px}.modal-content{width:95%;max-width:350px}}
+        .title-container{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px}
+        .title-left{flex:1}
+        .title-right{text-align:right}
+        .status-line{margin-top:8px;font-size:16px;color:#333;display:block}
+    </style>
+</head>
+<body>
+    <div class="title-container">
+        <div class="title-left">
+            <h2>Genealogy Recorder
+                <span style="font-size:14px;">
+                    Version: <span id="pageVersion">2.0.1</span> — December 02, 2025
+                </span>
+            </h2>
+            <span class="status-line" id="fileStatus">No records loaded</span>
+        </div>
+        <div class="title-right">
+            <button onclick="openFeedbackModal()" class="task-btn" style="background:#007bff;font-size:15px;padding:6px 12px;min-width:auto">Provide Feedback</button>
+        </div>
+    </div>
+
+    <div class="info">
+        <p class="warning">Data is deleted when you leave this page. Hit "Return Updates" when complete, to save your changes!</p>
+    </div>
+
+    <div class="task-buttons" id="taskButtons">
+        <button type="button" onclick="loadFromDropbox()" class="task-btn" id="selectLoadBtn">Load Records 📂</button>
+        <button type="button" onclick="openRequestModal()" class="task-btn" id="requestEditBtn">Request Edit Package ✉️</button>
+        <button type="button" onclick="openModal('addChild')" class="task-btn disabled-btn" id="addChildBtn" style="display:none">Add Child 👶</button>
+        <button type="button" onclick="openModal('addPartner')" class="task-btn disabled-btn" id="addPartnerBtn" style="display:none">Add Partner 💍</button>
+        <button type="button" onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn" style="display:none">Update Record ✏️</button>
+        <button type="button" onclick="openModal('recordDeathBurial')" class="task-btn disabled-btn" id="recordDeathBurialBtn" style="display:none">Record Death/Burial ⚰️</button>
+        <button type="button" onclick="openStoryModal()" class="task-btn" id="editStoryBtn" style="display:none">Edit Story</button>
+        <button type="button" onclick="toggleTable()" class="task-btn disabled-btn" id="viewTableBtn" style="display:none">View Table 📋</button>
+        <button type="button" onclick="downloadUpdates()" class="task-btn" id="returnUpdatesBtn" style="display:none">Return Updates 📤</button>
+        <button type="button" onclick="exitApp()" class="task-btn" id="exitBtn" style="display:none">Exit 🚪</button>
+    </div>
+
+    <input type="file" id="textFile" accept=".zip,.json" style="display:none;" onchange="handleFileSelect()">
+    <div id="tableContainer" class="table-container" style="display:none;">
+        <div id="recordBody"></div>
+    </div>
+
+    <div id="modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3 id="modalTitle"></h3>
+            <form id="modalForm" autocomplete="off"></form>
+        </div>
+    </div>
+
+    <script>
+        let records = [], decryptionPassphrase = null, exchangePassphrase = null, originalFileName = 'records.zip';
+        let debugMode = false, isEncryptedZip = false;
+        let modalMode = null, editingIndex = null, editingField = null, highlightedRow = null;
+        let vestigialColumns = new Set(['notes', 'unprocessed_items']);
+        let renderTimeout = null;
+        let ticketNumber = null;
+        let hasReturnedUpdates = false;
+        let editingPartnerId = null;  // tracks which partner we're editing
+        const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
+        const dateFields = ['birth_date', 'death_date', 'marriage_date'];
+        const fieldRestrictions = {
+            person: {
+                editable: ['name', 'sex', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'attributes', 'parents'],
+                uneditable: ['record_type'],
+                greyedOut: ['gen', 'marriage_date', 'relationship', 'divorced', 'divorce date']
+            },
+            partner: {
+                editable: ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorce', 'parents'],
+                uneditable: ['record_type'],
+                greyedOut: ['gen', 'sex']
+            }
+        };
+        const DROPBOX_FOLDER = '';
+
+        async function getAccessToken() {
+            try {
+                const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        grant_type: 'refresh_token',
+                        refresh_token: DROPBOX_REFRESH_TOKEN,
+                        client_id: DROPBOX_APP_KEY,
+                        client_secret: DROPBOX_APP_SECRET
+                    })
+                });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error_description || 'Failed to refresh access token');
+                return data.access_token;
+            } catch (err) {
+                throw new Error('Unable to authenticate with Dropbox');
+            }
+        }
+
+        function openStoryModal(personIndex = null, partnerRecordId = null) {
+            if (!records || records.length === 0) {
+                safeShowError('No records loaded.');
+                return;
+            }
+
+            safeOpenModal('story');
+            document.getElementById('modalTitle').textContent = 'Edit Story';
+
+            // Build list in tree order (same as records array)
+            const allPeople = [];
+            records.forEach((person, idx) => {
+                allPeople.push({ label: person.name, personIndex: idx, partnerId: null });
+                (person.partners || []).forEach(p => {
+                    allPeople.push({ label: `└ ${p.name || '(unnamed)'}`, personIndex: idx, partnerId: p.record_id });
+                });
+            });
+
+            let optionsHtml = '<option value="">-- Select Person or Partner --</option>';
+            allPeople.forEach(item => {
+                const hasStory = item.partnerId
+                    ? (records[item.personIndex].partners.find(p => p.record_id === item.partnerId)?.story || '').trim().length > 0
+                    : (records[item.personIndex].story || '').trim().length > 0;
+                const icon = hasStory ? 'open_book' : 'closed_book';
+                const value = `${item.personIndex}|${item.partnerId || ''}`;
+                const selected = (personIndex === item.personIndex && partnerRecordId === item.partnerId) ? 'selected' : '';
+                optionsHtml += `<option value="${value}" ${selected}>${item.label} ${icon}</option>`;
+            });
+
+            document.getElementById('modalForm').innerHTML = `
+                <div style="margin-bottom:12px;">
+                    <label>Select Person or Partner</label>
+                    <select id="storyPersonSelect" style="width:100%;padding:10px;font-size:16px;">
+                        ${optionsHtml}
+                    </select>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label>Story <span id="storyCounter" style="float:right;color:#666;font-size:14px;">0 words • 0 characters</span></label>
+                    <textarea id="storyText" rows="24" placeholder="Write the life story here…"
+                            style="width:100%;font-family:Georgia,serif;font-size:17px;line-height:1.6;padding:12px;border:1px solid #999;border-radius:6px;resize:vertical;"></textarea>
+                </div>
+                <div style="text-align:center;margin-top:12px;">
+                    <button type="button" onclick="saveStoryFromModal()" style="padding:12px 24px;font-size:17px;background:#28a745;">Save Story</button>
+                    <button type="button" onclick="copyStoryToClipboard()" style="margin:0 8px;padding:10px 18px;background:#007bff;">Copy</button>
+                    <button type="button" onclick="clearStoryFromModal()" style="padding:10px 18px;background:#dc3545;">Clear</button>
+                    <button type="button" onclick="closeModal()" style="margin-left:8px;padding:10px 18px;background:#666;">Cancel</button>
+                </div>
+            `;
+
+            const select = document.getElementById('storyPersonSelect');
+            const textarea = document.getElementById('storyText');
+            const counter = document.getElementById('storyCounter');
+
+            const updateCounter = () => {
+                const text = textarea.value;
+                const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+                const chars = text.length;
+                counter.textContent = `${words} word${words===1?'':'s'} • ${chars} chars`;
+            };
+
+            const loadStory = () => {
+                const [pIdx, pId] = select.value.split('|');
+                const idx = parseInt(pIdx);
+                let story = '';
+                if (pId) {
+                    const partner = records[idx].partners.find(p => p.record_id === pId);
+                    story = partner?.story || '';
+                } else if (idx >= 0) {
+                    story = records[idx].story || '';
+                }
+                textarea.value = story.trim();
+                updateCounter();
+            };
+
+            select.addEventListener('change', loadStory);
+            textarea.addEventListener('input', updateCounter);
+            loadStory();
+
+            window.saveStoryFromModal = () => {
+                const [pIdx, pId] = select.value.split('|');
+                const idx = parseInt(pIdx);
+                const story = textarea.value;
+                if (pId) {
+                    const partner = records[idx].partners.find(p => p.record_id === pId);
+                    if (partner) partner.story = story;
+                } else {
+                    records[idx].story = story;
+                }
+
+                safeCloseModal();
+                debounceDisplayRecords();
+            };
+
+            window.clearStoryFromModal = () => {
+                if (confirm('Permanently delete this story?')) {
+                    textarea.value = '';
+                    saveStoryFromModal();
+                }
+            };
+        }
+
+        function copyStoryToClipboard() {
+            const txt = document.getElementById('storyText');
+            txt.select();
+            document.execCommand('copy');
+            const btn = event.target;
+            const old = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.style.background = '#218838';
+            setTimeout(() => {
+                btn.textContent = old;
+                btn.style.background = '#007bff';
+            }, 1500);
+        }
+
+        function saveStory(personIndex, partnerRecordId = null) {
+            const story = document.getElementById('storyText').value;
+            if (partnerRecordId) {
+                const person = records[personIndex];
+                const partner = person.partners.find(p => p.record_id === partnerRecordId);
+                if (partner) partner.story = story;
+            } else {
+                records[personIndex].story = story;
+            }
+            safeCloseModal();
+            debounceDisplayRecords();
+        }
+
+        function clearStoryConfirm(personIndex, partnerRecordId = null) {
+            if (confirm('Permanently delete this entire story? This cannot be undone.')) {
+                document.getElementById('storyText').value = '';
+                saveStory(personIndex, partnerRecordId);
+            }
+        }       
+
+        function safeOpenModal(mode) {
+            if (window.location.search && !window.location.search.includes('debug=1'))
+                window.history.replaceState({}, document.title, window.location.pathname);
+            modalMode = mode;
+            document.getElementById('modal').style.display = 'block';
+            document.getElementById('modalForm').innerHTML = '';
+        }
+
+        function safeCloseModal() {
+            document.getElementById('modal').style.display = 'none';
+            modalMode = null;
+            document.getElementById('modalForm').innerHTML = '';
+        }
+
+        function safeShowError(message) {
+            const div = document.createElement('div');
+            div.style.cssText = 'position:fixed;top:20px;right:20px;background:#dc3545;color:white;padding:15px;border-radius:5px;z-index:2000;max-width:300px;box-shadow:0 2px 10px rgba(0,0,0,0.2);font-size:14px';
+            div.innerHTML = `<strong>Error</strong><br>${message}<button onclick="this.parentElement.remove()" style="margin-left:10px;background:none;border:none;color:white;cursor:pointer;float:right">×</button>`;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 6000);
+        }
+
+        function showPopup(html) {
+            const div = document.createElement('div');
+            div.style = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border:1px solid #000;z-index:10000;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:90%';
+            div.innerHTML = html + '<br><button onclick="this.parentElement.remove()" style="margin-top:15px;padding:8px 16px">Close</button>';
+            document.body.appendChild(div);
+        }
+
+        // ==================== PROVIDE FEEDBACK ====================
+        function openFeedbackModal() {
+            safeOpenModal('feedback');
+            document.getElementById('modalTitle').textContent = 'Provide Feedback';
+            document.getElementById('modalForm').innerHTML = `
+                <label>Feedback Title <span style="color:red">*</span></label>
+                <input type="text" id="feedbackTitle" required>
+
+                <label>Description <span style="color:red">*</span></label>
+                <textarea id="feedbackDesc" rows="6" required></textarea>
+
+                <button type="button" onclick="submitFeedback()">Submit Feedback</button>
+            `;
+        }
+
+        async function submitFeedback() {
+            const title = document.getElementById('feedbackTitle').value.trim();
+            const desc = document.getElementById('feedbackDesc').value.trim();
+            if (!title || !desc) {
+                safeShowError('Both title and description are required');
+                return;
+            }
+
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const timestamp = `${year}${month}${day}_${hours}${minutes}${seconds}`;
+
+            const data = {
+                timestamp: `${year}-${month}-${day} ${hours}:${minutes}:${seconds} PST`,
+                ticket_number: ticketNumber || "none",
+                feedback_title: title,
+                feedback_description: desc
+            };
+
+            try {
+                const accessToken = await getAccessToken();
+                const dbx = new Dropbox.Dropbox({ accessToken });
+                const filename = `feedback/feedback_${timestamp}_${ticketNumber || 'none'}.json`;
+
+                await dbx.filesUpload({
+                    contents: JSON.stringify(data, null, 2),
+                    path: DROPBOX_FOLDER + '/' + filename,
+                    mode: { '.tag': 'add' },
+                    autorename: true
+                });
+
+                safeCloseModal();
+                showPopup(`
+                    <h3 style="color:green">✓ Feedback Submitted</h3>
+                    <p>Thank you! Your feedback has been saved as:</p>
+                    <b>${filename}</b>
+                    <p>We appreciate your input.</p>
+                `);
+            } catch (err) {
+                safeShowError('Failed to submit feedback: ' + err.message);
+            }
+        }
+
+        async function loadFromDropbox() {
+            if (debugMode) {
+                document.getElementById('textFile').click();
+                return;
+            }
+
+            const passphrase = await askPassphrase('File Retrieval');
+            if (!passphrase) return;
+            exchangePassphrase = passphrase;
+            decryptionPassphrase = passphrase;
+
+            try {
+                const accessToken = await getAccessToken();
+                const dbx = new Dropbox.Dropbox({ accessToken });
+                const fileHash = CryptoJS.SHA256(passphrase).toString();
+                const response = await dbx.filesListFolder({ path: DROPBOX_FOLDER });
+                const fileEntry = response.result.entries
+                    .filter(e => e.name.startsWith(fileHash) && e.name.endsWith('.zip'))
+                    .sort((a, b) => b.name.localeCompare(a.name))[0];
+                if (!fileEntry) {
+                    safeShowError('No file found in Dropbox for the provided passphrase.');
+                    return;
+                }
+
+                const fileResponse = await dbx.filesDownload({ path: fileEntry.path_display });
+                const buffer = await fileResponse.result.fileBlob.arrayBuffer();
+                const plainZip = decryptBlob(buffer, passphrase);
+                const zip = await JSZip.loadAsync(plainZip);
+
+                const jsonEntry = Object.values(zip.files).find(f => f.name.match(/records_?\d*\.json$/i));
+                if (!jsonEntry) throw new Error('No records_<ticket>.json found in ZIP');
+
+                originalFileName = jsonEntry.name.replace(/\.json$/i, '.zip');
+                ticketNumber = originalFileName.match(/records_(\d+)\.zip/)?.[1] || 'Unknown';
+
+                document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Loaded`;
+
+                const text = await jsonEntry.async('text');
+                const obj = JSON.parse(text);
+
+                let recordArray;
+                if (obj.data && Array.isArray(obj.data)) {
+                    recordArray = obj.data;
+                } else if (obj.records && Array.isArray(obj.records)) {
+                    recordArray = obj.records;
+                } else {
+                    throw new Error('No valid record array found in downloaded JSON');
+                }
+
+                records = recordArray;
+
+                // Normalize: ensure partners is array, even if empty
+                records.forEach(r => {
+                    if (!Array.isArray(r.partners)) r.partners = [];
+                    if (!r.parent_ids) r.parent_ids = [];
+                    if (!r.children_no_other_parent) r.children_no_other_parent = [];
+                    if (!r.notes) r.notes = [];
+                    if (!r.unprocessed_items) r.unprocessed_items = [];
+                });
+
+                isEncryptedZip = true;
+                finishLoad();
+            } catch (err) {
+                safeShowError(`Failed to load from Dropbox: ${err.message}`);
+                resetSession();
+            }
+        }
+        
+        function askPassphrase(promptText) {
+            return new Promise(resolve => {
+                // Defer execution until next tick — ensures safeOpenModal exists
+                setTimeout(() => {
+                    safeOpenModal('passphrase');
+                    document.getElementById('modalTitle').textContent = `Enter Passphrase for ${promptText}`;
+                    document.getElementById('modalForm').innerHTML = `
+                        <label>Passphrase</label>
+                        <input type="password" id="pp" autocomplete="off" data-lpignore="true" autofocus>
+                        <button type="button" onclick="window.resolvePass()">Submit</button>
+                    `;
+                    window.resolvePass = () => {
+                        const val = document.getElementById('pp').value;
+                        safeCloseModal();
+                        resolve(val || null);
+                    };
+                }, 0);
+            });
+        }
+
+        function resetSession() {
+            records = [];
+            decryptionPassphrase = null;
+            exchangePassphrase = null;
+            originalFileName = 'records.zip';
+            ticketNumber = null;
+            isEncryptedZip = false;
+            hasReturnedUpdates = false;
+            document.getElementById('selectLoadBtn').style.display = 'block';
+            document.getElementById('requestEditBtn').style.display = 'block';
+            ['addChildBtn','addPartnerBtn','updateRecordBtn','recordDeathBurialBtn','viewTableBtn','editStoryBtn','returnUpdatesBtn','exitBtn'].forEach(id => {
+                document.getElementById(id).style.display = 'none';
+            });
+            document.getElementById('fileStatus').textContent = 'No records loaded';
+            document.getElementById('tableContainer').style.display = 'none';
+            document.getElementById('recordBody').innerHTML = '';
+        }
+
+        function enableButtonsAfterLoad() {
+            document.getElementById('selectLoadBtn').style.display = 'none';
+            document.getElementById('requestEditBtn').style.display = 'none';
+            ['addChildBtn','addPartnerBtn','updateRecordBtn','editStoryBtn','recordDeathBurialBtn','viewTableBtn'].forEach(id => {
+                document.getElementById(id).style.display = 'block';
+                document.getElementById(id).classList.remove('disabled-btn');
+            });
+            document.getElementById('returnUpdatesBtn').style.display = 'block';
+        }
+
+        function finishLoad() {
+            enableButtonsAfterLoad();
+            debounceDisplayRecords();
+        }
+
+        function exitApp() {
+            if (confirm("Are you sure you want to exit? Any unsaved changes will be lost.")) {
+                resetSession();
+            }
+        }
+
+        function openRequestModal() {
+            safeOpenModal('requestEdit');
+            document.getElementById('modalTitle').textContent = 'Request New Edit Package';
+            document.getElementById('modalForm').innerHTML = `
+                <label>Your Full Name <span style="color:red">*</span></label>
+                <input type="text" required>
+                <label>Your Email <span style="color:red">*</span></label>
+                <input type="email" required>
+                <label>Starting Person Full Name (exactly as in the tree) <span style="color:red">*</span></label>
+                <input type="text" required>
+                <label>Starting Person Birth Year (e.g. 1946) <span style="color:red">*</span></label>
+                <input type="text" pattern="[0-9]{4}" placeholder="e.g. 1946" required>
+                <label>Your Relationship to This Person (e.g. grandson, niece, self) <span style="color:red">*</span></label>
+                <input type="text" required>
+                <div class="note">
+                    An acknowledgement email containing a passphrase will be sent to the email address above.
+                </div>
+                <button type="button" onclick="submitEditRequest()">Submit Request</button>
+            `;
+        }
+
+        async function submitEditRequest() {
+            const inputs = document.querySelectorAll('#modalForm input');
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const tz = now.toLocaleTimeString('en-us', { timeZoneName: 'short' }).split(' ')[2];
+            const formattedTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} ${tz}`;
+            const data = {
+                timestamp: formattedTimestamp,
+                requestor_name: inputs[0].value.trim(),
+                requestor_email: inputs[1].value.trim(),
+                starting_person: inputs[2].value.trim(),
+                starting_person_birth_year: inputs[3].value.trim(),
+                relationship: inputs[4].value.trim()
+            };
+            if (Object.values(data).some(v => v === '')) {
+                safeShowError('Please fill in all required fields.');
+                return;
+            }
+            try {
+                const accessToken = await getAccessToken();
+                const dbx = new Dropbox.Dropbox({ accessToken });
+                const datePart = now.toISOString().slice(0,10).replace(/-/g,'');
+                const timePart = now.toTimeString().slice(0,8).replace(/:/g,'');
+                const safeName = data.requestor_name.replace(/[^a-zA-Z0-9]/g, '_').slice(0,20);
+                const filename = `requests/request_${datePart}_${timePart}_${safeName}.json`;
+                await dbx.filesUpload({
+                    contents: JSON.stringify(data, null, 2),
+                    path: DROPBOX_FOLDER + '/' + filename,
+                    mode: { '.tag': 'add' },
+                    autorename: true
+                });
+                safeCloseModal();
+                showPopup(`
+                    <h3 style="color:green">✓ Request Submitted Successfully!</h3>
+                    <p><strong>Request Time:</strong> ${formattedTimestamp}</p>
+                    <p>Your request has been saved as:<br><b>${filename}</b></p>
+                    <p>I will prepare your edit package and send you a passphrase by email shortly.</p>
+                `);
+            } catch (err) {
+                safeShowError('Failed to submit request: ' + err.message);
+            }
+        }
+
+        function deriveKey(passphrase, salt) {
+            return CryptoJS.PBKDF2(passphrase, salt, { keySize: 8, iterations: 100000, hasher: CryptoJS.algo.SHA256 });
+        }
+
+        function decryptBlob(arrayBuffer, passphrase) {
+            const data = new Uint8Array(arrayBuffer);
+            if (data.length < 32) throw new Error("File too short");
+            const salt = CryptoJS.lib.WordArray.create(data.slice(0, 16));
+            const iv = CryptoJS.lib.WordArray.create(data.slice(16, 32));
+            const ct = CryptoJS.lib.WordArray.create(data.slice(32));
+            const key = deriveKey(passphrase, salt);
+            const decrypted = CryptoJS.AES.decrypt({ ciphertext: ct }, key, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding });
+            const decryptedBytes = CryptoJS.enc.Latin1.stringify(decrypted);
+            const padLen = decryptedBytes.charCodeAt(decryptedBytes.length - 1);
+            if (padLen < 1 || padLen > 16) throw new Error("Invalid padding");
+            return decryptedBytes.slice(0, -padLen);
+        }
+
+        function encryptBlob(zipBinaryString, passphrase) {
+            const salt = CryptoJS.lib.WordArray.random(16);
+            const iv = CryptoJS.lib.WordArray.random(16);
+            const key = deriveKey(passphrase, salt);
+            const len = zipBinaryString.length;
+            const padLen = 16 - (len % 16);
+            let padded = zipBinaryString;
+            for (let i = 0; i < padLen; i++) padded += String.fromCharCode(padLen);
+            const wordArray = CryptoJS.enc.Latin1.parse(padded);
+            const encrypted = CryptoJS.AES.encrypt(wordArray, key, { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding });
+            return salt.concat(iv).concat(encrypted.ciphertext);
+        }
+
+        async function downloadUpdates() {
+            if (!records.length) return safeShowError('No data to save');
+            if (!exchangePassphrase && isEncryptedZip) return safeShowError('Exchange passphrase required');
+
+            const jsonContent = JSON.stringify(records, null, 2);
+            let blob;
+
+            if (debugMode && !isEncryptedZip) {
+                // Local debug: just download JSON
+                blob = new Blob([jsonContent], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `edited_${originalFileName.replace(/\.zip$/i, '.json')}`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showPopup(`<h3 style="color:green">JSON Saved Locally</h3><p>edited_${originalFileName.replace(/\.zip$/i, '.json')}</p>`);
+                hasReturnedUpdates = true;
+                document.getElementById('exitBtn').style.display = 'block';
+                return;
+            }
+
+            // Normal flow: create encrypted ZIP with JSON inside
+            const zip = new JSZip();
+            zip.file(`records_${ticketNumber}.json`, jsonContent);
+            const zipBin = await zip.generateAsync({ type: 'uint8array' });
+            const encrypted = encryptBlob(String.fromCharCode.apply(null, zipBin), decryptionPassphrase || exchangePassphrase);
+            const uint8 = new Uint8Array(encrypted.sigBytes);
+            for (let i = 0; i < encrypted.sigBytes; i++) {
+                const w = encrypted.words[Math.floor(i / 4)];
+                uint8[i] = (w >>> (24 - (i % 4) * 8)) & 0xFF;
+            }
+            blob = new Blob([uint8], { type: 'application/octet-stream' });
+
+            try {
+                const accessToken = await getAccessToken();
+                const dbx = new Dropbox.Dropbox({ accessToken });
+                const fileHash = CryptoJS.SHA256(exchangePassphrase).toString();
+                const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                const dropboxPath = `${DROPBOX_FOLDER}/${fileHash}_edited_${timestamp}.zip`;
+
+                await dbx.filesUpload({ contents: blob, path: dropboxPath, mode: 'overwrite' });
+
+                showPopup(`Updated file saved to Dropbox as edited_${timestamp}.zip`);
+                hasReturnedUpdates = true;
+                document.getElementById('exitBtn').style.display = 'block';
+                document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Returned`;
+            } catch (err) {
+                safeShowError(`Failed to upload: ${err.message}`);
+            }
+        }
+
+        function handleFileSelect() {
+            const file = document.getElementById('textFile').files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+
+            if (file.name.endsWith('.json')) {
+                reader.onload = function(e) {
+                    try {
+                        const obj = JSON.parse(e.target.result);
+
+                        // Extract the actual array — supports your current format and future ones
+                        let recordArray;
+                        if (obj.data && Array.isArray(obj.data)) {
+                            recordArray = obj.data;
+                        } else if (obj.records && Array.isArray(obj.records)) {
+                            recordArray = obj.records;
+                        } else if (Array.isArray(obj)) {
+                            recordArray = obj;
+                        } else {
+                            throw new Error('JSON does not contain a recognizable record array (looked for .data, .records, or root array)');
+                        }
+
+                        records = recordArray;
+
+                        // Normalize required arrays and fields
+                        records.forEach(r => {
+                            if (!Array.isArray(r.partners)) r.partners = [];
+                            if (!r.parent_ids) r.parent_ids = [];
+                            if (!r.children_no_other_parent) r.children_no_other_parent = [];
+                            if (!r.notes) r.notes = [];
+                            if (!r.unprocessed_items) r.unprocessed_items = [];
+                            if (!r.record_id) r.record_id = crypto.randomUUID();
+                        });
+
+                        originalFileName = file.name.replace(/\.json$/i, '.zip');
+                        ticketNumber = originalFileName.match(/records_(\d+)\.zip/)?.[1] || 'Local';
+                        document.getElementById('fileStatus').textContent = `Local JSON Loaded – ${file.name}`;
+                        finishLoad();
+                    } catch (err) {
+                        safeShowError('Invalid JSON file: ' + err.message);
+                        console.error('JSON parse error:', err);
+                    }
+                };
+                reader.readAsText(file);
+                return;
+            }
+
+            // === ZIP handling (encrypted) ===
+            if (file.name.endsWith('.zip')) {
+                reader.onload = async function(e) {
+                    try {
+                        const buffer = e.target.result;
+                        const passphrase = await askPassphrase('Decrypt Local ZIP');
+                        if (!passphrase) return;
+
+                        const plainZip = decryptBlob(buffer, passphrase);
+                        const zip = await JSZip.loadAsync(plainZip);
+
+                        const jsonEntry = Object.values(zip.files).find(f => f.name.match(/records_?\d*\.json$/i));
+                        if (!jsonEntry) throw new Error('No records_<ticket>.json found in ZIP');
+
+                        originalFileName = jsonEntry.name.replace(/\.json$/i, '.zip');
+                        ticketNumber = originalFileName.match(/records_(\d+)\.zip/)?.[1] || 'Local';
+                        document.getElementById('fileStatus').textContent = `Local ZIP Loaded – Ticket ${ticketNumber}`;
+
+                        const text = await jsonEntry.async('text');
+                        const obj = JSON.parse(text);
+
+                        let recordArray;
+                        if (obj.data && Array.isArray(obj.data)) {
+                            recordArray = obj.data;
+                        } else if (obj.records && Array.isArray(obj.records)) {
+                            recordArray = obj.records;
+                        } else {
+                            throw new Error('No valid record array found in downloaded JSON');
+                        }
+
+                        records = recordArray;
+                        records.forEach(r => {
+                            if (!Array.isArray(r.partners)) r.partners = [];
+                            if (!r.parent_ids) r.parent_ids = [];
+                            if (!r.children_no_other_parent) r.children_no_other_parent = [];
+                            if (!r.notes) r.notes = [];
+                            if (!r.unprocessed_items) r.unprocessed_items = [];
+                            if (!r.record_id) r.record_id = crypto.randomUUID();
+                        });
+
+                        isEncryptedZip = true;
+                        decryptionPassphrase = passphrase;
+                        exchangePassphrase = passphrase;
+                        finishLoad();
+                    } catch (err) {
+                        safeShowError('Failed to load ZIP: ' + err.message);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+                return;
+            }
+
+            safeShowError('Please select a .json or encrypted .zip file');
+        }
+
+        function dateToTimestamp(dateStr) {
+            if (!dateStr) return Infinity;
+            const parts = dateStr.split('-').map(Number);
+            if (parts.length === 1) return parts[0] * 10000 * 100;
+            if (parts.length === 2) return parts[0] * 10000 * 100 + parts[1] * 100;
+            return parts[0] * 10000 * 100 + parts[1] * 100 + parts[2];
+        }
+        window.addEventListener('beforeunload', e => {
+            if (modalMode) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+        window.addEventListener('error', e => {
+            if (e.message.includes('runtime.lastError')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+        function isValidDate(dateStr) {
+            if (!dateStr || dateStr.trim() === '') return true;
+            const parts = dateStr.split('-');
+            if (parts.length === 1) {
+                const year = parseInt(parts[0], 10);
+                return !isNaN(year) && year >= 1 && year <= 9999;
+            } else if (parts.length === 2) {
+                const year = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                return !isNaN(year) && year >= 1 && year <= 9999 && !isNaN(month) && month >= 1 && month <= 12;
+            } else if (parts.length === 3) {
+                const date = Date.parse(dateStr + 'T00:00:00');
+                if (isNaN(date)) return false;
+                const parsedDate = new Date(date);
+                return parsedDate.getFullYear() == parts[0] && (parsedDate.getMonth() + 1) == parts[1] && parsedDate.getDate() == parts[2];
+            }
+            return false;
+        }
+
+        function openModal(mode) {
+            safeOpenModal(mode);
+            const modalTitle = document.getElementById('modalTitle');
+            const modalForm = document.getElementById('modalForm');
+            let fields = [];
+            if (mode === 'addChild') {
+                modalTitle.textContent = 'Add Child';
+                const selectablePeople = records;  // All top-level records are main persons — no record_type needed
+                fields = [
+                    { name: 'parents', label: 'Genealogical Parent Name', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true },
+                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true },
+                    { name: 'sex', label: 'Sex', type: 'select', options: ['', 'male', 'female'] },
+                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
+                    { name: 'birth_location', label: 'Birth Location', type: 'text' }
+                ];
+            } else if (mode === 'addPartner') {
+                modalTitle.textContent = 'Add Partner';
+                const selectablePeople = records;  // All top-level records are main persons — no record_type needed
+                fields = [
+                    { name: 'partner', label: 'Select Genealogical Partner', type: 'select', options: ['', ...selectablePeople.map(r => r.name)], required: true },
+                    { name: 'relationship', label: 'Relationship', type: 'select', options: ['', 'spouse', 'partner', 'other'], required: true },
+                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true },
+                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
+                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
+                    { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
+                    { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' }
+                ];
+            } else if (mode === 'updateRecord') {
+                modalTitle.textContent = 'Update Record';
+                const recordOptions = records.flatMap((person, i) => {
+                    const main = person.name || '(no name)';
+                    const partners = (person.partners || []).map(p => `Partner: ${p.name || '(no name)'}`);
+                    return [main, ...partners];
+                });
+                fields = [
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...recordOptions], required: true },
+                    { name: 'field', label: 'Field to Update', type: 'select', options: [''] },
+                    { name: 'value', label: 'New Value', type: 'text', required: true }
+                ];
+            } else if (mode === 'recordDeathBurial') {
+                modalTitle.textContent = 'Record Death/Burial';
+                const recordOptions = records.flatMap((person, i) => {
+                    const main = person.name || '(no name)';
+                    const partners = (person.partners || []).map(p => `Partner: ${p.name || '(no name)'}`);
+                    return [main, ...partners];
+                });
+                fields = [
+                    { name: 'record', label: 'Select Record', type: 'select', options: ['', ...recordOptions], required: true },
+                    { name: 'death_date', label: 'Death Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
+                    { name: 'death_location', label: 'Death Location', type: 'text' },
+                    { name: 'burial_location', label: 'Burial Location', type: 'text' }
+                ];
+            }
+            fields.forEach(field => {
+                const label = document.createElement('label');
+                label.textContent = field.label;
+                if (field.required) label.innerHTML += ' <span style="color:red">*</span>';
+                modalForm.appendChild(label);
+                if (field.type === 'select') {
+                    const select = document.createElement('select');
+                    select.name = field.name;
+                    if (field.required) select.required = true;
+                    field.options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.textContent = opt || '(Select)';
+                        select.appendChild(option);
+                    });
+                    modalForm.appendChild(select);
+                } else {
+                    const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
+                    input.type = field.type;
+                    input.name = field.name;
+                    if (field.required) input.required = true;
+                    if (field.autocomplete) input.setAttribute('autocomplete', field.autocomplete);
+                    modalForm.appendChild(input);
+                }
+            });
+            const submitBtn = document.createElement('button');
+            submitBtn.type = 'button';
+            submitBtn.textContent = 'Save';
+            submitBtn.onclick = () => {
+                if (submitBtn.disabled) return;
+                submitBtn.disabled = true;
+                setTimeout(() => submitBtn.disabled = false, 1000);
+                saveModalData(mode);
+            };
+            modalForm.appendChild(submitBtn);
+            if (mode === 'updateRecord') {
+                const recordSelect = modalForm.querySelector('select[name="record"]');
+                const fieldSelect = modalForm.querySelector('select[name="field"]');
+                recordSelect.addEventListener('change', () => {
+                    const selectedRecord = recordSelect.value;
+                    if (!selectedRecord) {
+                        fieldSelect.innerHTML = '<option value=""></option>';
+                        return;
+                    }
+                    const [recordType, name] = selectedRecord.split(': ');
+                    const cleanType = recordType.toLowerCase() === 'partner' ? 'partner' : 'person';
+                    const editableFields = [...fieldRestrictions[cleanType].editable];
+                    fieldSelect.innerHTML = '';
+                    const emptyOption = document.createElement('option');
+                    emptyOption.value = '';
+                    fieldSelect.appendChild(emptyOption);
+                    editableFields.forEach(f => {
+                        const option = document.createElement('option');
+                        option.value = f;
+                        option.textContent = f;
+                        fieldSelect.appendChild(option);
+                    });
+                    fieldSelect.value = '';
+                    fieldSelect.addEventListener('change', () => {
+                        const valueInput = modalForm.querySelector('[name="value"]');
+                        if (fieldSelect.value === 'attributes' && cleanType === 'person') {
+                            const newSelect = document.createElement('select');
+                            newSelect.name = 'value';
+                            newSelect.required = true;
+                            ['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'].forEach(opt => {
+                                const option = document.createElement('option');
+                                option.value = opt;
+                                option.textContent = opt || '(None)';
+                                newSelect.appendChild(option);
+                            });
+                            valueInput.replaceWith(newSelect);
+                        } else if (fieldSelect.value === 'sex' && cleanType === 'person') {
+                            const newSelect = document.createElement('select');
+                            newSelect.name = 'value';
+                            newSelect.required = true;
+                            ['', 'male', 'female'].forEach(opt => {
+                                const option = document.createElement('option');
+                                option.value = opt;
+                                option.textContent = opt || '(Select)';
+                                newSelect.appendChild(option);
+                            });
+                            valueInput.replaceWith(newSelect);
+                        } else if (fieldSelect.value === 'relationship' && cleanType === 'spouse') {
+                            const newSelect = document.createElement('select');
+                            newSelect.name = 'value';
+                            newSelect.required = true;
+                            ['', 'spouse', 'partner', 'other'].forEach(opt => {
+                                const option = document.createElement('option');
+                                option.value = opt;
+                                option.textContent = opt || '(Select)';
+                                newSelect.appendChild(option);
+                            });
+                            valueInput.replaceWith(newSelect);
+                        } else if (valueInput.tagName === 'SELECT') {
+                            const newInput = document.createElement('input');
+                            newInput.type = 'text';
+                            newInput.name = 'value';
+                            newInput.required = true;
+                            valueInput.replaceWith(newInput);
+                        }
+                    });
+                });
+            }
+        }
+        function closeModal() { safeCloseModal(); }
+
+        function saveModalData(mode) {
+            try {
+                const form = document.getElementById('modalForm');
+                const data = {};
+                for (let input of form.elements) {
+                    if (input.name && input.type !== 'button') data[input.name] = input.value || '';
+                }
+                if (debugMode) console.log(`Processing ${mode} with data:`, data);
+                if (mode === 'addChild') {
+                    if (!data.name || !data.parents) { safeShowError('Name and Parent are required.'); return; }
+                    const parent = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
+                    if (!parent) { safeShowError('Invalid parent selected.'); return; }
+                    if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
+                    const parentGen = parseInt(parent.gen) || 0;
+                    const newRecord = {
+                        record_type: 'Person',
+                        gen: (parentGen + 1).toString(),
+                        name: data.name,
+                        sex: data.sex || '',
+                        birth_date: data.birth_date || '',
+                        birth_location: data.birth_location || '',
+                        parents: '',
+                        death_date: '',
+                        death_location: '',
+                        burial_location: '',
+                        service: '',
+                        marriage_date: '',
+                        relationship: '',
+                        divorce: '',
+                        attributes: '',
+                        unprocessed_items: '',
+                        notes: ''
+                    };
+                    let insertIndex = records.indexOf(parent) + 1;
+                    let treeEnd = records.length;
+                    for (let i = insertIndex; i < records.length; i++) {
+                        if (records[i].record_type.toLowerCase() === 'person' && (parseInt(records[i].gen) || 0) <= parentGen) {
+                            treeEnd = i;
+                            break;
+                        }
+                    }
+                    if (debugMode) console.log(`Parent ${parent.name} (gen: ${parentGen}) descendant tree ends at index ${treeEnd}`);
+                    const children = records.slice(insertIndex, treeEnd).filter(r => r.record_type.toLowerCase() == 'person' && (parseInt(r.gen) || 0) === parentGen + 1);
+                    if (debugMode) console.log(`Found ${children.length} children for parent ${parent.name}`);
+                    if (children.length > 0 && data.birth_date) {
+                        const newTimestamp = dateToTimestamp(data.birth_date);
+                        if (debugMode) console.log(`New child birth_date: ${data.birth_date}, timestamp: ${newTimestamp}`);
+                        const sortedChildren = records.slice(insertIndex, treeEnd)
+                            .reduce((acc, r, i) => r.record_type.toLowerCase() === 'person' && (parseInt(r.gen) || 0) === parentGen + 1 ? [...acc, { index: i + insertIndex, ts: dateToTimestamp(r.birth_date) }] : acc, [])
+                            .sort((a, b) => a.ts - b.ts);
+                        if (debugMode) console.log(`Sorted children:`, sortedChildren);
+                        const insertPos = sortedChildren.findIndex(c => c.ts > newTimestamp);
+                        insertIndex = insertPos === -1 ? treeEnd : sortedChildren[insertPos].index;
+                        if (debugMode) console.log(`Inserting child at index ${insertIndex}`);
+                    } else {
+                        insertIndex = treeEnd;
+                        if (debugMode) console.log(`No children or no birth_date, inserting at index ${insertIndex}`);
+                    }
+                    records.splice(insertIndex, 0, newRecord);
+                    if (debugMode) console.log('Added child record:', newRecord, `at index ${insertIndex}`);
+                } else if (mode === 'addPartner') {
+                    if (!data.name || !data.partner || !data.relationship) { safeShowError('Name, Select Genealogical Partner, and Relationship are required.'); return; }
+                    const partner = records.find(r => r.name === data.partner && r.record_type.toLowerCase() === 'person');
+                    if (!partner) { safeShowError('Invalid partner selected.'); return; }
+                    if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
+                    if (data.marriage_date && !isValidDate(data.marriage_date)) { safeShowError('Invalid marriage date. Use YYYY-MM-DD, YYYY-MM or YYYY.'); return; }
+
+                    const newRecord = {
+                        record_type: 'Partner',
+                        gen: '',
+                        name: data.name,
+                        sex: '',
+                        birth_date: data.birth_date || '',
+                        birth_location: data.birth_location || '',
+                        parents: data.parents || '',
+                        death_date: '',
+                        death_location: '',
+                        burial_location: '',
+                        service: '',
+                        marriage_date: data.marriage_date || '',
+                        relationship: data.relationship,
+                        divorce: '',
+                        attributes: '',
+                        unprocessed_items: '',
+                        notes: ''
+                    };
+
+                    let insertIndex = records.indexOf(partner) + 1;
+
+                    // CASE 1: Check if the very next record is already a Partner of this exact person
+                    // If yes → scan consecutive partners and insert by marriage_date order
+                    if (insertIndex < records.length && 
+                        records[insertIndex].record_type.toLowerCase() === 'partner') {
+                        
+                        // Find the full consecutive block of partners (stop at first non-partner or partner of someone else)
+                        let partnerEnd = insertIndex;
+                        while (partnerEnd < records.length && 
+                               records[partnerEnd].record_type.toLowerCase() === 'partner') {
+                            partnerEnd++;
+                        }
+
+                        const partners = records.slice(insertIndex, partnerEnd);
+                        if (data.marriage_date) {
+                            const newTimestamp = dateToTimestamp(data.marriage_date);
+                            const sortedPartners = partners.map((s, i) => ({
+                                index: insertIndex + i,
+                                ts: dateToTimestamp(s.marriage_date)
+                            })).sort((a, b) => a.ts - b.ts);
+
+                            const insertPos = sortedPartners.findIndex(s => s.ts > newTimestamp);
+                            insertIndex = insertPos === -1 
+                                ? partnerEnd 
+                                : sortedPartners[insertPos].index;
+                        } else {
+                            // No marriage date → append to end of existing partner block
+                            insertIndex = partnerEnd;
+                        }
+                    }
+                    // CASE 2: Next record is NOT a partner (or file ends) → insert immediately after partner
+                    // This is the correct and only behavior when no partner block exists yet
+                    else {
+                        // insertIndex is already set to partner + 1 → do nothing, insert here
+                    }
+
+                    records.splice(insertIndex, 0, newRecord);
+                    if (debugMode) console.log('Added partner record:', newRecord, `at index ${insertIndex}`);
+                } else if (mode === 'updateRecord') {
+                    if (!data.record || !data.field) { safeShowError('Please select a record and field.'); return; }
+                    if (!data.value && data.field !== 'attributes' && data.field !== 'sex') { safeShowError('Please enter a value.'); return; }
+                    const [recordType, name] = data.record.split(': ');
+                    const record = records.find(r => (r.record_type.toLowerCase() === 'partner' ? 'Partner' : r.record_type) === recordType && r.name === name);
+                    if (!record) { safeShowError('Invalid record selected.'); return; }
+                    if (data.field === 'relationship' && !['', 'spouse', 'partner', 'other'].includes(data.value)) { safeShowError('Relationship must be "spouse", "partner", or "other".'); return; }
+                    if (data.field === 'attributes' && !['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'].includes(data.value)) { safeShowError('Attributes must be one of: None, stillborn, step, foster, adopted, continuation.'); return; }
+                    if (data.field === 'sex' && !['', 'male', 'female'].includes(data.value)) { safeShowError('Sex must be one of: male, female, or empty.'); return; }
+                    if (data.field === 'divorce' && data.value && data.value !== 'true' && !isValidDate(data.value)) { safeShowError('Divorce must be a valid date, "true", or empty.'); return; }
+                    if (dateFields.includes(data.field) && data.value && !isValidDate(data.value)) { safeShowError('Invalid date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
+                    const cleanType = recordType.toLowerCase() === 'partner' ? 'partner' : 'person';
+                    const isEditable = fieldRestrictions[cleanType].editable.includes(data.field);
+                    if (isEditable) {
+                        const oldValue = record[data.field];
+                        record[data.field] = data.value;
+                        if (debugMode) console.log(`Updated ${data.field} from "${oldValue}" to "${data.value}" for ${name}`);
+                    } else {
+                        safeShowError('Selected field is not editable.');
+                        return;
+                    }
+                } else if (mode === 'recordDeathBurial') {
+                    if (!data.record) { safeShowError('Please select a record.'); return; }
+                    const [recordType, name] = data.record.split(': ');
+                    const record = records.find(r => (r.record_type.toLowerCase() === 'partner' ? 'Partner' : r.record_type) === recordType && r.name === name);
+                    if (!record) { safeShowError('Invalid record selected.'); return; }
+                    if (data.death_date && !isValidDate(data.death_date)) { safeShowError('Invalid death date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
+                    let updated = false;
+                    if (data.death_date && isFieldEditable(record.record_type, 'death_date')) { record.death_date = data.death_date; updated = true; }
+                    if (data.death_location && isFieldEditable(record.record_type, 'death_location')) { record.death_location = data.death_location; updated = true; }
+                    if (data.burial_location && isFieldEditable(record.record_type, 'burial_location')) { record.burial_location = data.burial_location; updated = true; }
+                    if (!updated) { safeShowError('At least one field (Death Date, Death Location, or Burial Location) must be provided and editable.'); return; }
+                    if (debugMode) console.log(`Updated death/burial info for ${name}`);
+                }
+                
+                
+                safeCloseModal();
+                debounceDisplayRecords();
+                if (debugMode) console.log(`Saved ${mode} data:`, data);
+            } catch (error) {
+                if (debugMode) console.error(`Error in saveModalData(${mode}):`, error);
+                safeShowError(`An unexpected error occurred: ${error.message}`);
+            }
+        }
+
+        function toggleTable() {
+            const tableContainer = document.getElementById('tableContainer');
+            const isHidden = tableContainer.style.display === 'none';
+            tableContainer.style.display = isHidden ? 'block' : 'none';
+            if (isHidden && records.length > 0) debounceDisplayRecords();
+            if (debugMode) console.log(`Table toggled: ${isHidden ? 'shown' : 'hidden'}`);
+            }
+        function debounceDisplayRecords() {
+            if (renderTimeout) clearTimeout(renderTimeout);
+            renderTimeout = setTimeout(displayRecords, 16);
+        }
+        function toggleColumn(column) {
+            if (vestigialColumns.has(column)) {
+                vestigialColumns.delete(column);
+                if (debugMode) console.log(`Restored column: ${column}`);
+            } else {
+                vestigialColumns.add(column);
+                if (debugMode) console.log(`Collapsed column: ${column}`);
+            }
+            debounceDisplayRecords();
+        }
+        function isFieldEditable(recordType, field) {
+            const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
+            const restrictions = fieldRestrictions[cleanType];
+            if (!restrictions) { if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}`); return false; }
+            if (cleanType === 'person' && field === 'parents') { if (debugMode) console.log(`Field 'parents' is not editable in table for record_type='person'`); return false; }
+            const isEditable = restrictions.editable.includes(field) && field !== 'attributes' && field !== 'sex';
+            if (debugMode) console.log(`Checking editable: record_type='${cleanType}', field=${field}, isEditable=${isEditable}`);
+            return isEditable;
+        }
+        function isFieldGreyedOut(recordType, field) {
+            const cleanType = recordType ? recordType.toString().trim().toLowerCase() : '';
+            const restrictions = fieldRestrictions[cleanType];
+            if (!restrictions) { if (debugMode) console.log(`No restrictions for record_type='${cleanType}', field=${field}`); return false; }
+            const isGreyedOut = restrictions.greyedOut.includes(field);
+            if (debugMode) console.log(`Checking greyed-out: record_type='${cleanType}', field=${field}, isGreyedOut=${isGreyedOut}`);
+            return isGreyedOut;
+        }
+
+        function displayRecords() {
+            const recordBody = document.getElementById('recordBody');
+            recordBody.innerHTML = '';
+            if (records.length === 0) return;
+
+            // Build flat list: main person + their partners
+            const flatRows = [];
+            records.forEach((person, personIndex) => {
+                flatRows.push({ ...person, isPartner: false, personIndex });
+                person.partners.forEach(partner => {
+                    flatRows.push({
+                        ...person,
+                        ...partner,
+                        name: partner.name || '',
+                        record_type: 'Partner',
+                        gen: person.generation || person.gen || '',
+                        sex: '',
+                        isPartner: true,
+                        partnerData: partner,
+                        personIndex,
+                    });
+                });
+            });
+
+            const table = document.createElement('table');
+            const headerRow = document.createElement('tr');
+
+            // === Define exact column order and display names (matches original CSV exactly) ===
+            const columnConfig = [
+                { key: 'record_type', label: 'record', width: '60px' },
+                { key: 'gen', label: 'gen', width: '40px' },
+                { key: 'name', label: 'name' },
+                { key: 'sex', label: 'sex', width: '40px' },
+                { key: 'birth_date', label: 'birth_date' },
+                { key: 'birth_location', label: 'birth_location' },
+                { key: 'death_date', label: 'death_date' },
+                { key: 'death_location', label: 'death_location' },
+                { key: 'burial_location', label: 'burial_location' },
+                { key: 'burial_notes', label: 'burial_notes' },
+                { key: 'service', label: 'service' },
+                { key: 'marriage_date', label: 'marriage_date' },
+                { key: 'relationship', label: 'relationship' },
+                { key: 'divorced', label: 'divorced' },
+                { key: 'divorce_date', label: 'divorce_date' },
+                { key: 'parents', label: 'parents' },
+                { key: 'attributes', label: 'attributes' },
+                { key: 'unprocessed_items', label: 'unprocessed_items' },
+                { key: 'notes', label: 'notes' },
+                { key: 'story', label: 'story', vestigial: false }
+            ];
+
+            columnConfig.forEach(col => {
+
+                const th = document.createElement('th');
+                th.className = col.key;
+                if (col.width) th.style.width = col.width;
+
+                if (!['record_type', 'gen', 'name', 'sex'].includes(col.key)) {
+                    const eye = document.createElement('span');
+                    eye.textContent = vestigialColumns.has(col.key) ? '👁️‍🗨️' : '👁️';
+                    eye.className = 'action-icons';
+                    eye.style.cursor = 'pointer';
+                    eye.onclick = (e) => {
+                        e.stopPropagation();
+                        toggleColumn(col.key);
+                    };
+                    th.appendChild(eye);
+                }
+
+                const label = document.createElement('span');
+                label.className = 'header-text';
+                label.textContent = col.label;
+                th.appendChild(label);
+
+                if (vestigialColumns.has(col.key)) th.className += ' vestigial';
+                headerRow.appendChild(th);
+            });
+
+            table.appendChild(headerRow);
+
+            flatRows.forEach((row, flatIndex) => {
+                const personIndex = records.findIndex(r => r.record_id === row.record_id);
+                const tr = document.createElement('tr');
+                if (highlightedRow === personIndex && !row.isPartner) tr.className = 'highlighted-row';
+                tr.className += ' editable-row';
+
+                columnConfig.forEach(col => {
+                    const td = document.createElement('td');
+                    td.className = col.key;
+
+                    if (col.key === 'story') {
+                        const hasStory = row.isPartner
+                            ? (row.partnerData.story || '').trim().length > 0
+                            : (row.story || '').trim().length > 0;
+                        const hasPhotos = row.isPartner
+                            ? (row.partnerData.photos?.length > 0)
+                            : (row.photos?.length > 0);
+
+                        td.innerHTML = `
+                            <span style="cursor:pointer; margin-right:10px; font-size:20px;" title="Edit story">
+                                ${hasStory ? '📖' : '📕'}
+                            </span>
+                            <span style="cursor:pointer; font-size:20px;" title="Photo gallery">
+                                ${hasPhotos ? '📸' : '📷'}
+                            </span>
+                        `;
+
+                        td.querySelector('span:first-child').onclick = (e) => {
+                            e.stopPropagation();
+                            openStoryModal(row.personIndex, row.isPartner ? row.partnerData.record_id : null);
+                        };
+
+                        td.querySelector('span:last-child').onclick = (e) => {
+                            e.stopPropagation();
+                            openPhotoGallery(row.personIndex, row.isPartner ? row.partnerData.record_id : null);
+                        };
+                    } else if (col.key === 'record_type') {
+                        td.textContent = row.isPartner ? 'Partner' : 'Person';
+                    } else if (col.key === 'gen') {
+                        td.textContent = row.isPartner ? '' : (row.generation || row.gen || '');
+                    } else if (col.key === 'sex') {
+                        td.textContent = row.isPartner ? '' : (row.sex || '');
+                    } else {
+                        const value = row[col.key];
+                        td.textContent = (value === null || value === undefined) ? '' : String(value);
+                    }
+
+                    // Vestigial styling
+                    if (vestigialColumns.has(col.key) && col.key !== 'story') {
+                        td.className += ' vestigial';
+                    }
+
+                    // Editable cells (same rules as before)
+                    const isMainPerson = !row.isPartner;
+                    const field = col.key;
+
+                    const editableMain = isMainPerson && ['name','sex','birth_date','birth_location','death_date','death_location','burial_location','service','attributes','parents'].includes(field);
+                    const editablePartner = row.isPartner && ['name','birth_date','birth_location','death_date','death_location','burial_location','service','marriage_date','relationship','divorced','divorce_date'].includes(field);
+
+                    if ((editableMain || editablePartner) && !vestigialColumns.has(field)) {
+                        td.className += ' editable';
+                        td.style.cursor = 'pointer';
+                        td.onclick = (e) => {
+                            if (editingIndex === null) {
+                                e.stopPropagation();
+                                startEditing(row.personIndex, field, td, td.textContent.trim(), row.isPartner ? row.partnerData.record_id : null);
+                            }
+                        };
+                    }
+
+                    tr.appendChild(td);
+                });
+
+                table.appendChild(tr);
+            });
+
+            recordBody.appendChild(table);
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 1. startEditing — now supports nested partner paths
+        // ──────────────────────────────────────────────────────────────
+        function startEditing(personIndex, field, td, currentValue, partnerRecordId = null) {
+            editingIndex = personIndex;
+            editingField = field;
+            editingPartnerId = partnerRecordId;  // null for main person, string for partner
+
+            td.innerHTML = '';
+
+            // Special dropdowns
+            if (field === 'sex' && !partnerRecordId) {
+                const select = createSelect(['', 'male', 'female'], currentValue);
+                td.appendChild(select);
+                select.focus();
+                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                return;
+            }
+            if (field === 'attributes' && !partnerRecordId) {
+                const select = createSelect(['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'], currentValue);
+                td.appendChild(select);
+                select.focus();
+                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                return;
+            }
+            if (field === 'relationship' && partnerRecordId) {
+                const select = createSelect(['', 'spouse', 'partner', 'other'], currentValue);
+                td.appendChild(select);
+                select.focus();
+                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                return;
+            }
+
+            // Default: textarea
+            const textarea = document.createElement('textarea');
+            textarea.className = 'edit-textarea';
+            textarea.value = currentValue;
+            textarea.rows = Math.max(2, currentValue.split('\n').length);
+            td.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+
+            textarea.onblur = () => saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerRecordId);
+            textarea.onkeydown = e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerRecordId);
+                } else if (e.key === 'Escape') {
+                    cancelEdit(td, currentValue);
+                }
+            };
+        }
+
+        // Helper for dropdowns
+        function createSelect(options, selected) {
+            const select = document.createElement('select');
+            select.className = 'edit-select';
+            options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt || '(none)';
+                if (opt === selected) option.selected = true;
+                select.appendChild(option);
+            });
+            return select;
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 2. saveEdit — now writes to correct nested location
+        // ──────────────────────────────────────────────────────────────
+        function saveEdit(personIndex, field, value, td, oldValue, partnerRecordId = null) {
+            const trimmed = value.trim();
+
+            // Validation
+            if (dateFields.includes(field) && trimmed && !isValidDate(trimmed)) {
+                safeShowError(`Invalid date in ${field}. Use YYYY, YYYY-MM, or YYYY-MM-DD.`);
+                cancelEdit(td, oldValue);
+                return;
+            }
+            if (field === 'relationship' && partnerRecordId && !['', 'spouse', 'partner', 'other'].includes(trimmed)) {
+                safeShowError('Relationship must be spouse, partner, or other.');
+                cancelEdit(td, oldValue);
+                return;
+            }
+
+            const person = records[personIndex];
+
+            if (!partnerRecordId) {
+                // Main person record
+                if (person[field] !== trimmed) {
+                    person[field] = trimmed;
+                    console.log(`Updated person[${personIndex}].${field} → "${trimmed}"`);
+                }
+            } else {
+                // Partner record
+                const partner = person.partners.find(p => p.record_id === partnerRecordId);
+                if (partner) {
+                    if (partner[field] !== trimmed) {
+                        partner[field] = trimmed;
+                        console.log(`Updated person[${personIndex}].partners[${partner.record_id}].${field} → "${trimmed}"`);
+                    }
+                }
+            }
+
+            // Clean up and redraw
+            editingIndex = null;
+            editingField = null;
+            editingPartnerId = null;
+
+            td.innerHTML = '<span class="cell-content">' + (trimmed || '') + '</span>';
+            debounceDisplayRecords();
+        }
+
+        function cancelEdit(td, oldValue) {
+            editingIndex = null;
+            editingField = null;
+            editingPartnerId = null;
+            td.innerHTML = '<span class="cell-content">' + (oldValue || '') + '</span>';
+        }
+
+        function openPhotoGallery(personIndex, partnerRecordId = null) {
+    if (!records?.length) return safeShowError('No records loaded');
+
+    safeOpenModal('photos');
+    const isPartner = partnerRecordId !== null;
+    const person = records[personIndex];
+    const target = isPartner ? person.partners.find(p => p.record_id === partnerRecordId) : person;
+    const name = isPartner ? `${target.name || '(unnamed)'} (Partner)` : person.name;
+
+    if (!target.photos) target.photos = [];
+
+    document.getElementById('modalTitle').textContent = `Photos – ${name}`;
+
+    document.getElementById('modalForm').innerHTML = `
+        <div style="text-align:center; margin:20px 0;">
+            <div id="photoDropZone" style="border:3px dashed #007bff; border-radius:12px; padding:40px; background:#f8f9ff; cursor:pointer;">
+                <p style="margin:0; font-size:18px; color:#007bff;">Drop photos here or click to upload</p>
+                <input type="file" id="photoUpload" multiple accept="image/*" style="display:none">
+            </div>
+        </div>
+        <div id="photoGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:15px; max-height:70vh; overflow-y:auto; padding:10px;"></div>
+        <div style="text-align:center; margin-top:20px;">
+            <button type="button" onclick="closeModal()" style="padding:12px 30px; background:#666; color:white; border:none; border-radius:6px;">Close</button>
+        </div>
+    `;
+
+    const dropZone = document.getElementById('photoDropZone');
+    const uploadInput = document.getElementById('photoUpload');
+    const grid = document.getElementById('photoGrid');
+
+    dropZone.onclick = () => uploadInput.click();
+
+    ['dragover', 'dragenter'].forEach(e => dropZone.addEventListener(e, ev => {
+        ev.preventDefault();
+        dropZone.style.background = '#e1f5fe';
+    }));
+    ['dragleave', 'dragend', 'drop'].forEach(e => dropZone.addEventListener(e, ev => {
+        ev.preventDefault();
+        if (e === 'drop' && ev.dataTransfer.files.length) handlePhotos(ev.dataTransfer.files, target, grid, personIndex, partnerRecordId);
+        dropZone.style.background = '#f8f9ff';
+    }));
+
+    uploadInput.addEventListener('change', () => {
+        if (uploadInput.files.length) handlePhotos(uploadInput.files, target, grid, personIndex, partnerRecordId);
+    });
+
+    renderPhotos(target, grid, personIndex, partnerRecordId);
+
+    new Sortable(grid, {
+        animation: 150,
+        onEnd: () => {
+            const order = Array.from(grid.children).map(div => ({
+                id: div.dataset.id,
+                data: div.dataset.src,
+                caption: div.querySelector('textarea').value
+            }));
+            target.photos = order;
+        }
+    });
+}
+
+        function handlePhotos(files, target, grid, personIndex, partnerRecordId) {
+            Array.from(files).forEach(file => {
+                if (!file.type.startsWith('image/')) return;
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const id = 'photo_' + Date.now() + Math.floor(Math.random() * 10000);
+                    target.photos.push({
+                        id: id,
+                        data: e.target.result,
+                        caption: file.name.split('.').slice(0, -1).join('.') || 'Photo'
+                    });
+                    renderPhotos(target, grid, personIndex, partnerRecordId);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderPhotos(target, grid, personIndex, partnerRecordId) {
+            grid.innerHTML = target.photos.length === 0
+                ? '<p style="grid-column:1/-1; text-align:center; color:#666; font-style:italic;">No photos yet</p>'
+                : '';
+
+            target.photos.forEach((photo, i) => {
+                const div = document.createElement('div');
+                div.dataset.id = photo.id;
+                div.dataset.src = photo.data;
+                div.style.cssText = 'border:1px solid #ddd; border-radius:8px; overflow:hidden; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.1);';
+
+                div.innerHTML = `
+                    <div style="position:relative;">
+                        <img src="${photo.data}" style="width:100%; height:180px; object-fit:cover;">
+                        <button onclick="event.stopPropagation(); deletePhoto(${personIndex}, ${partnerRecordId ? `'${partnerRecordId}'` : 'null'}, '${photo.id}')" 
+                                style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.7); color:white; border:none; border-radius:50%; width:32px; height:32px; cursor:pointer;">×</button>
+                    </div>
+                    <textarea placeholder="Caption..." style="width:100%; border:none; padding:8px; font-size:14px; resize:none; height:60px;">${photo.caption || ''}</textarea>
+                `;
+
+                div.querySelector('textarea').addEventListener('input', e => {
+                    target.photos[i].caption = e.target.value;
+                });
+
+                grid.appendChild(div);
+            });
+        }
+
+        function deletePhoto(personIndex, partnerRecordId, photoId) {
+            if (!confirm('Delete this photo permanently?')) return;
+            const person = records[personIndex];
+            const target = partnerRecordId ? person.partners.find(p => p.record_id === partnerRecordId) : person;
+            target.photos = target.photos.filter(p => p.id !== photoId);
+            renderPhotos(target, document.getElementById('photoGrid'), personIndex, partnerRecordId);
+        }
+
+        function initDebug() {
+            if (window.location.search.includes('debug=1')) {
+                (async () => {
+                    const pp = await askPassphrase('DEBUG');
+                    if (CryptoJS.SHA256(pp).toString() === debugPassphraseHash) {
+                        debugMode = true;
+                        console.log('DEBUG MODE ON');
+                        document.getElementById('textFile').setAttribute('accept', '.zip,.json');
+                    } else {
+                        console.log('Debug mode disabled - incorrect passphrase');
+                    }
+                    decryptionPassphrase = null;
+                })();
+            }
+        }
+        initDebug();
+        // ──────────────────────────────────────────────────────────────
+        //  RESTORE: Connect the file input to handleFileSelect
+        // ──────────────────────────────────────────────────────────────
+        document.getElementById('textFile').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>
