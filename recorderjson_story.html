@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.1</span> — December 01, 2025
+                    Version: <span id="pageVersion">1.0.2</span> — December 01, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1170,7 +1170,7 @@ async function loadFromDropbox() {
             recordBody.innerHTML = '';
             if (records.length === 0) return;
 
-            // Build flat list for display: main person + their partners as pseudo-rows
+            // Build flat list: main person + their partners
             const flatRows = [];
             records.forEach(person => {
                 flatRows.push({ ...person, isPartner: false });
@@ -1178,8 +1178,10 @@ async function loadFromDropbox() {
                     flatRows.push({
                         ...person,
                         ...partner,
-                        name: partner.name,
+                        name: partner.name || '',
                         record_type: 'Partner',
+                        gen: person.generation || person.gen || '',
+                        sex: '',
                         isPartner: true,
                         partnerData: partner
                     });
@@ -1189,74 +1191,122 @@ async function loadFromDropbox() {
             const table = document.createElement('table');
             const headerRow = document.createElement('tr');
 
-            // Use first record keys + always show story
-            const sample = flatRows[0];
-            const headers = Object.keys(sample).filter(h => 
-                !['partners', 'parent_ids', 'children_no_other_parent', 'notes', 'unprocessed_items', 'partnerData', 'isPartner'].includes(h)
-            );
-            if (!headers.includes('story')) headers.push('story');
+            // === Define exact column order and display names (matches original CSV exactly) ===
+            const columnConfig = [
+                { key: 'record_type', label: 'record', width: '60px' },
+                { key: 'gen', label: 'gen', width: '40px' },
+                { key: 'name', label: 'name' },
+                { key: 'sex', label: 'sex', width: '40px' },
+                { key: 'birth_date', label: 'birth_date' },
+                { key: 'birth_location', label: 'birth_location' },
+                { key: 'death_date', label: 'death_date' },
+                { key: 'death_location', label: 'death_location' },
+                { key: 'burial_location', label: 'burial_location' },
+                { key: 'burial_notes', label: 'burial_notes' },
+                { key: 'service', label: 'service' },
+                { key: 'marriage_date', label: 'marriage_date' },
+                { key: 'relationship', label: 'relationship' },
+                { key: 'divorced', label: 'divorced' },
+                { key: 'divorce_date', label: 'divorce_date' },
+                { key: 'parents', label: 'parents' },
+                { key: 'attributes', label: 'attributes' },
+                { key: 'unprocessed_items', label: 'unprocessed_items' },
+                { key: 'notes', label: 'notes' },
+                { key: 'story', label: 'story', vestigial: false }
+            ];
 
-            headers.forEach(header => {
-                const th = document.createElement('th');
-                th.className = header;
-                if (!['record_type', 'gen', 'name', 'sex'].includes(header)) {
-                    const toggleButton = document.createElement('span');
-                    toggleButton.textContent = vestigialColumns.has(header) ? 'Hidden' : 'Visible';
-                    toggleButton.className = 'action-icons';
-                    toggleButton.onclick = () => toggleColumn(header);
-                    th.appendChild(toggleButton);
+            columnConfig.forEach(col => {
+                if (col.key === 'story') {
+                    // Story column always shown, never vestigial
+                    const th = document.createElement('th');
+                    th.className = 'story';
+                    th.style.width = '50px';
+                    th.textContent = 'story';
+                    headerRow.appendChild(th);
+                    return;
                 }
-                const headerText = document.createElement('span');
-                headerText.textContent = header === 'record_type' ? 'record' : header;
-                headerText.className = 'header-text';
-                th.appendChild(headerText);
-                if (vestigialColumns.has(header) && !['record_type', 'gen', 'name', 'sex'].includes(header)) th.className += ' vestigial';
+
+                const th = document.createElement('th');
+                th.className = col.key;
+                if (col.width) th.style.width = col.width;
+
+                if (!['record_type', 'gen', 'name', 'sex'].includes(col.key)) {
+                    const eye = document.createElement('span');
+                    eye.textContent = vestigialColumns.has(col.key) ? 'closed_eye' : 'open_eye';
+                    eye.className = 'action-icons';
+                    eye.style.cursor = 'pointer';
+                    eye.onclick = (e) => {
+                        e.stopPropagation();
+                        toggleColumn(col.key);
+                    };
+                    th.appendChild(eye);
+                }
+
+                const label = document.createElement('span');
+                label.className = 'header-text';
+                label.textContent = col.label;
+                th.appendChild(label);
+
+                if (vestigialColumns.has(col.key)) th.className += ' vestigial';
                 headerRow.appendChild(th);
             });
+
             table.appendChild(headerRow);
 
             flatRows.forEach((row, flatIndex) => {
-                const originalIndex = records.findIndex(r => r.record_id === row.record_id);
+                const personIndex = records.findIndex(r => r.record_id === row.record_id);
                 const tr = document.createElement('tr');
-                if (highlightedRow === originalIndex && !row.isPartner) tr.className = 'highlighted-row';
+                if (highlightedRow === personIndex && !row.isPartner) tr.className = 'highlighted-row';
                 tr.className += ' editable-row';
 
-                headers.forEach(header => {
+                columnConfig.forEach(col => {
                     const td = document.createElement('td');
-                    td.className = header;
+                    td.className = col.key;
 
-                    let value = row[header] || '';
-                    if (header === 'record_type') value = row.isPartner ? 'Partner' : 'Person';
-
-                    const cellContent = document.createElement('span');
-                    if (header === 'story') {
+                    if (col.key === 'story') {
                         const hasStory = (row.story || '').trim().length > 0;
-                        cellContent.textContent = hasStory ? 'Open book' : 'Closed book';
-                        cellContent.style.fontSize = '20px';
-                        cellContent.style.cursor = 'pointer';
-                        cellContent.title = hasStory ? 'Edit story' : 'Add story';
-                        td.addEventListener('click', () => openStoryModal(originalIndex));
+                        td.textContent = hasStory ? 'open_book' : 'closed_book';
+                        td.style.fontSize = '20px';
+                        td.style.cursor = 'pointer';
+                        td.title = hasStory ? 'Click to edit story' : 'Click to add story';
+                        td.onclick = () => openStoryModal(personIndex);
+                    } else if (col.key === 'record_type') {
+                        td.textContent = row.isPartner ? 'Partner' : 'Person';
+                    } else if (col.key === 'gen') {
+                        td.textContent = row.isPartner ? '' : (row.generation || row.gen || '');
+                    } else if (col.key === 'sex') {
+                        td.textContent = row.isPartner ? '' : (row.sex || '');
                     } else {
-                        cellContent.textContent = value;
+                        const value = row[col.key];
+                        td.textContent = value === null || value === undefined ? '' : value;
                     }
-                    cellContent.className = 'cell-content';
-                    td.appendChild(cellContent);
 
-                    const isEditable = !row.isPartner || ['name', 'birth_date', 'birth_location', 'death_date', 'death_location', 'burial_location', 'service', 'marriage_date', 'relationship', 'divorced', 'divorce_date', 'story'].includes(header);
-                    if (isEditable && !vestigialColumns.has(header)) {
-                        td.className += ' editable';
-                        td.addEventListener('click', e => {
-                            if (editingIndex === null) {
-                                const targetRecordIndex = originalIndex;
-                                const targetField = row.isPartner ? `partners.${header}` : header;
-                                startEditing(targetRecordIndex, targetField, td, cellContent.textContent, row.isPartner ? row.partnerData.record_id : null);
-                                e.stopPropagation();
-                            }
-                        });
+                    // Vestigial styling
+                    if (vestigialColumns.has(col.key) && col.key !== 'story') {
+                        td.className += ' vestigial';
                     }
-                    if (vestigialColumns.has(header) && !['record_type', 'gen', 'name', 'sex'].includes(header)) td.className += ' vestigial';
+
+                    // Editable cells (same rules as before)
+                    const isMainPerson = !row.isPartner;
+                    const field = col.key;
+
+                    const editableMain = isMainPerson && ['name','sex','birth_date','birth_location','death_date','death_location','burial_location','service','attributes','parents'].includes(field);
+                    const editablePartner = row.isPartner && ['name','birth_date','birth_location','death_date','death_location','burial_location','service','marriage_date','relationship','divorced','divorce_date'].includes(field);
+
+                    if ((editableMain || editablePartner) && !vestigialColumns.has(field)) {
+                        td.className += ' editable';
+                        td.style.cursor = 'pointer';
+                        td.onclick = (e) => {
+                            if (editingIndex === null) {
+                                e.stopPropagation();
+                                startEditing(personIndex, field, td, td.textContent.trim(), row.isPartner ? row.partnerData.record_id : null);
+                            }
+                        };
+                    }
+
                     tr.appendChild(td);
                 });
+
                 table.appendChild(tr);
             });
 
