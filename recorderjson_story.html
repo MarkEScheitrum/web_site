@@ -369,7 +369,18 @@ async function loadFromDropbox() {
         document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Loaded`;
 
         const text = await jsonEntry.async('text');
-        records = JSON.parse(text);
+        const obj = JSON.parse(text);
+
+        let recordArray;
+        if (obj.data && Array.isArray(obj.data)) {
+            recordArray = obj.data;
+        } else if (obj.records && Array.isArray(obj.records)) {
+            recordArray = obj.records;
+        } else {
+            throw new Error('No valid record array found in downloaded JSON');
+        }
+
+        records = recordArray;
 
         // Normalize: ensure partners is array, even if empty
         records.forEach(r => {
@@ -640,9 +651,6 @@ async function loadFromDropbox() {
             }
         }
 
-        // ──────────────────────────────────────────────────────────────
-        //  RESTORE MISSING: handleFileSelect() – critical for debug CSV loading
-        // ──────────────────────────────────────────────────────────────
         function handleFileSelect() {
             const file = document.getElementById('textFile').files[0];
             if (!file) return;
@@ -652,26 +660,46 @@ async function loadFromDropbox() {
             if (file.name.endsWith('.json')) {
                 reader.onload = function(e) {
                     try {
-                        records = JSON.parse(e.target.result);
+                        const obj = JSON.parse(e.target.result);
+
+                        // Extract the actual array — supports your current format and future ones
+                        let recordArray;
+                        if (obj.data && Array.isArray(obj.data)) {
+                            recordArray = obj.data;
+                        } else if (obj.records && Array.isArray(obj.records)) {
+                            recordArray = obj.records;
+                        } else if (Array.isArray(obj)) {
+                            recordArray = obj;
+                        } else {
+                            throw new Error('JSON does not contain a recognizable record array (looked for .data, .records, or root array)');
+                        }
+
+                        records = recordArray;
+
+                        // Normalize required arrays and fields
                         records.forEach(r => {
                             if (!Array.isArray(r.partners)) r.partners = [];
                             if (!r.parent_ids) r.parent_ids = [];
                             if (!r.children_no_other_parent) r.children_no_other_parent = [];
                             if (!r.notes) r.notes = [];
                             if (!r.unprocessed_items) r.unprocessed_items = [];
+                            if (!r.record_id) r.record_id = crypto.randomUUID();
                         });
+
                         originalFileName = file.name.replace(/\.json$/i, '.zip');
                         ticketNumber = originalFileName.match(/records_(\d+)\.zip/)?.[1] || 'Local';
                         document.getElementById('fileStatus').textContent = `Local JSON Loaded – ${file.name}`;
                         finishLoad();
                     } catch (err) {
                         safeShowError('Invalid JSON file: ' + err.message);
+                        console.error('JSON parse error:', err);
                     }
                 };
                 reader.readAsText(file);
                 return;
             }
 
+            // === ZIP handling (encrypted) ===
             if (file.name.endsWith('.zip')) {
                 reader.onload = async function(e) {
                     try {
@@ -690,14 +718,25 @@ async function loadFromDropbox() {
                         document.getElementById('fileStatus').textContent = `Local ZIP Loaded – Ticket ${ticketNumber}`;
 
                         const text = await jsonEntry.async('text');
-                        records = JSON.parse(text);
+                        const obj = JSON.parse(text);
 
+                        let recordArray;
+                        if (obj.data && Array.isArray(obj.data)) {
+                            recordArray = obj.data;
+                        } else if (obj.records && Array.isArray(obj.records)) {
+                            recordArray = obj.records;
+                        } else {
+                            throw new Error('No valid record array found in downloaded JSON');
+                        }
+
+                        records = recordArray;
                         records.forEach(r => {
                             if (!Array.isArray(r.partners)) r.partners = [];
                             if (!r.parent_ids) r.parent_ids = [];
                             if (!r.children_no_other_parent) r.children_no_other_parent = [];
                             if (!r.notes) r.notes = [];
                             if (!r.unprocessed_items) r.unprocessed_items = [];
+                            if (!r.record_id) r.record_id = crypto.randomUUID();
                         });
 
                         isEncryptedZip = true;
