@@ -1232,7 +1232,7 @@ async function loadFromDropbox() {
 
                 if (!['record_type', 'gen', 'name', 'sex'].includes(col.key)) {
                     const eye = document.createElement('span');
-                    eye.textContent = vestigialColumns.has(col.key) ? 'closed_eye' : 'open_eye';
+                    eye.textContent = vestigialColumns.has(col.key) ? '👁️‍🗨️' : '👁️';
                     eye.className = 'action-icons';
                     eye.style.cursor = 'pointer';
                     eye.onclick = (e) => {
@@ -1265,7 +1265,7 @@ async function loadFromDropbox() {
 
                     if (col.key === 'story') {
                         const hasStory = (row.story || '').trim().length > 0;
-                        td.textContent = hasStory ? 'open_book' : 'closed_book';
+                        td.textContent = hasStory ? '📖' : '📕';
                         td.style.fontSize = '20px';
                         td.style.cursor = 'pointer';
                         td.title = hasStory ? 'Click to edit story' : 'Click to add story';
