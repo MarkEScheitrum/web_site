@@ -48,7 +48,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">1.0.4</span> — December 01, 2025
+                    Version: <span id="pageVersion">1.0.5</span> — December 01, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1179,8 +1179,8 @@ async function loadFromDropbox() {
 
             // Build flat list: main person + their partners
             const flatRows = [];
-            records.forEach(person => {
-                flatRows.push({ ...person, isPartner: false });
+            records.forEach((person, personIndex) => {
+                flatRows.push({ ...person, isPartner: false, personIndex });
                 person.partners.forEach(partner => {
                     flatRows.push({
                         ...person,
@@ -1190,7 +1190,8 @@ async function loadFromDropbox() {
                         gen: person.generation || person.gen || '',
                         sex: '',
                         isPartner: true,
-                        partnerData: partner
+                        partnerData: partner,
+                        personIndex,
                     });
                 });
             });
@@ -1223,33 +1224,6 @@ async function loadFromDropbox() {
             ];
 
             columnConfig.forEach(col => {
-                if (col.key === 'story') {
-                    let hasStory = false;
-                    let storyOwnerIndex = personIndex;        // main person by default
-                    let storyOwnerIsPartner = false;
-                    let partnerRecordId = null;
-
-                    if (row.isPartner) {
-                        // Partner row — story belongs to the partner object
-                        const partner = row.partnerData;
-                        hasStory = (partner.story || '').trim().length > 0;
-                        storyOwnerIsPartner = true;
-                        partnerRecordId = partner.record_id;
-                    } else {
-                        // Main person row
-                        hasStory = (row.story || '').trim().length > 0;
-                    }
-
-                    td.textContent = hasStory ? 'open_book' : 'closed_book';
-                    td.style.fontSize = '20px';
-                    td.style.cursor = 'pointer';
-                    td.title = hasStory ? 'Click to edit story' : 'Click to add story';
-
-                    td.onclick = () => openStoryModal(
-                        storyOwnerIndex,
-                        storyOwnerIsPartner ? partnerRecordId : null
-                    );
-                }
 
                 const th = document.createElement('th');
                 th.className = col.key;
@@ -1289,12 +1263,16 @@ async function loadFromDropbox() {
                     td.className = col.key;
 
                     if (col.key === 'story') {
-                        const hasStory = (row.story || '').trim().length > 0;
-                        td.textContent = hasStory ? '📖' : '📕';
+                        const hasStory = row.isPartner 
+                            ? (row.partnerData.story || '').trim().length > 0 
+                            : (row.story || '').trim().length > 0;td.textContent = hasStory ? '📖' : '📕';
                         td.style.fontSize = '20px';
                         td.style.cursor = 'pointer';
                         td.title = hasStory ? 'Click to edit story' : 'Click to add story';
-                        td.onclick = () => openStoryModal(personIndex);
+                        td.onclick = () => openStoryModal(
+                            row.personIndex,
+                            row.isPartner ? row.partnerData.record_id : null
+                        );
                     } else if (col.key === 'record_type') {
                         td.textContent = row.isPartner ? 'Partner' : 'Person';
                     } else if (col.key === 'gen') {
@@ -1324,7 +1302,7 @@ async function loadFromDropbox() {
                         td.onclick = (e) => {
                             if (editingIndex === null) {
                                 e.stopPropagation();
-                                startEditing(personIndex, field, td, td.textContent.trim(), row.isPartner ? row.partnerData.record_id : null);
+                                startEditing(row.personIndex, field, td, td.textContent.trim(), row.isPartner ? row.partnerData.record_id : null);
                             }
                         };
                     }
