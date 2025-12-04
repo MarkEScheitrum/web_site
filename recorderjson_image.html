@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.1</span> — December 02, 2025
+                    Version: <span id="pageVersion">2.0.2</span> — December 04, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -98,6 +98,7 @@
         let ticketNumber = null;
         let hasReturnedUpdates = false;
         let editingPartnerId = null;  // tracks which partner we're editing
+        let originalHeader = {};   // will keep everything that was outside the "data" array when loading
         const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
         const fieldRestrictions = {
@@ -596,31 +597,57 @@
             let blob;
 
             if (debugMode && !isEncryptedZip) {
-                // Local debug: just download JSON
-                blob = new Blob([jsonContent], { type: 'application/json' });
+                // Build full JSON with preserved header + new metadata
+                const now = new Date();
+                const iso = now.toISOString().replace(/T/, ' ').replace(/\..+/, '');
+
+                const output = {
+                    ...originalHeader,                                   // keep everything from original file
+                    editor: "Genealogy Recorder Web Editor",
+                    editor_version: document.getElementById('pageVersion').textContent.trim(),
+                    last_edited: iso + " UTC",
+                    data: records                                        // current data
+                };
+
+                const jsonContent = JSON.stringify(output, null, 2);
+                const blob = new Blob([jsonContent], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `edited_${originalFileName.replace(/\.zip$/i, '.json')}`;
                 a.click();
                 URL.revokeObjectURL(url);
-                showPopup(`<h3 style="color:green">JSON Saved Locally</h3><p>edited_${originalFileName.replace(/\.zip$/i, '.json')}</p>`);
+
+                showPopup(`<h3 style="color:green">JSON Saved Locally</h3><p>edited_${originalFileName.replace(/\.zip$/i, '.json')}</p) <small>Includes header & editor info</small>`);
                 hasReturnedUpdates = true;
                 document.getElementById('exitBtn').style.display = 'block';
                 return;
             }
 
-            // Normal flow: create encrypted ZIP with JSON inside
-            const zip = new JSZip();
-            zip.file(`records_${ticketNumber}.json`, jsonContent);
-            const zipBin = await zip.generateAsync({ type: 'uint8array' });
-            const encrypted = encryptBlob(String.fromCharCode.apply(null, zipBin), decryptionPassphrase || exchangePassphrase);
-            const uint8 = new Uint8Array(encrypted.sigBytes);
-            for (let i = 0; i < encrypted.sigBytes; i++) {
-                const w = encrypted.words[Math.floor(i / 4)];
-                uint8[i] = (w >>> (24 - (i % 4) * 8)) & 0xFF;
-            }
-            blob = new Blob([uint8], { type: 'application/octet-stream' });
+            // Normal flow: create encrypted ZIP with full JSON (header + metadata + data)
+                const now = new Date();
+                const iso = now.toISOString().replace(/T/, ' ').replace(/\..+/, '');
+
+                const fullOutput = {
+                    ...originalHeader,
+                    editor: "Genealogy Recorder Web Editor",
+                    editor_version: document.getElementById('pageVersion').textContent.trim(),
+                    last_edited: iso + " UTC",
+                    data: records
+                };
+
+                const jsonContent = JSON.stringify(getOutputObject(fullOutput), null, 2);
+
+                const zip = new JSZip();
+                zip.file(`records_${ticketNumber}.json`, jsonContent);
+                const zipBin = await zip.generateAsync({ type: 'uint8array' });
+                const encrypted = encryptBlob(String.fromCharCode.apply(null, zipBin), decryptionPassphrase || exchangePassphrase);
+                const uint8 = new Uint8Array(encrypted.sigBytes);
+                for (let i = 0; i < encrypted.sigBytes; i++) {
+                    const w = encrypted.words[Math.floor(i / 4)];
+                    uint8[i] = (w >>> (24 - (i % 4) * 8)) & 0xFF;
+                }
+                blob = new Blob([uint8], { type: 'application/octet-stream' });
 
             try {
                 const accessToken = await getAccessToken();
@@ -640,32 +667,37 @@
             }
         }
 
-        function handleFileSelect() {
+    function handleFileSelect() {
             const file = document.getElementById('textFile').files[0];
             if (!file) return;
-
+        
             const reader = new FileReader();
-
+        
             if (file.name.endsWith('.json')) {
                 reader.onload = function(e) {
                     try {
-                        const obj = JSON.parse(e.target.result);
-
-                        // Extract the actual array — supports your current format and future ones
+                        const fullObj = JSON.parse(e.target.result);
+        
+                        // Preserve everything that is NOT the data array as header
+                        originalHeader = { ...fullObj };
+                        delete originalHeader.data;
+                        delete originalHeader.records;   // in case older format used "records"
+        
+                        // Extract the actual array
                         let recordArray;
-                        if (obj.data && Array.isArray(obj.data)) {
-                            recordArray = obj.data;
-                        } else if (obj.records && Array.isArray(obj.records)) {
-                            recordArray = obj.records;
-                        } else if (Array.isArray(obj)) {
-                            recordArray = obj;
+                        if (fullObj.data && Array.isArray(fullObj.data)) {
+                            recordArray = fullObj.data;
+                        } else if (fullObj.records && Array.isArray(fullObj.records)) {
+                            recordArray = fullObj.records;
+                        } else if (Array.isArray(fullObj)) {
+                            recordArray = fullObj;
                         } else {
-                            throw new Error('JSON does not contain a recognizable record array (looked for .data, .records, or root array)');
+                            throw new Error('JSON does not contain a recognizable record array');
                         }
-
+        
                         records = recordArray;
-
-                        // Normalize required arrays and fields
+        
+                        // Normalise fields
                         records.forEach(r => {
                             if (!Array.isArray(r.partners)) r.partners = [];
                             if (!r.parent_ids) r.parent_ids = [];
@@ -674,7 +706,7 @@
                             if (!r.unprocessed_items) r.unprocessed_items = [];
                             if (!r.record_id) r.record_id = crypto.randomUUID();
                         });
-
+        
                         originalFileName = file.name.replace(/\.json$/i, '.zip');
                         ticketNumber = originalFileName.match(/records_(\d+)\.zip/)?.[1] || 'Local';
                         document.getElementById('fileStatus').textContent = `Local JSON Loaded – ${file.name}`;
