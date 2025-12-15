@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.4</span> — December 15, 2025
+                    Version: <span id="pageVersion">2.0.5</span> — December 15, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -852,11 +852,20 @@
                     { name: 'service', label: 'Service (e.g. military)', type: 'text' },
                     { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' }
                 ];
-                const note = document.createElement('p');
-                note.className = 'note';
-                note.innerHTML = 'This adds a parent above the current root person.<br>Use only when extending upward in a new branch.<br>Spouses must be added using "Add Partner".';
-                modalForm.insertBefore(note, modalForm.firstChild);
 
+                // Add explanatory note (same way other modes do if needed)
+                setTimeout(() => {
+                    const note = document.createElement('p');
+                    note.className = 'note';
+                    note.innerHTML = 'This adds a parent above the current root person.<br>Use only when extending upward in a new branch.<br>Spouses must be added using "Add Partner".';
+                    const form = document.getElementById('modalForm');
+                    if (form.firstChild) {
+                        form.insertBefore(note, form.firstChild);
+                    } else {
+                        form.appendChild(note);
+                    }
+                }, 0);
+            
             } else if (mode === 'updateRecord') {
                 modalTitle.textContent = 'Update Record';
                 const recordOptions = records.flatMap((person, i) => {
@@ -1547,7 +1556,7 @@
             td.innerHTML = '<span class="cell-content">' + (oldValue || '') + '</span>';
         }
 
-                function saveNewParent() {
+        function saveNewParent() {
             const name = document.getElementById('parentName').value.trim();
             if (!name) {
                 safeShowError('Name is required');
