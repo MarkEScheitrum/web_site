@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.3</span> — December 05, 2025
+                    Version: <span id="pageVersion">2.0.4</span> — December 15, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -68,6 +68,7 @@
         <button type="button" onclick="openRequestModal()" class="task-btn" id="requestEditBtn">Request Edit Package ✉️</button>
         <button type="button" onclick="openModal('addChild')" class="task-btn disabled-btn" id="addChildBtn" style="display:none">Add Child 👶</button>
         <button type="button" onclick="openModal('addPartner')" class="task-btn disabled-btn" id="addPartnerBtn" style="display:none">Add Partner 💍</button>
+        <button type="button" onclick="openModal('addParent')" class="task-btn disabled-btn" id="addParentBtn" style="display:none">Add Parent 👤↑</button>
         <button type="button" onclick="openModal('updateRecord')" class="task-btn disabled-btn" id="updateRecordBtn" style="display:none">Update Record ✏️</button>
         <button type="button" onclick="openModal('recordDeathBurial')" class="task-btn disabled-btn" id="recordDeathBurialBtn" style="display:none">Record Death/Burial ⚰️</button>
         <button type="button" onclick="openStoryModal()" class="task-btn" id="editStoryBtn" style="display:none">Edit Story</button>
@@ -838,6 +839,24 @@
                     { name: 'marriage_date', label: 'Marriage Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
                     { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' }
                 ];
+            } else if (mode === 'addParent') {
+                modalTitle.textContent = 'Add Parent (Genealogical Ancestor)';
+                fields = [
+                    { name: 'name', label: 'Name', type: 'text', autocomplete: 'off', required: true },
+                    { name: 'sex', label: 'Sex', type: 'select', options: ['', 'male', 'female'] },
+                    { name: 'birth_date', label: 'Birth Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
+                    { name: 'birth_location', label: 'Birth Location', type: 'text' },
+                    { name: 'death_date', label: 'Death Date (YYYY-MM-DD or YYYY-MM or YYYY)', type: 'text' },
+                    { name: 'death_location', label: 'Death Location', type: 'text' },
+                    { name: 'burial_location', label: 'Burial Location', type: 'text' },
+                    { name: 'service', label: 'Service (e.g. military)', type: 'text' },
+                    { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' }
+                ];
+                const note = document.createElement('p');
+                note.className = 'note';
+                note.innerHTML = 'This adds a parent above the current root person.<br>Use only when extending upward in a new branch.<br>Spouses must be added using "Add Partner".';
+                modalForm.insertBefore(note, modalForm.firstChild);
+
             } else if (mode === 'updateRecord') {
                 modalTitle.textContent = 'Update Record';
                 const recordOptions = records.flatMap((person, i) => {
@@ -1266,6 +1285,43 @@
                 if (highlightedRow === personIndex && !row.isPartner) tr.className = 'highlighted-row';
                 tr.className += ' editable-row';
 
+                tr.onclick = (e) => {
+                    if (highlightedRow !== personIndex) {
+                        highlightedRow = personIndex;
+                        // Enable standard buttons
+                        const addChildBtn = document.getElementById('addChildBtn');
+                        if (addChildBtn) {
+                            addChildBtn.style.display = 'inline-block';
+                            addChildBtn.classList.remove('disabled-btn');
+                        }
+                        const addPartnerBtn = document.getElementById('addPartnerBtn');
+                        if (addPartnerBtn) {
+                            addPartnerBtn.style.display = 'inline-block';
+                            addPartnerBtn.classList.remove('disabled-btn');
+                        }
+                        const updateRecordBtn = document.getElementById('updateRecordBtn');
+                        if (updateRecordBtn) {
+                            updateRecordBtn.style.display = 'inline-block';
+                            updateRecordBtn.classList.remove('disabled-btn');
+                        }
+                        // Show Add Parent only if selected is root
+                        const selectedGen = records[personIndex].generation || 1;
+                        const minGen = Math.min(...records.map(r => r.generation || 999));
+                        const isRoot = selectedGen === minGen;
+                        const addParentBtn = document.getElementById('addParentBtn');
+                        if (addParentBtn) {
+                            if (isRoot) {
+                                addParentBtn.style.display = 'inline-block';
+                                addParentBtn.classList.remove('disabled-btn');
+                            } else {
+                                addParentBtn.style.display = 'none';
+                                addParentBtn.classList.add('disabled-btn');
+                            }
+                        }
+                        debounceDisplayRecords();
+                    }
+                };
+
                 columnConfig.forEach(col => {
                     const td = document.createElement('td');
                     td.className = col.key;
@@ -1337,6 +1393,35 @@
             });
 
             recordBody.appendChild(table);
+
+                        // Deselect on click outside rows
+            document.onclick = (e) => {
+                if (!e.target.closest('tr.editable-row')) {
+                    highlightedRow = null;
+                    const addChildBtn = document.getElementById('addChildBtn');
+                    if (addChildBtn) {
+                        addChildBtn.style.display = 'none';
+                        addChildBtn.classList.add('disabled-btn');
+                    }
+                    const addPartnerBtn = document.getElementById('addPartnerBtn');
+                    if (addPartnerBtn) {
+                        addPartnerBtn.style.display = 'none';
+                        addPartnerBtn.classList.add('disabled-btn');
+                    }
+                    const updateRecordBtn = document.getElementById('updateRecordBtn');
+                    if (updateRecordBtn) {
+                        updateRecordBtn.style.display = 'none';
+                        updateRecordBtn.classList.add('disabled-btn');
+                    }
+                    const addParentBtn = document.getElementById('addParentBtn');
+                    if (addParentBtn) {
+                        addParentBtn.style.display = 'none';
+                        addParentBtn.classList.add('disabled-btn');
+                    }
+                    debounceDisplayRecords();
+                }
+            };
+
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -1460,6 +1545,43 @@
             editingField = null;
             editingPartnerId = null;
             td.innerHTML = '<span class="cell-content">' + (oldValue || '') + '</span>';
+        }
+
+                function saveNewParent() {
+            const name = document.getElementById('parentName').value.trim();
+            if (!name) {
+                safeShowError('Name is required');
+                return;
+            }
+
+            const currentRootGen = records[highlightedRow].generation || 1;
+
+            const newParent = {
+                record_id: Date.now() + Math.floor(Math.random() * 10000),
+                generation: currentRootGen - 1,
+                name: name,
+                sex: document.getElementById('parentSex').value || '',
+                birth_date: document.getElementById('parentBirthDate').value.trim(),
+                birth_location: document.getElementById('parentBirthLocation').value.trim(),
+                death_date: document.getElementById('parentDeathDate').value.trim(),
+                death_location: document.getElementById('parentDeathLocation').value.trim(),
+                burial_location: document.getElementById('parentBurialLocation').value.trim(),
+                service: document.getElementById('parentService').value.trim(),
+                partners: [],
+                photos: [],
+                story: '',
+                attributes: '',
+                parents: null
+            };
+
+            // Insert new parent at the very top of the records array
+            records.unshift(newParent);
+
+            safeCloseModal();
+            debounceDisplayRecords();
+
+            // Highlight the new root
+            highlightedRow = 0;
         }
 
         function openPhotoGallery(personIndex, partnerRecordId = null) {
