@@ -1040,13 +1040,13 @@
                         }
                     }
                     if (debugMode) console.log(`Parent ${parent.name} (gen: ${parentGen}) descendant tree ends at index ${treeEnd}`);
-                    const children = records.slice(insertIndex, treeEnd).filter(r => r.record_type.toLowerCase() == 'person' && (parseInt(r.gen) || 0) === parentGen + 1);
+                    const children = records.slice(insertIndex, treeEnd).filter(r => r.record_type.toLowerCase() == 'person' && (parseInt(r.generation) || 0) === parentGen + 1);
                     if (debugMode) console.log(`Found ${children.length} children for parent ${parent.name}`);
                     if (children.length > 0 && data.birth_date) {
                         const newTimestamp = dateToTimestamp(data.birth_date);
                         if (debugMode) console.log(`New child birth_date: ${data.birth_date}, timestamp: ${newTimestamp}`);
                         const sortedChildren = records.slice(insertIndex, treeEnd)
-                            .reduce((acc, r, i) => r.record_type.toLowerCase() === 'person' && (parseInt(r.gen) || 0) === parentGen + 1 ? [...acc, { index: i + insertIndex, ts: dateToTimestamp(r.birth_date) }] : acc, [])
+                            .reduce((acc, r, i) => r.record_type.toLowerCase() === 'person' && (parseInt(r.generation) || 0) === parentGen + 1 ? [...acc, { index: i + insertIndex, ts: dateToTimestamp(r.birth_date) }] : acc, [])
                             .sort((a, b) => a.ts - b.ts);
                         if (debugMode) console.log(`Sorted children:`, sortedChildren);
                         const insertPos = sortedChildren.findIndex(c => c.ts > newTimestamp);
@@ -1352,8 +1352,8 @@
                             updateRecordBtn.classList.remove('disabled-btn');
                         }
                         // Show Add Parent only if selected is root
-                        const selectedGen = records[personIndex].generation || 1;
-                        const minGen = Math.min(...records.map(r => r.generation || 999));
+                        const selectedGen = parseInt(records[personIndex].generation, 10) || 1;
+                        const minGen = Math.min(...records.map(r => parseInt(r.generation, 10) || 999));
                         const isRoot = selectedGen === minGen;
                         const addParentBtn = document.getElementById('addParentBtn');
                         if (addParentBtn) {
@@ -1402,7 +1402,7 @@
                     } else if (col.key === 'record_type') {
                         td.textContent = row.isPartner ? 'Partner' : 'Person';
                     } else if (col.key === 'gen') {
-                        td.textContent = row.isPartner ? '' : (row.generation || row.gen || '');
+                        td.textContent = row.isPartner ? '' : (row.generation || '');
                     } else if (col.key === 'sex') {
                         td.textContent = row.isPartner ? '' : (row.sex || '');
                     } else {
@@ -1601,7 +1601,7 @@
                 return;
             }
 
-            const currentRootGen = records[highlightedRow].generation || 1;
+            let currentRootGen = parseInt(records[highlightedRow].generation, 10) || 1;
 
             const newParent = {
                 record_id: Date.now() + Math.floor(Math.random() * 10000),
