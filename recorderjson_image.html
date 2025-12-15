@@ -1178,7 +1178,7 @@
                     if (currentRoot) {
                         currentRootGen = parseInt(currentRoot.generation, 10) || 1;
                     }
-                    
+
                     const newParent = {
                         record_id: Date.now() + Math.floor(Math.random() * 10000),
                         generation: currentRootGen - 1,
@@ -1196,6 +1196,16 @@
                         attributes: '',
                         parents: data.parents || null
                     };
+
+                   // Set new parent generation to one less than current root
+                    newParent.generation = currentRootGen - 1;
+
+                    // Increment all existing generations by 1 (they are now one level deeper)
+                    records.forEach(r => {
+                        if (r.generation !== undefined) {
+                            r.generation = parseInt(r.generation, 10) + 1;
+                        }
+                    });
 
                     // Insert at the very top — becomes new root
                     records.unshift(newParent);
@@ -1610,6 +1620,7 @@
 
             const newParent = {
                 record_id: Date.now() + Math.floor(Math.random() * 10000),
+                record_type: 'Person',  // <--- ADD THIS 
                 generation: currentRootGen - 1,
                 name: name,
                 sex: document.getElementById('parentSex').value || '',
