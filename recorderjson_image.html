@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.5</span> — December 15, 2025
+                    Version: <span id="pageVersion">2.0.6</span> — December 15, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1157,8 +1157,46 @@
                     if (data.burial_location && isFieldEditable(record.record_type, 'burial_location')) { record.burial_location = data.burial_location; updated = true; }
                     if (!updated) { safeShowError('At least one field (Death Date, Death Location, or Burial Location) must be provided and editable.'); return; }
                     if (debugMode) console.log(`Updated death/burial info for ${name}`);
-                }
                 
+                } else if (mode === 'addParent') {
+                    if (!data.name) {
+                        safeShowError('Name is required.');
+                        return;
+                    }
+                    if (data.birth_date && !isValidDate(data.birth_date)) {
+                        safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+                    if (data.death_date && !isValidDate(data.death_date)) {
+                        safeShowError('Invalid death date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        return;
+                    }
+
+                    const currentRootGen = records[highlightedRow].generation || 1;
+
+                    const newParent = {
+                        record_id: Date.now() + Math.floor(Math.random() * 10000),
+                        generation: currentRootGen - 1,
+                        name: data.name.trim(),
+                        sex: data.sex || '',
+                        birth_date: data.birth_date || '',
+                        birth_location: data.birth_location || '',
+                        death_date: data.death_date || '',
+                        death_location: data.death_location || '',
+                        burial_location: data.burial_location || '',
+                        service: data.service || '',
+                        partners: [],
+                        photos: [],
+                        story: '',
+                        attributes: '',
+                        parents: data.parents || null
+                    };
+
+                    // Insert at the very top — becomes new root
+                    records.unshift(newParent);
+
+                    highlightedRow = 0; // select the new root
+                }
                 
                 safeCloseModal();
                 debounceDisplayRecords();
