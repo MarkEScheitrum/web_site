@@ -1180,7 +1180,6 @@
                     }
 
                     const newParent = {
-                        record_id: Date.now() + Math.floor(Math.random() * 10000),
                         generation: currentRootGen - 1,
                         name: data.name.trim(),
                         sex: data.sex || '',
@@ -1619,7 +1618,6 @@
             let currentRootGen = parseInt(records[0]?.generation, 10) || 1;
 
             const newParent = {
-                record_id: Date.now() + Math.floor(Math.random() * 10000),
                 record_type: 'Person',  // <--- ADD THIS 
                 generation: currentRootGen - 1,
                 name: name,
