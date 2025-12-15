@@ -1172,8 +1172,13 @@
                         return;
                     }
 
-                    const currentRootGen = records[highlightedRow].generation || 1;
-
+                    // For addParent, the current root is always records[0]
+                    const currentRoot = records[0];
+                    let currentRootGen = 1;
+                    if (currentRoot) {
+                        currentRootGen = parseInt(currentRoot.generation, 10) || 1;
+                    }
+                    
                     const newParent = {
                         record_id: Date.now() + Math.floor(Math.random() * 10000),
                         generation: currentRootGen - 1,
@@ -1601,7 +1606,7 @@
                 return;
             }
 
-            let currentRootGen = parseInt(records[highlightedRow].generation, 10) || 1;
+            let currentRootGen = parseInt(records[0]?.generation, 10) || 1;
 
             const newParent = {
                 record_id: Date.now() + Math.floor(Math.random() * 10000),
