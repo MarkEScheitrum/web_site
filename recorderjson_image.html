@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.14</span> — December 16, 2025
+                    Version: <span id="pageVersion">2.0.15</span> — December 16, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -98,7 +98,6 @@
         let renderTimeout = null;
         let ticketNumber = null;
         let hasReturnedUpdates = false;
-        let editingPartnerId = null;  // tracks which partner we're editing
         let originalHeader = {};   // will keep everything that was outside the "data" array when loading
         const debugPassphraseHash = '0be92202d0978436fce6d8c863f4a2a3d63711a4e4444cb0734beea27315f2a5';
         const dateFields = ['birth_date', 'death_date', 'marriage_date'];
@@ -136,7 +135,7 @@
             }
         }
 
-        function openStoryModal(personIndex = null, partnerRecordId = null) {
+        function openStoryModal(personIndex = null, partnerIndex = null) {
             if (!records || records.length === 0) {
                 safeShowError('No records loaded.');
                 return;
@@ -147,21 +146,27 @@
 
             // Build list in tree order (same as records array)
             const allPeople = [];
-            records.forEach((person, idx) => {
-                allPeople.push({ label: person.name, personIndex: idx, partnerId: null });
-                (person.partners || []).forEach(p => {
-                    allPeople.push({ label: `└ ${p.name || '(unnamed)'}`, personIndex: idx, partnerId: p.record_id });
+            records.forEach((person, personIndex) => {
+                allPeople.push({ label: person.name || '(no name)', personIndex, partnerIndex: null });
+
+                (person.partners || []).forEach((partner, partnerIndex) => {
+                    allPeople.push({
+                        label: `└ ${partner.name || '(unnamed)'}`,
+                        personIndex,
+                        partnerIndex
+                    });
                 });
             });
 
             let optionsHtml = '<option value="">-- Select Person or Partner --</option>';
             allPeople.forEach(item => {
-                const hasStory = item.partnerId
-                    ? (records[item.personIndex].partners.find(p => p.record_id === item.partnerId)?.story || '').trim().length > 0
+                const hasStory = item.partnerIndex !== undefined
+                    ? (records[item.personIndex].partners[item.partnerIndex]?.story || '').trim().length > 0
                     : (records[item.personIndex].story || '').trim().length > 0;
                 const icon = hasStory ? 'open_book' : 'closed_book';
-                const value = `${item.personIndex}|${item.partnerId || ''}`;
-                const selected = (personIndex === item.personIndex && partnerRecordId === item.partnerId) ? 'selected' : '';
+                const value = item.partnerIndex !== undefined ? `${item.personIndex}|${item.partnerIndex}` : `${item.personIndex}|`;
+                const selected = (personIndex === item.personIndex && partnerIndex === item.partnerIndex) ? 'selected' : '';
+
                 optionsHtml += `<option value="${value}" ${selected}>${item.label} ${icon}</option>`;
             });
 
@@ -197,12 +202,12 @@
             };
 
             const loadStory = () => {
-                const [pIdx, pId] = select.value.split('|');
-                const idx = parseInt(pIdx);
+                const parts = select.value.split('|');
+                const idx = parseInt(parts[0]);
+                const partnerIdx = parts[1] ? parseInt(parts[1]) : null;
                 let story = '';
-                if (pId) {
-                    const partner = records[idx].partners.find(p => p.record_id === pId);
-                    story = partner?.story || '';
+                if (partnerIdx !== null) {
+                    story = records[idx].partners[partnerIdx]?.story || '';
                 } else if (idx >= 0) {
                     story = records[idx].story || '';
                 }
@@ -215,12 +220,15 @@
             loadStory();
 
             window.saveStoryFromModal = () => {
-                const [pIdx, pId] = select.value.split('|');
-                const idx = parseInt(pIdx);
+                const parts = select.value.split('|');
+                const idx = parseInt(parts[0]);
+                const partnerIdx = parts[1] ? parseInt(parts[1]) : null;
                 const story = textarea.value;
-                if (pId) {
-                    const partner = records[idx].partners.find(p => p.record_id === pId);
-                    if (partner) partner.story = story;
+
+                if (partnerIdx !== null) {
+                    if (records[idx].partners[partnerIdx]) {
+                        records[idx].partners[partnerIdx].story = story;
+                    }
                 } else {
                     records[idx].story = story;
                 }
@@ -251,14 +259,18 @@
             }, 1500);
         }
 
-        function saveStory(personIndex, partnerRecordId = null) {
+        function saveStory(personIndex, partnerIndex = null) {
             const story = document.getElementById('storyText').value;
-            if (partnerRecordId) {
+
+            if (partnerIndex !== null) {
                 const person = records[personIndex];
-                const partner = person.partners.find(p => p.record_id === partnerRecordId);
-                if (partner) partner.story = story;
+                if (person && person.partners && person.partners[partnerIndex]) {
+                    person.partners[partnerIndex].story = story;
+                }
             } else {
-                records[personIndex].story = story;
+                if (records[personIndex]) {
+                    records[personIndex].story = story;
+                }
             }
             safeCloseModal();
             debounceDisplayRecords();
@@ -717,7 +729,6 @@
                             if (!r.children_no_other_parent) r.children_no_other_parent = [];
                             if (!r.notes) r.notes = [];
                             if (!r.unprocessed_items) r.unprocessed_items = [];
-                            if (!r.record_id) r.record_id = crypto.randomUUID();
                         });
         
                         originalFileName = file.name.replace(/\.json$/i, '.zip');
@@ -770,7 +781,6 @@
                             if (!r.children_no_other_parent) r.children_no_other_parent = [];
                             if (!r.notes) r.notes = [];
                             if (!r.unprocessed_items) r.unprocessed_items = [];
-                            if (!r.record_id) r.record_id = crypto.randomUUID();
                         });
 
                         isEncryptedZip = true;
@@ -1351,7 +1361,7 @@
             table.appendChild(headerRow);
 
             flatRows.forEach((row, flatIndex) => {
-                const personIndex = records.findIndex(r => r.record_id === row.record_id);
+                const personIndex = row.personIndex;  // already available from flatRows
                 const tr = document.createElement('tr');
                 if (highlightedRow === personIndex && !row.isPartner) tr.className = 'highlighted-row';
                 tr.className += ' editable-row';
@@ -1416,13 +1426,24 @@
 
                         td.querySelector('span:first-child').onclick = (e) => {
                             e.stopPropagation();
-                            openStoryModal(row.personIndex, row.isPartner ? row.partnerData.record_id : null);
+                            if (row.isPartner) {
+                                const partnerIdx = records[row.personIndex].partners.findIndex(p => p === row.partnerData);
+                                openStoryModal(row.personIndex, partnerIdx);
+                            } else {
+                                openStoryModal(row.personIndex, null);
+                            }
                         };
 
                         td.querySelector('span:last-child').onclick = (e) => {
                             e.stopPropagation();
-                            openPhotoGallery(row.personIndex, row.isPartner ? row.partnerData.record_id : null);
+                            if (row.isPartner) {
+                                const partnerIdx = records[row.personIndex].partners.findIndex(p => p === row.partnerData);
+                                openPhotoGallery(row.personIndex, partnerIdx);
+                            } else {
+                                openPhotoGallery(row.personIndex, null);
+                            }
                         };
+
                     } else if (col.key === 'record_type') {
                         td.textContent = row.isPartner ? 'Partner' : 'Person';
                     } else if (col.key === 'gen') {
@@ -1452,11 +1473,16 @@
                         td.onclick = (e) => {
                             if (editingIndex === null) {
                                 e.stopPropagation();
-                                startEditing(row.personIndex, field, td, td.textContent.trim(), row.isPartner ? row.partnerData.record_id : null);
+
+                                let partnerIdx = null;
+                                if (row.isPartner) {
+                                    partnerIdx = records[row.personIndex].partners.findIndex(p => p === row.partnerData);
+                                }
+
+                                startEditing(row.personIndex, field, td, td.textContent.trim(), partnerIdx);
                             }
                         };
                     }
-
                     tr.appendChild(td);
                 });
 
@@ -1578,11 +1604,11 @@
                 }
             } else {
                 // Partner record
-                const partner = person.partners.find(p => p.record_id === partnerRecordId);
-                if (partner) {
+                if (partnerIndex !== null && person.partners[partnerIndex]) {
+                    const partner = person.partners[partnerIndex];
                     if (partner[field] !== trimmed) {
                         partner[field] = trimmed;
-                        console.log(`Updated person[${personIndex}].partners[${partner.record_id}].${field} → "${trimmed}"`);
+                        console.log(`Updated person[${personIndex}].partners[${partnerIndex}].${field} → "${trimmed}"`);
                     }
                 }
             }
@@ -1640,13 +1666,13 @@
             highlightedRow = 0;
         }
 
-        function openPhotoGallery(personIndex, partnerRecordId = null) {
+        function openPhotoGallery(personIndex, partnerIndex = null) {
     if (!records?.length) return safeShowError('No records loaded');
 
     safeOpenModal('photos');
     const isPartner = partnerRecordId !== null;
     const person = records[personIndex];
-    const target = isPartner ? person.partners.find(p => p.record_id === partnerRecordId) : person;
+    const target = partnerIndex !== null ? person.partners[partnerIndex] : person;
     const name = isPartner ? `${target.name || '(unnamed)'} (Partner)` : person.name;
 
     if (!target.photos) target.photos = [];
@@ -1686,7 +1712,7 @@
         if (uploadInput.files.length) handlePhotos(uploadInput.files, target, grid, personIndex, partnerRecordId);
     });
 
-    renderPhotos(target, grid, personIndex, partnerRecordId);
+    renderPhotos(target, grid, personIndex, partnerIndex);
 
     new Sortable(grid, {
         animation: 150,
@@ -1712,7 +1738,7 @@
                         data: e.target.result,
                         caption: file.name.split('.').slice(0, -1).join('.') || 'Photo'
                     });
-                    renderPhotos(target, grid, personIndex, partnerRecordId);
+                    renderPhotos(target, grid, personIndex, partnerIndex);
                 };
                 reader.readAsDataURL(file);
             });
@@ -1739,7 +1765,7 @@
                 div.innerHTML = `
                     <div style="position:relative;">
                         <img src="${photo.data}" style="width:100%; height:auto; max-height:300px; object-fit:contain; background:#000; display:block;">
-                        <button onclick="event.stopPropagation(); deletePhoto(${personIndex}, ${partnerRecordId ? `'${partnerRecordId}'` : 'null'}, '${photo.id}')" 
+                        <button onclick="event.stopPropagation(); deletePhoto(${personIndex}, ${partnerIndex ? `'${partnerIndex}'` : 'null'}, '${photo.id}')" 
                                 style="position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.7); color:white; border:none; border-radius:50%; width:32px; height:32px; cursor:pointer;">×</button>
                     </div>
                     <textarea placeholder="Caption..." style="width:100%; border:none; padding:8px; font-size:14px; resize:none; height:60px;">${photo.caption || ''}</textarea>
@@ -1753,12 +1779,12 @@
             });
         }
 
-        function deletePhoto(personIndex, partnerRecordId, photoId) {
+        function deletePhoto(personIndex, partnerIndex, photoId) {
             if (!confirm('Delete this photo permanently?')) return;
             const person = records[personIndex];
-            const target = partnerRecordId ? person.partners.find(p => p.record_id === partnerRecordId) : person;
+            const target = partnerIndex !== null ? person.partners[partnerIndex] : person;
             target.photos = target.photos.filter(p => p.id !== photoId);
-            renderPhotos(target, document.getElementById('photoGrid'), personIndex, partnerRecordId);
+            renderPhotos(target, document.getElementById('photoGrid'), personIndex, partnerIndex);
         }
 
         function initDebug() {
