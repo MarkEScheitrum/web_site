@@ -1081,55 +1081,40 @@
                         return; 
                     }
 
-                    const newRecord = {
-                        record_type: 'Partner',
-                        gen: '',
-                        name: data.name,
-                        sex: '',
+                    // Create partner object (nested)
+                    const newPartner = {
+                        name: data.name.trim(),
+                        relationship: data.relationship,
                         birth_date: data.birth_date || '',
                         birth_location: data.birth_location || '',
-                        parents: data.parents || '',
-                        death_date: '',
-                        death_location: '',
-                        burial_location: '',
-                        service: '',
+                        death_date: data.death_date || '',
+                        death_location: data.death_location || '',
+                        burial_location: data.burial_location || '',
+                        service: data.service || '',
                         marriage_date: data.marriage_date || '',
-                        relationship: data.relationship,
-                        divorce: '',
-                        attributes: '',
-                        unprocessed_items: '',
-                        notes: ''
+                        divorce: data.divorce || '',
+                        divorce_date: data.divorce_date || '',
+                        parents: data.parents || '',
+                        story: '',
+                        photos: []
                     };
 
-                    // Insert after the selected main person
-                    let insertIndex = records.indexOf(mainPerson) + 1;
-
-                    // Existing partner block logic — keep exactly as original
-                    if (insertIndex < records.length &&
-                        records[insertIndex].record_type && records[insertIndex].record_type.toLowerCase() === 'partner') {
-                       
-                        let partnerEnd = insertIndex;
-                        while (partnerEnd < records.length &&
-                               records[partnerEnd].record_type && records[partnerEnd].record_type.toLowerCase() === 'partner') {
-                            partnerEnd++;
-                        }
-                        const partners = records.slice(insertIndex, partnerEnd);
-                        if (data.marriage_date) {
-                            const newTimestamp = dateToTimestamp(data.marriage_date);
-                            const sortedPartners = partners.map((s, i) => ({
-                                index: insertIndex + i,
-                                ts: dateToTimestamp(s.marriage_date)
-                            })).sort((a, b) => a.ts - b.ts);
-                            const insertPos = sortedPartners.findIndex(s => s.ts > newTimestamp);
-                            insertIndex = insertPos === -1 ? partnerEnd : sortedPartners[insertPos].index;
-                        } else {
-                            insertIndex = partnerEnd;
-                        }
+                    // Ensure partners array exists
+                    if (!Array.isArray(mainPerson.partners)) {
+                        mainPerson.partners = [];
                     }
 
-                    records.splice(insertIndex, 0, newRecord);
+                    // Insert into partners array (marriage date sorting optional — can add later)
+                    mainPerson.partners.push(newPartner);
 
-                    if (debugMode) console.log('Added partner record:', newRecord, `at index ${insertIndex}`);
+                    // Optional: sort partners by marriage_date if present
+                    if (data.marriage_date) {
+                        mainPerson.partners.sort((a, b) => {
+                            const aTs = dateToTimestamp(a.marriage_date || '');
+                            const bTs = dateToTimestamp(b.marriage_date || '');
+                            return aTs - bTs;
+                        });
+                    }
                 
                 } else if (mode === 'updateRecord') {
                     if (!data.record || !data.field) { safeShowError('Please select a record and field.'); return; }
@@ -1213,7 +1198,7 @@
                             r.generation += 1;
                         }
                     });
-                    
+
                     records.unshift(newParent);
 
                     highlightedRow = 0;
