@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.16</span> — December 16, 2025
+                    Version: <span id="pageVersion">2.0.17</span> — December 16, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -93,7 +93,7 @@
     <script>
         let records = [], decryptionPassphrase = null, exchangePassphrase = null, originalFileName = 'records.zip';
         let debugMode = false, isEncryptedZip = false;
-        let modalMode = null, editingIndex = null, editingField = null, highlightedRow = null;
+        let modalMode = null, editingIndex = null, editingField = null;
         let vestigialColumns = new Set(['notes', 'unprocessed_items']);
         let renderTimeout = null;
         let ticketNumber = null;
@@ -506,7 +506,6 @@
             exchangePassphrase = null;
             originalHeader = {};
             ticketNumber = null;
-            highlightedRow = null;
             editingPartnerId = null;
             
             // Force garbage collection of any lingering references
@@ -874,7 +873,8 @@
                     { name: 'death_location', label: 'Death Location', type: 'text' },
                     { name: 'burial_location', label: 'Burial Location', type: 'text' },
                     { name: 'service', label: 'Service (e.g. military)', type: 'text' },
-                    { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' }
+                    { name: 'parents', label: 'Parents', type: 'text', autocomplete: 'off' },
+                    { name: 'new_root_gen', label: 'New Root Generation', type: 'text', value: '1', required: true }
                 ];
 
                 // Add explanatory note (same way other modes do if needed)
@@ -1021,6 +1021,18 @@
             }
         }
         function closeModal() { safeCloseModal(); }
+
+        function shiftAllGenerations(newRootGen) {
+            const currentGens = records.map(r => parseInt(r.generation || 9999));
+            const currentMin = Math.min(...currentGens);
+            const delta = currentMin - newRootGen;
+
+            records.forEach(r => {
+                if (r.generation !== undefined) {
+                    r.generation = (parseInt(r.generation) - delta).toString();
+                }
+            });
+        }
 
         function saveModalData(mode) {
             try {
@@ -1175,28 +1187,16 @@
                     if (debugMode) console.log(`Updated death/burial info for ${name}`);
                 
                 } else if (mode === 'addParent') {
-                    if (!data.name) {
-                        safeShowError('Name is required.');
-                        return;
-                    }
-                    if (data.birth_date && !isValidDate(data.birth_date)) {
-                        safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
-                        return;
-                    }
-                    if (data.death_date && !isValidDate(data.death_date)) {
-                        safeShowError('Invalid death date. Use YYYY-MM-DD or YYYY-MM or YYYY.');
-                        return;
-                    }
+                    if (!data.name) return safeShowError('Name is required.');
 
-                    const currentRoot = records[0];
-                    let currentRootGen = 1;
-                    if (currentRoot) {
-                        currentRootGen = parseInt(currentRoot.generation, 10) || 1;
-                    }
+                    const newRootGen = parseInt(data.new_root_gen) || 1;
+                    if (isNaN(newRootGen) || newRootGen < 1) return safeShowError('Generation must be ≥1');
+
+                    shiftAllGenerations(newRootGen);
 
                     const newParent = {
                         record_type: 'Person',
-                        generation: currentRootGen,  // New parent takes old root's generation
+                        generation: newRootGen.toString(),
                         name: data.name.trim(),
                         sex: data.sex || '',
                         birth_date: data.birth_date || '',
@@ -1216,16 +1216,7 @@
                         children_no_other_parent: []
                     };
 
-                    // Increment all existing generations by 1
-                    records.forEach(r => {
-                        if (r.generation !== undefined) {
-                            r.generation += 1;
-                        }
-                    });
-
                     records.unshift(newParent);
-
-                    highlightedRow = 0;
                 }
                 
                 safeCloseModal();
@@ -1277,6 +1268,8 @@
         }
 
         function displayRecords() {
+            const mainPersons = records.filter(r => !r.isPartner);
+            const minGen = mainPersons.length ? Math.min(...mainPersons.map(r => parseInt(r.generation || 9999))) : 1;
             const recordBody = document.getElementById('recordBody');
             recordBody.innerHTML = '';
             if (records.length === 0) return;
@@ -1363,46 +1356,7 @@
             flatRows.forEach((row, flatIndex) => {
                 const personIndex = row.personIndex;  // already available from flatRows
                 const tr = document.createElement('tr');
-                if (highlightedRow === personIndex && !row.isPartner) tr.className = 'highlighted-row';
-                tr.className += ' editable-row';
-
-                tr.onclick = (e) => {
-                    if (highlightedRow !== personIndex) {
-                        highlightedRow = personIndex;
-                        // Enable standard buttons
-                        const addChildBtn = document.getElementById('addChildBtn');
-                        if (addChildBtn) {
-                            addChildBtn.style.display = 'inline-block';
-                            addChildBtn.classList.remove('disabled-btn');
-                        }
-                        const addPartnerBtn = document.getElementById('addPartnerBtn');
-                        if (addPartnerBtn) {
-                            addPartnerBtn.style.display = 'inline-block';
-                            addPartnerBtn.classList.remove('disabled-btn');
-                        }
-                        const updateRecordBtn = document.getElementById('updateRecordBtn');
-                        if (updateRecordBtn) {
-                            updateRecordBtn.style.display = 'inline-block';
-                            updateRecordBtn.classList.remove('disabled-btn');
-                        }
-                        // Show Add Parent only if selected is root
-                        const selectedGen = parseInt(records[personIndex].generation, 10) || 1;
-                        const minGen = Math.min(...records.map(r => parseInt(r.generation, 10) || 999));
-                        const isRoot = selectedGen === minGen;
-                        const addParentBtn = document.getElementById('addParentBtn');
-                        if (addParentBtn) {
-                            if (isRoot) {
-                                addParentBtn.style.display = 'inline-block';
-                                addParentBtn.classList.remove('disabled-btn');
-                            } else {
-                                addParentBtn.style.display = 'none';
-                                addParentBtn.classList.add('disabled-btn');
-                            }
-                        }
-                        debounceDisplayRecords();
-                    }
-                };
-
+                
                 columnConfig.forEach(col => {
                     const td = document.createElement('td');
                     td.className = col.key;
@@ -1448,6 +1402,17 @@
                         td.textContent = row.isPartner ? 'Partner' : 'Person';
                     } else if (col.key === 'gen') {
                         td.textContent = row.isPartner ? '' : (row.generation || '');
+                        const isRoot = !row.isPartner && parseInt(row.generation || 9999) === minGen;
+                        if (isRoot) {
+                            td.className += ' editable';
+                            td.style.cursor = 'pointer';
+                            td.onclick = (e) => {
+                                if (editingIndex === null) {
+                                    e.stopPropagation();
+                                    startEditing(row.personIndex, 'generation', td, td.textContent.trim(), null);
+                                }
+                            };
+                        }
                     } else if (col.key === 'sex') {
                         td.textContent = row.isPartner ? '' : (row.sex || '');
                     } else {
@@ -1494,7 +1459,6 @@
                         // Deselect on click outside rows
             document.onclick = (e) => {
                 if (!e.target.closest('tr.editable-row')) {
-                    highlightedRow = null;
                     const addParentBtn = document.getElementById('addParentBtn');
                     if (addParentBtn) {
                         addParentBtn.style.display = 'none';
@@ -1602,6 +1566,16 @@
                     person[field] = trimmed;
                     console.log(`Updated person[${personIndex}].${field} → "${trimmed}"`);
                 }
+                // === INSERT ROOT GENERATION HANDLING HERE ===
+                if (field === 'generation') {
+                    const newGen = parseInt(trimmed);
+                    if (isNaN(newGen) || newGen < 1) {
+                        safeShowError('Generation must be ≥1');
+                        cancelEdit(td, oldValue);
+                        return;
+                    }
+                    shiftAllGenerations(newGen);
+                }
             } else {
                 // Partner record
                 if (partnerIndex !== null && person.partners[partnerIndex]) {
@@ -1661,9 +1635,6 @@
 
             safeCloseModal();
             debounceDisplayRecords();
-
-            // Highlight the new root
-            highlightedRow = 0;
         }
 
         function openPhotoGallery(personIndex, partnerIndex = null) {
