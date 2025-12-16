@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.15</span> — December 16, 2025
+                    Version: <span id="pageVersion">2.0.16</span> — December 16, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -484,11 +484,11 @@
         function enableButtonsAfterLoad() {
             document.getElementById('selectLoadBtn').style.display = 'none';
             document.getElementById('requestEditBtn').style.display = 'none';
-            ['addChildBtn','addPartnerBtn','updateRecordBtn','editStoryBtn','recordDeathBurialBtn','viewTableBtn'].forEach(id => {
+            ['addParentBtn','addChildBtn','addPartnerBtn','updateRecordBtn','editStoryBtn','recordDeathBurialBtn','viewTableBtn','returnUpdatesBtn'].forEach(id => {
                 document.getElementById(id).style.display = 'block';
                 document.getElementById(id).classList.remove('disabled-btn');
             });
-            document.getElementById('returnUpdatesBtn').style.display = 'block';
+            
         }
 
         function finishLoad() {
