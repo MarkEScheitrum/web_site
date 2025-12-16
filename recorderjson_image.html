@@ -1179,9 +1179,15 @@
                         return;
                     }
 
+                    const currentRoot = records[0];
+                    let currentRootGen = 1;
+                    if (currentRoot) {
+                        currentRootGen = parseInt(currentRoot.generation, 10) || 1;
+                    }
+
                     const newParent = {
                         record_type: 'Person',
-                        generation: 1,
+                        generation: currentRootGen,  // New parent takes old root's generation
                         name: data.name.trim(),
                         sex: data.sex || '',
                         birth_date: data.birth_date || '',
@@ -1201,13 +1207,13 @@
                         children_no_other_parent: []
                     };
 
-                    // Increment generations only for main persons (skip partners)
+                    // Increment all existing generations by 1
                     records.forEach(r => {
-                        if (r.record_type === 'Person' && r.generation !== undefined) {
-                            r.generation = parseInt(r.generation, 10) + 1;
+                        if (r.generation !== undefined) {
+                            r.generation += 1;
                         }
                     });
-
+                    
                     records.unshift(newParent);
 
                     highlightedRow = 0;
