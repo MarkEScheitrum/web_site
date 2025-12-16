@@ -1460,21 +1460,6 @@
             document.onclick = (e) => {
                 if (!e.target.closest('tr.editable-row')) {
                     highlightedRow = null;
-                    const addChildBtn = document.getElementById('addChildBtn');
-                    if (addChildBtn) {
-                        addChildBtn.style.display = 'none';
-                        addChildBtn.classList.add('disabled-btn');
-                    }
-                    const addPartnerBtn = document.getElementById('addPartnerBtn');
-                    if (addPartnerBtn) {
-                        addPartnerBtn.style.display = 'none';
-                        addPartnerBtn.classList.add('disabled-btn');
-                    }
-                    const updateRecordBtn = document.getElementById('updateRecordBtn');
-                    if (updateRecordBtn) {
-                        updateRecordBtn.style.display = 'none';
-                        updateRecordBtn.classList.add('disabled-btn');
-                    }
                     const addParentBtn = document.getElementById('addParentBtn');
                     if (addParentBtn) {
                         addParentBtn.style.display = 'none';
