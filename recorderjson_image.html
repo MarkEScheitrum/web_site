@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.11</span> — December 15, 2025
+                    Version: <span id="pageVersion">2.0.12</span> — December 15, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1269,20 +1269,24 @@
             // Build flat list: main person + their partners
             const flatRows = [];
             records.forEach((person, personIndex) => {
-                flatRows.push({ ...person, isPartner: false, personIndex });
-                person.partners.forEach(partner => {
-                    flatRows.push({
-                        ...person,
-                        ...partner,
-                        name: partner.name || '',
-                        record_type: 'Partner',
-                        gen: person.generation || person.gen || '',
-                        sex: '',
-                        isPartner: true,
-                        partnerData: partner,
-                        personIndex,
-                    });
-                });
+                // Only main persons (record_type 'Person') have partners array
+                if (person.record_type === 'Person' || person.record_type === undefined) {
+                    flatRows.push({ ...person, isPartner: false, personIndex });
+                    if (Array.isArray(person.partners)) {
+                        person.partners.forEach(partner => {
+                            flatRows.push({
+                                ...person,
+                                ...partner,
+                                name: partner.name || '',
+                                record_type: 'Partner',
+                                sex: '',
+                                isPartner: true,
+                                partnerData: partner,
+                                personIndex,
+                            });
+                        });
+                    }
+                }
             });
 
             const table = document.createElement('table');
