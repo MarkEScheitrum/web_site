@@ -1197,9 +1197,6 @@
                         parents: data.parents || null
                     };
 
-                   // Set new parent generation to one less than current root
-                    newParent.generation = currentRootGen - 1;
-
                     // Increment all existing generations by 1 (they are now one level deeper)
                     records.forEach(r => {
                         if (r.generation !== undefined) {
@@ -1620,7 +1617,7 @@
 
             const newParent = {
                 record_type: 'Person',  // <--- ADD THIS 
-                generation: currentRootGen - 1,
+                generation: currentRootGen,
                 name: name,
                 sex: document.getElementById('parentSex').value || '',
                 birth_date: document.getElementById('parentBirthDate').value.trim(),
