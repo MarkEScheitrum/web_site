@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.12</span> — December 15, 2025
+                    Version: <span id="pageVersion">2.0.14</span> — December 16, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -485,10 +485,24 @@
         }
 
         function exitApp() {
-            if (confirm("Are you sure you want to exit? Any unsaved changes will be lost.")) {
-                resetSession();
-            }
+        if (confirm("Are you sure you want to exit? Any unsaved changes will be lost.")) {
+            // Fully clear sensitive data from memory
+            records.length = 0;                // Clear the array contents
+            records = [];                      // Replace with new empty array
+            
+            decryptionPassphrase = null;
+            exchangePassphrase = null;
+            originalHeader = {};
+            ticketNumber = null;
+            highlightedRow = null;
+            editingPartnerId = null;
+            
+            // Force garbage collection of any lingering references
+            if (window.gc && debugMode) window.gc();
+
+            resetSession();
         }
+    }
 
         function openRequestModal() {
             safeOpenModal('requestEdit');
