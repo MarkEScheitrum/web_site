@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.10</span> — December 15, 2025
+                    Version: <span id="pageVersion">2.0.11</span> — December 15, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1175,20 +1175,13 @@
                         return;
                     }
                     if (data.death_date && !isValidDate(data.death_date)) {
-                        safeShowError('Invalid death date. Use YYYY, YYYY-MM, or YYYY-MM-DD.');
+                        safeShowError('Invalid death date. Use YYYY-MM-DD or YYYY-MM or YYYY.');
                         return;
-                    }
-
-                    // For addParent, the current root is always records[0]
-                    const currentRoot = records[0];
-                    let currentRootGen = 1;
-                    if (currentRoot) {
-                        currentRootGen = parseInt(currentRoot.generation, 10) || 1;
                     }
 
                     const newParent = {
                         record_type: 'Person',
-                        generation: currentRootGen,
+                        generation: 1,
                         name: data.name.trim(),
                         sex: data.sex || '',
                         birth_date: data.birth_date || '',
@@ -1201,23 +1194,23 @@
                         photos: [],
                         story: '',
                         attributes: '',
-                        parents: data.parents || null
+                        parents: data.parents || null,
+                        notes: [],
+                        unprocessed_items: [],
+                        parent_ids: [],
+                        children_no_other_parent: []
                     };
 
-                   // Set new parent generation to one less than current root
-                    newParent.generation = currentRootGen;
-
-                    // Increment all existing generations by 1 (they are now one level deeper)
+                    // Increment generations only for main persons (skip partners)
                     records.forEach(r => {
-                        if (r.generation !== undefined) {
+                        if (r.record_type === 'Person' && r.generation !== undefined) {
                             r.generation = parseInt(r.generation, 10) + 1;
                         }
                     });
 
-                    // Insert at the very top — becomes new root
                     records.unshift(newParent);
 
-                    highlightedRow = 0; // select the new root
+                    highlightedRow = 0;
                 }
                 
                 safeCloseModal();
