@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.17</span> — December 16, 2025
+                    Version: <span id="pageVersion">2.0.18</span> — December 16, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -305,11 +305,18 @@
             setTimeout(() => div.remove(), 6000);
         }
 
-        function showPopup(html) {
+        function showPopup(html, autoCloseMs = 4000) {
             const div = document.createElement('div');
-            div.style = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border:1px solid #000;z-index:10000;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:90%';
-            div.innerHTML = html + '<br><button onclick="this.parentElement.remove()" style="margin-top:15px;padding:8px 16px">Close</button>';
+            div.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border:1px solid #000;z-index:10000;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:90%;text-align:center;';
+            div.innerHTML = html + '<br><button onclick="this.parentElement.remove()" style="margin-top:15px;padding:8px 16px;cursor:pointer;">Close</button>';
             document.body.appendChild(div);
+
+            // Auto-close after specified time (unless 0 or negative)
+            if (autoCloseMs > 0) {
+                setTimeout(() => {
+                    if (div.parentElement) div.remove();
+                }, autoCloseMs);
+            }
         }
 
         // ==================== PROVIDE FEEDBACK ====================
