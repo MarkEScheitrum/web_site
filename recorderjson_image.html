@@ -1456,18 +1456,6 @@
 
             recordBody.appendChild(table);
 
-                        // Deselect on click outside rows
-            document.onclick = (e) => {
-                if (!e.target.closest('tr.editable-row')) {
-                    const addParentBtn = document.getElementById('addParentBtn');
-                    if (addParentBtn) {
-                        addParentBtn.style.display = 'none';
-                        addParentBtn.classList.add('disabled-btn');
-                    }
-                    debounceDisplayRecords();
-                }
-            };
-
         }
 
         // ──────────────────────────────────────────────────────────────
