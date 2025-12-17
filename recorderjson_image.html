@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.19</span> — December 16, 2025
+                    Version: <span id="pageVersion">2.0.20</span> — December 16, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1199,7 +1199,7 @@
                     const newRootGen = parseInt(data.new_root_gen) || 1;
                     if (isNaN(newRootGen) || newRootGen < 1) return safeShowError('Generation must be ≥1');
 
-                    // First: create and insert the new root with the desired generation
+                    // Create and insert the new root first
                     const newParent = {
                         record_type: 'Person',
                         generation: newRootGen.toString(),
@@ -1224,20 +1224,26 @@
 
                     records.unshift(newParent);
 
-                    // Then: shift all OTHER generations to maintain relative differences
-                    // We exclude the new root (now at index 0) from shifting
-                    const currentMinBeforeShift = Math.min(...records.slice(1).map(r => parseInt(r.generation || 9999)));
-                    const delta = currentMinBeforeShift - (newRootGen + 1);  // next gen should be newRootGen + 1
+                    // Now shift the REST of the tree (records[1:]) so the old root becomes newRootGen + 1
+                    if (records.length > 1) {
+                        const oldMinGen = Math.min(...records.slice(1).map(r => parseInt(r.generation || 9999)));
+                        const delta = (newRootGen + 1) - oldMinGen;
 
-                    records.slice(1).forEach(r => {
-                        if (r.generation !== undefined) {
-                            const oldGen = parseInt(r.generation);
-                            r.generation = (oldGen + delta + 1).toString();  // +1 to place after new root
-                        }
-                    });
+                        records.slice(1).forEach(r => {
+                            if (r.generation !== undefined) {
+                                const oldGen = parseInt(r.generation);
+                                r.generation = (oldGen + delta).toString();
+                            }
+                        });
+                    }
 
-                    // NOW shift all existing records (including the old root) down to maintain relative generations
-                    shiftAllGenerations(newRootGen);
+                    // Optional debug
+                    if (debugMode) {
+                        console.log('New root added with gen:', newRootGen);
+                        console.log('Old min gen was:', records.length > 1 ? oldMinGen : 'none');
+                        console.log('Applied delta:', records.length > 1 ? delta : 0);
+                        console.log('Final generations:', records.map(r => r.generation));
+                    }
                 }
                 
                 safeCloseModal();
@@ -1581,8 +1587,21 @@
                         cancelEdit(td, oldValue);
                         return;
                     }
-                    shiftAllGenerations(newGen);
+
+                    // Shift everything EXCEPT the true root (personIndex 0)
+                    const delta = (newGen + 1) - parseInt(person.generation);
+
+                    records.slice(1).forEach(r => {
+                        if (r.generation !== undefined) {
+                            r.generation = (parseInt(r.generation) + delta).toString();
+                        }
+                    });
+
+                    // Update the root itself
+                    person.generation = newGen.toString();
                 }
+
+
             } else {
                 // Partner record
                 const partner = person.partners[partnerIndex];
