@@ -1583,22 +1583,21 @@
                         return;
                     }
 
-                    // Pre-edit root gen = oldValue from the cell
                     const preEditRootGen = parseInt(oldValue || 1);
-                    const delta = newGen - preEditRootGen;
 
-                    // Apply delta to all non-root persons
+                    // Recalculate each descendant based on their original offset from pre-edit root
                     records.slice(1).forEach(r => {
                         if (r.generation !== undefined) {
-                            const oldGen = parseInt(r.generation);
-                            r.generation = (oldGen + delta).toString();
+                            const relativeOffset = parseInt(r.generation) - preEditRootGen;
+                            r.generation = (newGen + relativeOffset).toString();
                         }
                     });
 
                     person.generation = newGen.toString();
 
                     if (debugMode) {
-                        console.log(`Cell edit: pre-edit = ${preEditRootGen}, new = ${newGen}, delta = ${delta}`);
+                        console.log(`Root cell edit: pre = ${preEditRootGen}, new = ${newGen}`);
+                        console.log('Final:', records.map((r, i) => `${i}: ${r.generation} (${r.name})`));
                     }
                 }
 
