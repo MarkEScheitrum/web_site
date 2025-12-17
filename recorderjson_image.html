@@ -1429,9 +1429,9 @@
                     const isMainPerson = !row.isPartner;
                     const field = col.key;
 
-                    const editableMain = isMainPerson && ['name','sex','birth_date','birth_location','death_date','death_location','burial_location','service','attributes','parents'].includes(field);
-                    const editablePartner = row.isPartner && ['name','birth_date','birth_location','death_date','death_location','burial_location','service','marriage_date','relationship','divorced','divorce_date'].includes(field);
-
+                    const editableMain = isMainPerson && ['name','sex','birth_date','birth_location','death_date','death_location','burial_location','service','attributes'].includes(field);
+                    const editablePartner = row.isPartner && ['name','birth_date','birth_location','death_date','death_location','burial_location','service','marriage_date','relationship','divorced','divorce_date','parents'].includes(field);
+                    
                     if ((editableMain || editablePartner) && !vestigialColumns.has(field)) {
                         td.className += ' editable';
                         td.style.cursor = 'pointer';
