@@ -1458,39 +1458,35 @@
 
         }
 
-        // ──────────────────────────────────────────────────────────────
-        // 1. startEditing — now supports nested partner paths
-        // ──────────────────────────────────────────────────────────────
-        function startEditing(personIndex, field, td, currentValue, partnerRecordId = null) {
+        function startEditing(personIndex, field, td, currentValue, partnerIndex = null) {
             editingIndex = personIndex;
             editingField = field;
-            editingPartnerId = partnerRecordId;  // null for main person, string for partner
 
             td.innerHTML = '';
 
             // Special dropdowns
-            if (field === 'sex' && !partnerRecordId) {
+            if (field === 'sex' && partnerIndex === null) {
                 const select = createSelect(['', 'male', 'female'], currentValue);
                 td.appendChild(select);
                 select.focus();
-                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
-                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerIndex);
+                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerIndex);
                 return;
             }
-            if (field === 'attributes' && !partnerRecordId) {
+            if (field === 'attributes' && partnerIndex === null) {
                 const select = createSelect(['', 'stillborn', 'step', 'foster', 'adopted', 'continuation'], currentValue);
                 td.appendChild(select);
                 select.focus();
-                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
-                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerIndex);
+                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerIndex);
                 return;
             }
-            if (field === 'relationship' && partnerRecordId) {
+            if (field === 'relationship' && partnerIndex !== null) {
                 const select = createSelect(['', 'spouse', 'partner', 'other'], currentValue);
                 td.appendChild(select);
                 select.focus();
-                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
-                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerRecordId);
+                select.onchange = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerIndex);
+                select.onblur = () => saveEdit(personIndex, field, select.value, td, currentValue, partnerIndex);
                 return;
             }
 
@@ -1503,17 +1499,17 @@
             textarea.focus();
             textarea.select();
 
-            textarea.onblur = () => saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerRecordId);
+            textarea.onblur = () => saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerIndex);
             textarea.onkeydown = e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerRecordId);
+                    saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerIndex);
                 } else if (e.key === 'Escape') {
                     cancelEdit(td, currentValue);
                 }
             };
         }
-
+ 
         // Helper for dropdowns
         function createSelect(options, selected) {
             const select = document.createElement('select');
@@ -1528,10 +1524,7 @@
             return select;
         }
 
-        // ──────────────────────────────────────────────────────────────
-        // 2. saveEdit — now writes to correct nested location
-        // ──────────────────────────────────────────────────────────────
-        function saveEdit(personIndex, field, value, td, oldValue, partnerRecordId = null) {
+        function saveEdit(personIndex, field, value, td, oldValue, partnerIndex = null) {
             const trimmed = value.trim();
 
             // Validation
@@ -1540,7 +1533,7 @@
                 cancelEdit(td, oldValue);
                 return;
             }
-            if (field === 'relationship' && partnerRecordId && !['', 'spouse', 'partner', 'other'].includes(trimmed)) {
+            if (field === 'relationship' && partnerIndex !== null && !['', 'spouse', 'partner', 'other'].includes(trimmed)) {
                 safeShowError('Relationship must be spouse, partner, or other.');
                 cancelEdit(td, oldValue);
                 return;
@@ -1548,13 +1541,14 @@
 
             const person = records[personIndex];
 
-            if (!partnerRecordId) {
+            if (partnerIndex === null) {
                 // Main person record
                 if (person[field] !== trimmed) {
                     person[field] = trimmed;
                     console.log(`Updated person[${personIndex}].${field} → "${trimmed}"`);
                 }
-                // === INSERT ROOT GENERATION HANDLING HERE ===
+
+                // Root generation handling
                 if (field === 'generation') {
                     const newGen = parseInt(trimmed);
                     if (isNaN(newGen) || newGen < 1) {
@@ -1566,29 +1560,19 @@
                 }
             } else {
                 // Partner record
-                if (partnerIndex !== null && person.partners[partnerIndex]) {
-                    const partner = person.partners[partnerIndex];
-                    if (partner[field] !== trimmed) {
-                        partner[field] = trimmed;
-                        console.log(`Updated person[${personIndex}].partners[${partnerIndex}].${field} → "${trimmed}"`);
-                    }
+                const partner = person.partners[partnerIndex];
+                if (partner && partner[field] !== trimmed) {
+                    partner[field] = trimmed;
+                    console.log(`Updated person[${personIndex}].partners[${partnerIndex}].${field} → "${trimmed}"`);
                 }
             }
 
             // Clean up and redraw
             editingIndex = null;
             editingField = null;
-            editingPartnerId = null;
 
             td.innerHTML = '<span class="cell-content">' + (trimmed || '') + '</span>';
             debounceDisplayRecords();
-        }
-
-        function cancelEdit(td, oldValue) {
-            editingIndex = null;
-            editingField = null;
-            editingPartnerId = null;
-            td.innerHTML = '<span class="cell-content">' + (oldValue || '') + '</span>';
         }
 
         function saveNewParent() {
