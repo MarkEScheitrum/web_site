@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.18</span> — December 16, 2025
+                    Version: <span id="pageVersion">2.0.19</span> — December 16, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1199,7 +1199,7 @@
                     const newRootGen = parseInt(data.new_root_gen) || 1;
                     if (isNaN(newRootGen) || newRootGen < 1) return safeShowError('Generation must be ≥1');
 
-                    // Create the new parent first with the desired generation
+                    // First: create and insert the new root with the desired generation
                     const newParent = {
                         record_type: 'Person',
                         generation: newRootGen.toString(),
@@ -1222,8 +1222,19 @@
                         children_no_other_parent: []
                     };
 
-                    // Insert new parent at the beginning
                     records.unshift(newParent);
+
+                    // Then: shift all OTHER generations to maintain relative differences
+                    // We exclude the new root (now at index 0) from shifting
+                    const currentMinBeforeShift = Math.min(...records.slice(1).map(r => parseInt(r.generation || 9999)));
+                    const delta = currentMinBeforeShift - (newRootGen + 1);  // next gen should be newRootGen + 1
+
+                    records.slice(1).forEach(r => {
+                        if (r.generation !== undefined) {
+                            const oldGen = parseInt(r.generation);
+                            r.generation = (oldGen + delta + 1).toString();  // +1 to place after new root
+                        }
+                    });
 
                     // NOW shift all existing records (including the old root) down to maintain relative generations
                     shiftAllGenerations(newRootGen);
@@ -1586,7 +1597,7 @@
             editingField = null;
 
             td.innerHTML = '<span class="cell-content">' + (trimmed || '') + '</span>';
-            debounceDisplayRecords();
+            setTimeout(() => debounceDisplayRecords(), 0);
         }
 
         function saveNewParent() {
