@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.20</span> — December 16, 2025
+                    Version: <span id="pageVersion">2.0.21</span> — December 16, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1193,13 +1193,17 @@
                     if (!updated) { safeShowError('At least one field (Death Date, Death Location, or Burial Location) must be provided and editable.'); return; }
                     if (debugMode) console.log(`Updated death/burial info for ${name}`);
                 
-                                } else if (mode === 'addParent') {
+                } else if (mode === 'addParent') {
                     if (!data.name) return safeShowError('Name is required.');
 
                     const newRootGen = parseInt(data.new_root_gen) || 1;
                     if (isNaN(newRootGen) || newRootGen < 1) return safeShowError('Generation must be ≥1');
 
-                    // Create and insert the new root first
+                    // Pre-edit root gen = current root gen - 1 (adding a parent one generation earlier)
+                    const currentRootGen = records.length > 0 ? parseInt(records[0].generation || 1) : 1;
+                    const preEditRootGen = currentRootGen - 1;
+                    const delta = newRootGen - preEditRootGen;
+
                     const newParent = {
                         record_type: 'Person',
                         generation: newRootGen.toString(),
@@ -1224,23 +1228,16 @@
 
                     records.unshift(newParent);
 
-                    // Shift the rest of the tree so the old root becomes newRootGen + 1
-                    if (records.length > 1) {
-                        const oldMinGen = Math.min(...records.slice(1).map(r => parseInt(r.generation || 9999)));
-                        const delta = (newRootGen + 1) - oldMinGen;
-
-                        records.slice(1).forEach(r => {
-                            if (r.generation !== undefined) {
-                                const oldGen = parseInt(r.generation);
-                                r.generation = (oldGen + delta).toString();
-                            }
-                        });
-                    }
+                    // Apply delta to all non-root persons
+                    records.slice(1).forEach(r => {
+                        if (r.generation !== undefined) {
+                            const oldGen = parseInt(r.generation);
+                            r.generation = (oldGen + delta).toString();
+                        }
+                    });
 
                     if (debugMode) {
-                        console.log('AddParent complete:');
-                        console.log('New root generation:', newRootGen);
-                        console.log('Final generations:', records.map((r, i) => `${i}: ${r.generation} (${r.name})`));
+                        console.log(`AddParent: pre-edit = ${preEditRootGen}, new = ${newRootGen}, delta = ${delta}`);
                     }
                 }
                 
@@ -1586,11 +1583,11 @@
                         return;
                     }
 
-                    // Calculate delta based on the desired new root gen vs current root gen
-                    const oldRootGen = parseInt(person.generation || 1);
-                    const delta = newGen - oldRootGen;
+                    // Pre-edit root gen = oldValue from the cell
+                    const preEditRootGen = parseInt(oldValue || 1);
+                    const delta = newGen - preEditRootGen;
 
-                    // Apply delta to ALL descendants (records[1:])
+                    // Apply delta to all non-root persons
                     records.slice(1).forEach(r => {
                         if (r.generation !== undefined) {
                             const oldGen = parseInt(r.generation);
@@ -1598,12 +1595,10 @@
                         }
                     });
 
-                    // Finally, update the root
                     person.generation = newGen.toString();
 
                     if (debugMode) {
-                        console.log(`Root generation changed from ${oldRootGen} to ${newGen}, delta: ${delta}`);
-                        console.log('Final generations:', records.map((r, i) => `${i}: ${r.generation} (${r.name})`));
+                        console.log(`Cell edit: pre-edit = ${preEditRootGen}, new = ${newGen}, delta = ${delta}`);
                     }
                 }
 
