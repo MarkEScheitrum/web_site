@@ -1193,7 +1193,7 @@
                     if (!updated) { safeShowError('At least one field (Death Date, Death Location, or Burial Location) must be provided and editable.'); return; }
                     if (debugMode) console.log(`Updated death/burial info for ${name}`);
                 
-                } else if (mode === 'addParent') {
+                                } else if (mode === 'addParent') {
                     if (!data.name) return safeShowError('Name is required.');
 
                     const newRootGen = parseInt(data.new_root_gen) || 1;
@@ -1224,7 +1224,7 @@
 
                     records.unshift(newParent);
 
-                    // Now shift the REST of the tree (records[1:]) so the old root becomes newRootGen + 1
+                    // Shift the rest of the tree so the old root becomes newRootGen + 1
                     if (records.length > 1) {
                         const oldMinGen = Math.min(...records.slice(1).map(r => parseInt(r.generation || 9999)));
                         const delta = (newRootGen + 1) - oldMinGen;
@@ -1237,12 +1237,10 @@
                         });
                     }
 
-                    // Optional debug
                     if (debugMode) {
-                        console.log('New root added with gen:', newRootGen);
-                        console.log('Old min gen was:', records.length > 1 ? oldMinGen : 'none');
-                        console.log('Applied delta:', records.length > 1 ? delta : 0);
-                        console.log('Final generations:', records.map(r => r.generation));
+                        console.log('AddParent complete:');
+                        console.log('New root generation:', newRootGen);
+                        console.log('Final generations:', records.map((r, i) => `${i}: ${r.generation} (${r.name})`));
                     }
                 }
                 
