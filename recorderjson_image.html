@@ -1199,8 +1199,7 @@
                     const newRootGen = parseInt(data.new_root_gen) || 1;
                     if (isNaN(newRootGen) || newRootGen < 1) return safeShowError('Generation must be ≥1');
 
-                    shiftAllGenerations(newRootGen);
-
+                    // Create the new parent first with the desired generation
                     const newParent = {
                         record_type: 'Person',
                         generation: newRootGen.toString(),
@@ -1223,7 +1222,11 @@
                         children_no_other_parent: []
                     };
 
+                    // Insert new parent at the beginning
                     records.unshift(newParent);
+
+                    // NOW shift all existing records (including the old root) down to maintain relative generations
+                    shiftAllGenerations(newRootGen);
                 }
                 
                 safeCloseModal();
@@ -1409,7 +1412,11 @@
                         td.textContent = row.isPartner ? 'Partner' : 'Person';
                     } else if (col.key === 'gen') {
                         td.textContent = row.isPartner ? '' : (row.generation || '');
-                        const isRoot = !row.isPartner && parseInt(row.generation || 9999) === minGen;
+                        const isRoot = !row.isPartner && 
+                            parseInt(row.generation || 9999) === minGen &&
+                            row.personIndex === records.findIndex(r => 
+                                parseInt(r.generation || 9999) === minGen && !r.isPartner
+                            );
                         if (isRoot) {
                             td.className += ' editable';
                             td.style.cursor = 'pointer';
