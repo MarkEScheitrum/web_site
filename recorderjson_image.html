@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.21</span> — December 16, 2025
+                    Version: <span id="pageVersion">2.0.22</span> — December 16, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1568,13 +1568,7 @@
             const person = records[personIndex];
 
             if (partnerIndex === null) {
-                // Main person record
-                if (person[field] !== trimmed) {
-                    person[field] = trimmed;
-                    console.log(`Updated person[${personIndex}].${field} → "${trimmed}"`);
-                }
-
-                // Root generation handling
+                // === ROOT GENERATION SPECIAL HANDLING (must come first) ===
                 if (field === 'generation') {
                     const newGen = parseInt(trimmed);
                     if (isNaN(newGen) || newGen < 1) {
@@ -1583,9 +1577,9 @@
                         return;
                     }
 
-                    const preEditRootGen = parseInt(oldValue || 1);
+                    const preEditRootGen = parseInt(oldValue || '1');
 
-                    // Recalculate each descendant based on their original offset from pre-edit root
+                    // Recalculate all descendants using their original offset from pre-edit root
                     records.slice(1).forEach(r => {
                         if (r.generation !== undefined) {
                             const relativeOffset = parseInt(r.generation) - preEditRootGen;
@@ -1596,12 +1590,23 @@
                     person.generation = newGen.toString();
 
                     if (debugMode) {
-                        console.log(`Root cell edit: pre = ${preEditRootGen}, new = ${newGen}`);
-                        console.log('Final:', records.map((r, i) => `${i}: ${r.generation} (${r.name})`));
+                        console.log(`Root cell edit: pre=${preEditRootGen}, new=${newGen}`);
+                        console.log('Final generations:', records.map((r, i) => `${i}: ${r.generation} (${r.name || 'Partner'})`));
                     }
+
+                    // Restore content and redraw
+                    td.innerHTML = '<span class="cell-content">' + (trimmed || '') + '</span>';
+                    editingIndex = null;
+                    editingField = null;
+                    requestAnimationFrame(() => debounceDisplayRecords());
+                    return;  // Skip normal update below
                 }
 
-
+                // Normal main person field update
+                if (person[field] !== trimmed) {
+                    person[field] = trimmed;
+                    console.log(`Updated person[${personIndex}].${field} → "${trimmed}"`);
+                }
             } else {
                 // Partner record
                 const partner = person.partners[partnerIndex];
@@ -1611,12 +1616,11 @@
                 }
             }
 
-            // Clean up and redraw
+            // Clean up and redraw (for non-generation edits)
+            td.innerHTML = '<span class="cell-content">' + (trimmed || '') + '</span>';
             editingIndex = null;
             editingField = null;
-
-            td.innerHTML = '<span class="cell-content">' + (trimmed || '') + '</span>';
-            setTimeout(() => debounceDisplayRecords(), 0);
+            requestAnimationFrame(() => debounceDisplayRecords());
         }
 
         function saveNewParent() {
