@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.23</span> — December 16, 2025
+                    Version: <span id="pageVersion">2.0.24</span> — December 16, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1481,16 +1481,14 @@
             });
 
             recordBody.appendChild(table);
-
         }
-
-        function startEditing(personIndex, field, td, currentValue, partnerIndex = null) {
+                function startEditing(personIndex, field, td, currentValue, partnerIndex = null) {
             editingIndex = personIndex;
             editingField = field;
 
             td.innerHTML = '';
 
-            // Special dropdowns
+            // Special dropdowns (unchanged)
             if (field === 'sex' && partnerIndex === null) {
                 const select = createSelect(['', 'male', 'female'], currentValue);
                 td.appendChild(select);
@@ -1516,23 +1514,33 @@
                 return;
             }
 
-            // Default: textarea
+            // Default: textarea for text fields
             const textarea = document.createElement('textarea');
             textarea.className = 'edit-textarea';
             textarea.value = currentValue;
-            textarea.rows = Math.max(2, currentValue.split('\n').length);
+            textarea.rows = 1;  // Keep it single-line feel
             td.appendChild(textarea);
             textarea.focus();
             textarea.select();
 
-            // Only save on blur — Enter will naturally blur the field
-            textarea.onblur = () => saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerIndex);
+            let savedOnEnter = false;
 
-            // Optional: allow Escape to cancel
             textarea.onkeydown = e => {
-                if (e.key === 'Escape') {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();         // No newline
+                    savedOnEnter = true;
+                    saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerIndex);
+                    textarea.blur();             // Force blur to clean up
+                } else if (e.key === 'Escape') {
                     cancelEdit(td, currentValue);
                 }
+            };
+
+            textarea.onblur = () => {
+                if (!savedOnEnter) {
+                    saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerIndex);
+                }
+                savedOnEnter = false;  // Reset for next edit
             };
         }
  
