@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.24</span> — December 16, 2025
+                    Version: <span id="pageVersion">2.0.25</span> — December 18, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1054,10 +1054,10 @@
                     const parent = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
                     if (!parent) { safeShowError('Invalid parent selected.'); return; }
                     if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
-                    const parentGen = parseInt(parent.gen) || 0;
+                    const parentGeneration = parseInt(parent.generation) || 0;
                     const newRecord = {
                         record_type: 'Person',
-                        gen: (parentGen + 1).toString(),
+                        generation: (parentGeneration + 1).toString(),
                         name: data.name,
                         sex: data.sex || '',
                         birth_date: data.birth_date || '',
@@ -1077,19 +1077,19 @@
                     let insertIndex = records.indexOf(parent) + 1;
                     let treeEnd = records.length;
                     for (let i = insertIndex; i < records.length; i++) {
-                        if (records[i].record_type.toLowerCase() === 'person' && (parseInt(records[i].gen) || 0) <= parentGen) {
+                        if (records[i].record_type.toLowerCase() === 'person' && (parseInt(records[i].generation) || 0) <= parentGeneration) {
                             treeEnd = i;
                             break;
                         }
                     }
-                    if (debugMode) console.log(`Parent ${parent.name} (gen: ${parentGen}) descendant tree ends at index ${treeEnd}`);
-                    const children = records.slice(insertIndex, treeEnd).filter(r => r.record_type.toLowerCase() == 'person' && (parseInt(r.generation) || 0) === parentGen + 1);
+                    if (debugMode) console.log(`Parent ${parent.name} (gen: ${parentGeneration}) descendant tree ends at index ${treeEnd}`);
+                    const children = records.slice(insertIndex, treeEnd).filter(r => r.record_type.toLowerCase() == 'person' && (parseInt(r.generation) || 0) === parentGeneration + 1);
                     if (debugMode) console.log(`Found ${children.length} children for parent ${parent.name}`);
                     if (children.length > 0 && data.birth_date) {
                         const newTimestamp = dateToTimestamp(data.birth_date);
                         if (debugMode) console.log(`New child birth_date: ${data.birth_date}, timestamp: ${newTimestamp}`);
                         const sortedChildren = records.slice(insertIndex, treeEnd)
-                            .reduce((acc, r, i) => r.record_type.toLowerCase() === 'person' && (parseInt(r.generation) || 0) === parentGen + 1 ? [...acc, { index: i + insertIndex, ts: dateToTimestamp(r.birth_date) }] : acc, [])
+                            .reduce((acc, r, i) => r.record_type.toLowerCase() === 'person' && (parseInt(r.generation) || 0) === parentGeneration + 1 ? [...acc, { index: i + insertIndex, ts: dateToTimestamp(r.birth_date) }] : acc, [])
                             .sort((a, b) => a.ts - b.ts);
                         if (debugMode) console.log(`Sorted children:`, sortedChildren);
                         const insertPos = sortedChildren.findIndex(c => c.ts > newTimestamp);
@@ -1101,7 +1101,6 @@
                     }
                     records.splice(insertIndex, 0, newRecord);
                     if (debugMode) console.log('Added child record:', newRecord, `at index ${insertIndex}`);
-
                 } else if (mode === 'addPartner') {
                     if (!data.name || !data.partner || !data.relationship) { 
                         safeShowError('Name, Select Genealogical Partner, and Relationship are required.'); 
