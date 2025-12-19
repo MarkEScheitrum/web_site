@@ -1491,13 +1491,14 @@
 
             recordBody.appendChild(table);
         }
-                function startEditing(personIndex, field, td, currentValue, partnerIndex = null) {
+        
+        function startEditing(personIndex, field, td, currentValue, partnerIndex = null) {
             editingIndex = personIndex;
             editingField = field;
 
             td.innerHTML = '';
 
-            // Special dropdowns (unchanged)
+            // Special dropdowns
             if (field === 'sex' && partnerIndex === null) {
                 const select = createSelect(['', 'male', 'female'], currentValue);
                 td.appendChild(select);
@@ -1523,22 +1524,34 @@
                 return;
             }
 
-            // Default: textarea for text fields
+            // Default: textarea with auto-height and optional datalist
+            const container = document.createElement('div');
+            container.style.position = 'relative';
+            container.style.width = '100%';
+
             const textarea = document.createElement('textarea');
             textarea.className = 'edit-textarea';
             textarea.value = currentValue;
-            const lines = currentValue.split('\n').length;
+
+            // Set initial rows based on content
+            const lines = (currentValue.split('\n').length) || 1;
             textarea.rows = Math.max(1, lines);
+
+            // Auto-grow as user types
             textarea.style.height = 'auto';
             textarea.style.overflow = 'hidden';
+            textarea.style.resize = 'none';
+            textarea.style.boxSizing = 'border-box';
+
             textarea.addEventListener('input', () => {
                 textarea.style.height = 'auto';
-                textarea.style.height = textarea.scrollHeight + 'px';
+                textarea.style.height = (textarea.scrollHeight) + 'px';
             });
 
-            td.appendChild(textarea);
-            
-            // Add datalist for common fields
+            container.appendChild(textarea);
+            td.appendChild(container);
+
+            // Add datalist for common fields (birth/death/burial location, service, attributes, parents)
             if (['birth_location', 'death_location', 'burial_location', 'service', 'attributes', 'parents'].includes(field)) {
                 const datalistId = 'datalist-' + field + '-' + Date.now();
                 textarea.setAttribute('list', datalistId);
@@ -1554,7 +1567,7 @@
 
                 container.appendChild(datalist);
             }
-            
+
             textarea.focus();
             textarea.select();
 
@@ -1562,10 +1575,10 @@
 
             textarea.onkeydown = e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();         // No newline
+                    e.preventDefault();
                     savedOnEnter = true;
                     saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerIndex);
-                    textarea.blur();             // Force blur to clean up
+                    textarea.blur();
                 } else if (e.key === 'Escape') {
                     cancelEdit(td, currentValue);
                 }
@@ -1575,7 +1588,7 @@
                 if (!savedOnEnter) {
                     saveEdit(personIndex, field, textarea.value.trim(), td, currentValue, partnerIndex);
                 }
-                savedOnEnter = false;  // Reset for next edit
+                savedOnEnter = false;
             };
         }
  
