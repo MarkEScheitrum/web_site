@@ -1524,7 +1524,7 @@
                 return;
             }
 
-            // Default: textarea with auto-height and optional datalist
+            // Default: textarea with auto-height, resize handle, and optional datalist
             const container = document.createElement('div');
             container.style.position = 'relative';
             container.style.width = '100%';
@@ -1533,25 +1533,29 @@
             textarea.className = 'edit-textarea';
             textarea.value = currentValue;
 
-            // Set initial rows based on content
-            const lines = (currentValue.split('\n').length) || 1;
-            textarea.rows = Math.max(1, lines);
+            // Initial height: minimum 2 rows, more if content has newlines
+            const lines = currentValue.split('\n').length;
+            textarea.rows = Math.max(2, lines);
 
-            // Auto-grow as user types
-            textarea.style.height = 'auto';
-            textarea.style.overflow = 'hidden';
-            textarea.style.resize = 'none';
-            textarea.style.boxSizing = 'border-box';
+            // Preserve the resize grab handle
+            textarea.style.resize = 'vertical';
 
+            // Auto-grow on input (bonus UX)
             textarea.addEventListener('input', () => {
                 textarea.style.height = 'auto';
-                textarea.style.height = (textarea.scrollHeight) + 'px';
+                textarea.style.height = textarea.scrollHeight + 'px';
             });
+
+            // Trigger initial sizing after DOM insertion
+            setTimeout(() => {
+                textarea.style.height = 'auto';
+                textarea.style.height = textarea.scrollHeight + 'px';
+            }, 0);
 
             container.appendChild(textarea);
             td.appendChild(container);
 
-            // Add datalist for common fields (birth/death/burial location, service, attributes, parents)
+            // Add datalist for common fields
             if (['birth_location', 'death_location', 'burial_location', 'service', 'attributes', 'parents'].includes(field)) {
                 const datalistId = 'datalist-' + field + '-' + Date.now();
                 textarea.setAttribute('list', datalistId);
@@ -1570,7 +1574,7 @@
 
             textarea.focus();
             textarea.select();
-
+            
             let savedOnEnter = false;
 
             textarea.onkeydown = e => {
