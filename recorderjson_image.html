@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.25</span> — December 18, 2025
+                    Version: <span id="pageVersion">2.0.26</span> — December 18, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -319,6 +319,16 @@
             }
         }
 
+        function getCommonValues(field) {
+            const values = new Set();
+            records.forEach(r => {
+                if (r[field]) values.add(r[field].trim());
+                (r.partners || []).forEach(p => {
+                    if (p[field]) values.add(p[field].trim());
+                });
+            });
+            return Array.from(values).filter(v => v).sort();
+        }
         // ==================== PROVIDE FEEDBACK ====================
         function openFeedbackModal() {
             safeOpenModal('feedback');
@@ -1517,8 +1527,34 @@
             const textarea = document.createElement('textarea');
             textarea.className = 'edit-textarea';
             textarea.value = currentValue;
-            textarea.rows = 1;  // Keep it single-line feel
+            const lines = currentValue.split('\n').length;
+            textarea.rows = Math.max(1, lines);
+            textarea.style.height = 'auto';
+            textarea.style.overflow = 'hidden';
+            textarea.addEventListener('input', () => {
+                textarea.style.height = 'auto';
+                textarea.style.height = textarea.scrollHeight + 'px';
+            });
+
             td.appendChild(textarea);
+            
+            // Add datalist for common fields
+            if (['birth_location', 'death_location', 'burial_location', 'service', 'attributes', 'parents'].includes(field)) {
+                const datalistId = 'datalist-' + field + '-' + Date.now();
+                textarea.setAttribute('list', datalistId);
+
+                const datalist = document.createElement('datalist');
+                datalist.id = datalistId;
+
+                getCommonValues(field).forEach(val => {
+                    const option = document.createElement('option');
+                    option.value = val;
+                    datalist.appendChild(option);
+                });
+
+                container.appendChild(datalist);
+            }
+            
             textarea.focus();
             textarea.select();
 
