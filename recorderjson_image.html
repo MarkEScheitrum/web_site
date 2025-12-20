@@ -1524,38 +1524,33 @@
                 return;
             }
 
-            // Default: textarea with auto-height, resize handle, and optional datalist
-            const container = document.createElement('div');
-            container.style.position = 'relative';
-            container.style.width = '100%';
-
+            // Default: textarea with auto-height, resize, and datalist (no container wrapper)
             const textarea = document.createElement('textarea');
             textarea.className = 'edit-textarea';
             textarea.value = currentValue;
 
-            // Initial height: minimum 2 rows, more if content has newlines
+            // Initial rows: min 2, more for existing lines
             const lines = currentValue.split('\n').length;
             textarea.rows = Math.max(2, lines);
 
-            // Preserve the resize grab handle
+            // Preserve resize handle
             textarea.style.resize = 'vertical';
 
-            // Auto-grow on input (bonus UX)
+            // Auto-grow on input
             textarea.addEventListener('input', () => {
                 textarea.style.height = 'auto';
                 textarea.style.height = textarea.scrollHeight + 'px';
             });
 
-            // Trigger initial sizing after DOM insertion
+            // Initial sizing
             setTimeout(() => {
                 textarea.style.height = 'auto';
                 textarea.style.height = textarea.scrollHeight + 'px';
             }, 0);
 
-            container.appendChild(textarea);
-            td.appendChild(container);
+            td.appendChild(textarea);
 
-            // Add datalist for common fields
+            // Datalist for common fields — append directly to document body (avoids positioning issues)
             if (['birth_location', 'death_location', 'burial_location', 'service', 'attributes', 'parents'].includes(field)) {
                 const datalistId = 'datalist-' + field + '-' + Date.now();
                 textarea.setAttribute('list', datalistId);
@@ -1569,7 +1564,7 @@
                     datalist.appendChild(option);
                 });
 
-                container.appendChild(datalist);
+                document.body.appendChild(datalist);  // Append to body instead of container
             }
 
             textarea.focus();
