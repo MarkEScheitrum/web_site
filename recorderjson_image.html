@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.28</span> — December 19, 2025
+                    Version: <span id="pageVersion">2.0.29</span> — December 19, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -164,6 +164,17 @@
                     ? (records[item.personIndex].partners[item.partnerIndex]?.story || '').trim().length > 0
                     : (records[item.personIndex].story || '').trim().length > 0;
                 const icon = hasStory ? 'open_book' : 'closed_book';
+                if (debugMode) {
+                    const currentStory = item.partnerIndex !== undefined 
+                        ? (records[item.personIndex].partners[item.partnerIndex]?.story || '(no story field)')
+                        : (records[item.personIndex].story || '(no story field)');
+
+                        const storyLength = typeof currentStory === 'string' ? currentStory.trim().length : 0;
+
+                        console.log(`Dropdown build: "${item.label}" | hasStory = ${hasStory} | story exists = ${records[item.personIndex].hasOwnProperty('story') || (item.partnerIndex !== undefined && records[item.personIndex].partners[item.partnerIndex]?.hasOwnProperty('story'))} | length = ${storyLength} | preview = "${currentStory.substring(0, 50)}"`);
+                    }
+                
+                
                 const value = item.partnerIndex !== undefined ? `${item.personIndex}|${item.partnerIndex}` : `${item.personIndex}|`;
                 const selected = (personIndex === item.personIndex && partnerIndex === item.partnerIndex) ? 'selected' : '';
 
