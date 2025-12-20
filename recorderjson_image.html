@@ -223,18 +223,43 @@
                 const parts = select.value.split('|');
                 const idx = parseInt(parts[0]);
                 const partnerIdx = parts[1] ? parseInt(parts[1]) : null;
-                const story = textarea.value;
+                const story = textarea.value.trim();
 
-                if (partnerIdx !== null) {
-                    if (records[idx].partners[partnerIdx]) {
+                if (debugMode) {
+                    console.log('--- STORY SAVE DEBUG ---');
+                    console.log('Select value:', select.value);
+                    console.log('Parsed idx:', idx, 'partnerIdx:', partnerIdx);
+                    console.log('Story length:', story.length);
+                    console.log('Story preview:', story.substring(0, 100) + (story.length > 100 ? '...' : ''));
+                }
+
+                let savedTo = null;
+
+                if (partnerIdx !== null && !isNaN(partnerIdx)) {
+                    if (records[idx] && records[idx].partners && records[idx].partners[partnerIdx]) {
                         records[idx].partners[partnerIdx].story = story;
+                        savedTo = `partner ${partnerIdx} of person ${idx}`;
+                        if (debugMode) console.log('Saved to partner record:', records[idx].partners[partnerIdx]);
                     }
                 } else {
-                    records[idx].story = story;
+                    if (records[idx]) {
+                        records[idx].story = story;
+                        savedTo = `main person ${idx}`;
+                        if (debugMode) console.log('Saved to main person record:', records[idx]);
+                    }
+                }
+
+                if (debugMode) {
+                    if (savedTo) {
+                        console.log(`Story saved successfully to ${savedTo}`);
+                    } else {
+                        console.log('ERROR: Story save failed - invalid index or record not found');
+                    }
+                    console.log('--- END STORY SAVE DEBUG ---');
                 }
 
                 safeCloseModal();
-                debounceDisplayRecords();
+                displayRecords();  // Force immediate redraw to update book icon
             };
 
             window.clearStoryFromModal = () => {
