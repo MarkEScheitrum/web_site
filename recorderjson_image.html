@@ -147,42 +147,60 @@
             // Build list in tree order (same as records array)
             const allPeople = [];
             records.forEach((person, personIndex) => {
-                allPeople.push({ label: person.name || '(no name)', personIndex, partnerIndex: null });
+                // Main person
+                allPeople.push({ 
+                    label: person.name || '(no name)', 
+                    personIndex, 
+                    partnerIndex: null 
+                });
 
-                (person.partners || []).forEach((partner, partnerIndex) => {
+                // Partners (sub-array)
+                (person.partners || []).forEach((partner, partnerSubIndex) => {
                     allPeople.push({
                         label: `└ ${partner.name || '(unnamed)'}`,
                         personIndex,
-                        partnerIndex
+                        partnerIndex: partnerSubIndex  // Correct sub-index within partners array
                     });
                 });
             });
 
+            if (debugMode) {
+                console.log('--- STORY MODAL DROPDOWN BUILD DEBUG ---');
+                allPeople.forEach((item, listPos) => {
+                    const isPartner = item.partnerIndex !== null;
+                    const targetRecord = isPartner 
+                        ? records[item.personIndex]?.partners?.[item.partnerIndex]
+                        : records[item.personIndex];
+
+                    const storyValue = targetRecord?.story;
+                    const hasStoryField = targetRecord?.hasOwnProperty('story');
+                    const storyLength = typeof storyValue === 'string' ? storyValue.trim().length : 0;
+                    const storyPreview = typeof storyValue === 'string' 
+                        ? storyValue.trim().substring(0, 50) + (storyValue.trim().length > 50 ? '...' : '')
+                        : '(missing or not string)';
+
+                    const calculatedHasStory = storyLength > 0;
+
+                    console.log(`List position ${listPos}: "${item.label}"`);
+                    console.log(`  -> personIndex: ${item.personIndex}, partnerIndex: ${item.partnerIndex || 'null'}`);
+                    console.log(`  -> target record exists: ${!!targetRecord}`);
+                    console.log(`  -> story field exists: ${hasStoryField}`);
+                    console.log(`  -> story length: ${storyLength}`);
+                    console.log(`  -> story preview: "${storyPreview}"`);
+                    console.log(`  -> calculated hasStory: ${calculatedHasStory}`);
+                    console.log(`  ---`);
+                });
+                console.log('--- END DROPDOWN BUILD DEBUG ---');
+            }
+
             let optionsHtml = '<option value="">-- Select Person or Partner --</option>';
             allPeople.forEach(item => {
-                const hasStory = item.partnerIndex !== undefined
-                    ? (records[item.personIndex].partners[item.partnerIndex]?.story || '').trim().length > 0
-                    : (records[item.personIndex].story || '').trim().length > 0;
-                const icon = hasStory ? 'open_book' : 'closed_book';
-                if (debugMode) {
-                    const record = item.partnerIndex !== undefined 
-                        ? (records[item.personIndex]?.partners?.[item.partnerIndex] || null)
-                        : records[item.personIndex] || null;
-    
-                    const storyValue = record?.story ?? '(field missing)';
-                    const storyPreview = typeof storyValue === 'string' 
-                        ? storyValue.trim().substring(0, 100) + (storyValue.trim().length > 100 ? '...' : '')
-                        : storyValue;
-    
-                    console.log(`Dropdown build debug for "${item.label}" (index=${item.personIndex}${item.partnerIndex !== undefined ? `, partner=${item.partnerIndex}` : ''}):`);
-                    console.log('Full record object:', record);
-                    console.log(`hasStory calculation: ${hasStory}`);
-                    console.log(`story field value:`, storyValue);
-                    console.log(`story preview: "${storyPreview}"`);
-                    console.log('---');
-                }
-                                
-                const value = item.partnerIndex !== undefined ? `${item.personIndex}|${item.partnerIndex}` : `${item.personIndex}|`;
+                const hasStory = item.partnerIndex !== null
+                    ? (records[item.personIndex]?.partners?.[item.partnerIndex]?.story || '').trim().length > 0
+                    : (records[item.personIndex]?.story || '').trim().length > 0;
+
+                const icon = hasStory ? '📖' : '📕';
+                const value = item.partnerIndex !== null ? `${item.personIndex}|${item.partnerIndex}` : `${item.personIndex}|`;
                 const selected = (personIndex === item.personIndex && partnerIndex === item.partnerIndex) ? 'selected' : '';
 
                 optionsHtml += `<option value="${value}" ${selected}>${item.label} ${icon}</option>`;
