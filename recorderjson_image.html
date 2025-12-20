@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.26</span> — December 18, 2025
+                    Version: <span id="pageVersion">2.0.27</span> — December 19, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1524,7 +1524,7 @@
                 return;
             }
 
-            // Default: textarea with auto-height, resize, and datalist (no container wrapper)
+            // Default: textarea with auto-height, resize, and datalist (no container)
             const textarea = document.createElement('textarea');
             textarea.className = 'edit-textarea';
             textarea.value = currentValue;
@@ -1533,8 +1533,9 @@
             const lines = currentValue.split('\n').length;
             textarea.rows = Math.max(2, lines);
 
-            // Preserve resize handle
+            // Preserve resize handle and allow browser dropdown
             textarea.style.resize = 'vertical';
+            textarea.style.overflow = 'visible';  // Critical for datalist visibility
 
             // Auto-grow on input
             textarea.addEventListener('input', () => {
@@ -1550,7 +1551,7 @@
 
             td.appendChild(textarea);
 
-            // Datalist for common fields — append directly to document body (avoids positioning issues)
+            // Datalist for common fields
             if (['birth_location', 'death_location', 'burial_location', 'service', 'attributes', 'parents'].includes(field)) {
                 const datalistId = 'datalist-' + field + '-' + Date.now();
                 textarea.setAttribute('list', datalistId);
@@ -1564,7 +1565,7 @@
                     datalist.appendChild(option);
                 });
 
-                document.body.appendChild(datalist);  // Append to body instead of container
+                document.body.appendChild(datalist);  // Append to body = reliable visibility
             }
 
             textarea.focus();
