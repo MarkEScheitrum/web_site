@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.27</span> — December 19, 2025
+                    Version: <span id="pageVersion">2.0.28</span> — December 19, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -319,16 +319,6 @@
             }
         }
 
-        function getCommonValues(field) {
-            const values = new Set();
-            records.forEach(r => {
-                if (r[field]) values.add(r[field].trim());
-                (r.partners || []).forEach(p => {
-                    if (p[field]) values.add(p[field].trim());
-                });
-            });
-            return Array.from(values).filter(v => v).sort();
-        }
         // ==================== PROVIDE FEEDBACK ====================
         function openFeedbackModal() {
             safeOpenModal('feedback');
@@ -1524,7 +1514,7 @@
                 return;
             }
 
-            // Default: textarea for multi-line wrapping, resize, and datalist
+            // Default: textarea with full resize (vertical + horizontal) and multi-line support
             const textarea = document.createElement('textarea');
             textarea.className = 'edit-textarea';
             textarea.value = currentValue;
@@ -1533,41 +1523,22 @@
             const lines = currentValue.split('\n').length;
             textarea.rows = Math.max(2, lines);
 
-            // Essential for multi-line wrapping and resize handle
-            textarea.style.width = '100%';
-            textarea.style.boxSizing = 'border-box';
-            textarea.style.resize = 'vertical';
+            // Full resize in both directions (vertical and horizontal)
+            textarea.style.resize = 'both';  // This gives the grab handle for left/right + up/down
 
-            // Auto-grow on input
+            // Auto-grow vertically as user types more lines
             textarea.addEventListener('input', () => {
                 textarea.style.height = 'auto';
                 textarea.style.height = textarea.scrollHeight + 'px';
             });
 
-            // Initial sizing
+            // Initial sizing after insertion
             setTimeout(() => {
                 textarea.style.height = 'auto';
                 textarea.style.height = textarea.scrollHeight + 'px';
             }, 0);
 
             td.appendChild(textarea);
-
-            // Datalist for common fields — append to body for reliable dropdown
-            if (['birth_location', 'death_location', 'burial_location', 'service', 'attributes', 'parents'].includes(field)) {
-                const datalistId = 'datalist-' + field + '-' + Date.now();
-                textarea.setAttribute('list', datalistId);
-
-                const datalist = document.createElement('datalist');
-                datalist.id = datalistId;
-
-                getCommonValues(field).forEach(val => {
-                    const option = document.createElement('option');
-                    option.value = val;
-                    datalist.appendChild(option);
-                });
-
-                document.body.appendChild(datalist);
-            }
 
             textarea.focus();
             textarea.select();
