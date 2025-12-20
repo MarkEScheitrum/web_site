@@ -1524,7 +1524,7 @@
                 return;
             }
 
-            // Default: textarea with auto-height, resize, and datalist (no container)
+            // Default: textarea for multi-line wrapping, resize, and datalist
             const textarea = document.createElement('textarea');
             textarea.className = 'edit-textarea';
             textarea.value = currentValue;
@@ -1533,9 +1533,10 @@
             const lines = currentValue.split('\n').length;
             textarea.rows = Math.max(2, lines);
 
-            // Preserve resize handle and allow browser dropdown
+            // Essential for multi-line wrapping and resize handle
+            textarea.style.width = '100%';
+            textarea.style.boxSizing = 'border-box';
             textarea.style.resize = 'vertical';
-            textarea.style.overflow = 'visible';  // Critical for datalist visibility
 
             // Auto-grow on input
             textarea.addEventListener('input', () => {
@@ -1551,7 +1552,7 @@
 
             td.appendChild(textarea);
 
-            // Datalist for common fields
+            // Datalist for common fields — append to body for reliable dropdown
             if (['birth_location', 'death_location', 'burial_location', 'service', 'attributes', 'parents'].includes(field)) {
                 const datalistId = 'datalist-' + field + '-' + Date.now();
                 textarea.setAttribute('list', datalistId);
@@ -1565,7 +1566,7 @@
                     datalist.appendChild(option);
                 });
 
-                document.body.appendChild(datalist);  // Append to body = reliable visibility
+                document.body.appendChild(datalist);
             }
 
             textarea.focus();
