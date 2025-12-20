@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.29</span> — December 19, 2025
+                    Version: <span id="pageVersion">2.0.30</span> — December 19, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -165,14 +165,17 @@
                     : (records[item.personIndex].story || '').trim().length > 0;
                 const icon = hasStory ? 'open_book' : 'closed_book';
                 if (debugMode) {
-                    const currentStory = item.partnerIndex !== undefined 
-                        ? (records[item.personIndex].partners[item.partnerIndex]?.story || '(no story field)')
-                        : (records[item.personIndex].story || '(no story field)');
+                    const record = item.partnerIndex !== undefined 
+                        ? records[item.personIndex].partners[item.partnerIndex]
+                        : records[item.personIndex];
 
-                        const storyLength = typeof currentStory === 'string' ? currentStory.trim().length : 0;
+                    const storyValue = record ? record.story : undefined;
+                    const storyPreview = typeof storyValue === 'string' 
+                        ? storyValue.trim().substring(0, 50) + (storyValue.trim().length > 50 ? '...' : '')
+                        : '(undefined or missing)';
 
-                        console.log(`Dropdown build: "${item.label}" | hasStory = ${hasStory} | story exists = ${records[item.personIndex].hasOwnProperty('story') || (item.partnerIndex !== undefined && records[item.personIndex].partners[item.partnerIndex]?.hasOwnProperty('story'))} | length = ${storyLength} | preview = "${currentStory.substring(0, 50)}"`);
-                    }
+                    console.log(`Dropdown build [index=${item.personIndex}${item.partnerIndex !== undefined ? `, partner=${item.partnerIndex}` : ''}]: "${item.label}" | hasStory = ${hasStory} | story field exists = ${record ? record.hasOwnProperty('story') : 'no record'} | story value = "${storyPreview}"`);
+                }
                 
                 
                 const value = item.partnerIndex !== undefined ? `${item.personIndex}|${item.partnerIndex}` : `${item.personIndex}|`;
