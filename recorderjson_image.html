@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.31</span> — December 20, 2025
+                    Version: <span id="pageVersion">2.0.32</span> — December 20, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1112,9 +1112,6 @@
                 if (debugMode) console.log(`Processing ${mode} with data:`, data);
                 if (mode === 'addChild') {
                     if (!data.name || !data.parents) { safeShowError('Name and Parent are required.'); return; }
-                    
-                    } else if (mode === 'addChild') {
-                    if (!data.name || !data.parents) { safeShowError('Name and Parent are required.'); return; }
                     if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
 
                     console.log('DEBUG ADD CHILD: Expected parent name = "' + data.parents + '"');
@@ -1159,7 +1156,6 @@
                     }
 
                     const parent = foundParent;
-                    // ... rest of the addChild code unchanged (parentGeneration, newRecord, insertIndex, etc.)
                     
                     if (!parent) { safeShowError('Invalid parent selected.'); return; }
                     if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
