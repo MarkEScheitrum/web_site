@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.30</span> — December 19, 2025
+                    Version: <span id="pageVersion">2.0.31</span> — December 20, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1112,7 +1112,55 @@
                 if (debugMode) console.log(`Processing ${mode} with data:`, data);
                 if (mode === 'addChild') {
                     if (!data.name || !data.parents) { safeShowError('Name and Parent are required.'); return; }
-                    const parent = records.find(r => r.name === data.parents && r.record_type.toLowerCase() === 'person');
+                    
+                    } else if (mode === 'addChild') {
+                    if (!data.name || !data.parents) { safeShowError('Name and Parent are required.'); return; }
+                    if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
+
+                    console.log('DEBUG ADD CHILD: Expected parent name = "' + data.parents + '"');
+                    console.log('DEBUG ADD CHILD: Expected length = ' + data.parents.length);
+                    console.log('DEBUG ADD CHILD: Expected repr = ' + JSON.stringify(data.parents));  // shows hidden chars
+
+                    let foundParent = null;
+                    for (let i = 0; i < records.length; i++) {
+                        const r = records[i];
+                        const rName = r.name || '(no name)';
+                        const rType = r.record_type;
+                        const nameMatch = rName === data.parents;
+                        let typeMatch = false;
+                        let typeError = null;
+                        if (rType === undefined) {
+                            typeError = 'record_type is undefined';
+                        } else {
+                            try {
+                                typeMatch = rType.toLowerCase() === 'person';
+                            } catch (e) {
+                                typeError = 'Exception on toLowerCase: ' + e.message;
+                            }
+                        }
+                        const fullMatch = nameMatch && typeMatch;
+
+                        console.log(`DEBUG ADD CHILD: Checking index ${i}: name="${rName}" (length ${rName.length}), record_type=${rType}`);
+                        console.log(`  nameMatch: ${nameMatch} | typeMatch: ${typeMatch} | fullMatch: ${fullMatch} | typeError: ${typeError || 'none'}`);
+
+                        if (fullMatch) {
+                            foundParent = r;
+                            console.log(`DEBUG ADD CHILD: MATCH FOUND at index ${i}`);
+                            break;
+                        }
+                        if (typeError) {
+                            console.log(`DEBUG ADD CHILD: STOPPING DEBUG - would crash here on typeError`);
+                        }
+                    }
+
+                    if (!foundParent) {
+                        safeShowError('Invalid parent selected - no matching Person record found (check console for debug details).');
+                        return;
+                    }
+
+                    const parent = foundParent;
+                    // ... rest of the addChild code unchanged (parentGeneration, newRecord, insertIndex, etc.)
+                    
                     if (!parent) { safeShowError('Invalid parent selected.'); return; }
                     if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
                     const parentGeneration = parseInt(parent.generation) || 0;
