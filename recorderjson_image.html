@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.32</span> — December 20, 2025
+                    Version: <span id="pageVersion">2.0.33</span> — December 20, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1179,33 +1179,49 @@
                         unprocessed_items: '',
                         notes: ''
                     };
+                    
                     let insertIndex = records.indexOf(parent) + 1;
                     let treeEnd = records.length;
+
+                    // First, find the end of this parent's descendant branch
+                    // Stop at the first Person with generation <= parentGeneration
                     for (let i = insertIndex; i < records.length; i++) {
-                        if (records[i].record_type.toLowerCase() === 'person' && (parseInt(records[i].generation) || 0) <= parentGeneration) {
+                        const gen = parseInt(records[i].generation, 10);
+                        if (!isNaN(gen) && gen <= parentGeneration) {
                             treeEnd = i;
                             break;
                         }
                     }
-                    if (debugMode) console.log(`Parent ${parent.name} (gen: ${parentGeneration}) descendant tree ends at index ${treeEnd}`);
-                    const children = records.slice(insertIndex, treeEnd).filter(r => r.record_type.toLowerCase() == 'person' && (parseInt(r.generation) || 0) === parentGeneration + 1);
-                    if (debugMode) console.log(`Found ${children.length} children for parent ${parent.name}`);
-                    if (children.length > 0 && data.birth_date) {
+
+                    // Now, within the sibling range (insertIndex to treeEnd), 
+                    // find where to insert based on birth_date order
+                    if (data.birth_date) {
                         const newTimestamp = dateToTimestamp(data.birth_date);
-                        if (debugMode) console.log(`New child birth_date: ${data.birth_date}, timestamp: ${newTimestamp}`);
-                        const sortedChildren = records.slice(insertIndex, treeEnd)
-                            .reduce((acc, r, i) => r.record_type.toLowerCase() === 'person' && (parseInt(r.generation) || 0) === parentGeneration + 1 ? [...acc, { index: i + insertIndex, ts: dateToTimestamp(r.birth_date) }] : acc, [])
-                            .sort((a, b) => a.ts - b.ts);
-                        if (debugMode) console.log(`Sorted children:`, sortedChildren);
-                        const insertPos = sortedChildren.findIndex(c => c.ts > newTimestamp);
-                        insertIndex = insertPos === -1 ? treeEnd : sortedChildren[insertPos].index;
-                        if (debugMode) console.log(`Inserting child at index ${insertIndex}`);
+
+                        for (let i = insertIndex; i < treeEnd; i++) {
+                            const sibling = records[i];
+                            const siblingGen = parseInt(sibling.generation, 10);
+                            if (siblingGen === parentGeneration + 1) {
+                                const siblingTs = dateToTimestamp(sibling.birth_date);
+                                if (newTimestamp < siblingTs) {
+                                    insertIndex = i;
+                                    break;
+                                }
+                            } else {
+                                // Should not happen, but safety
+                                treeEnd = i;
+                                break;
+                            }
+                        }
+                        // If no earlier sibling found, insertIndex remains at the end of siblings
                     } else {
-                        insertIndex = treeEnd;
-                        if (debugMode) console.log(`No children or no birth_date, inserting at index ${insertIndex}`);
+                        // No birth_date: append to end of current sibling group
+                        // treeEnd is already correct
                     }
+
                     records.splice(insertIndex, 0, newRecord);
                     if (debugMode) console.log('Added child record:', newRecord, `at index ${insertIndex}`);
+
                 } else if (mode === 'addPartner') {
                     if (!data.name || !data.partner || !data.relationship) { 
                         safeShowError('Name, Select Genealogical Partner, and Relationship are required.'); 
