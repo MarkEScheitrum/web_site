@@ -1110,118 +1110,108 @@
                     if (input.name && input.type !== 'button') data[input.name] = input.value || '';
                 }
                 if (debugMode) console.log(`Processing ${mode} with data:`, data);
+                
+                
                 if (mode === 'addChild') {
                     if (!data.name || !data.parents) { safeShowError('Name and Parent are required.'); return; }
                     if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
 
-                    console.log('DEBUG ADD CHILD: Expected parent name = "' + data.parents + '"');
-                    console.log('DEBUG ADD CHILD: Expected length = ' + data.parents.length);
-                    console.log('DEBUG ADD CHILD: Expected repr = ' + JSON.stringify(data.parents));  // shows hidden chars
-
-                    let foundParent = null;
-                    for (let i = 0; i < records.length; i++) {
-                        const r = records[i];
-                        const rName = r.name || '(no name)';
-                        const rType = r.record_type;
-                        const nameMatch = rName === data.parents;
-                        let typeMatch = false;
-                        let typeError = null;
-                        if (rType === undefined) {
-                            typeError = 'record_type is undefined';
-                        } else {
-                            try {
-                                typeMatch = rType.toLowerCase() === 'person';
-                            } catch (e) {
-                                typeError = 'Exception on toLowerCase: ' + e.message;
-                            }
-                        }
-                        const fullMatch = nameMatch && typeMatch;
-
-                        console.log(`DEBUG ADD CHILD: Checking index ${i}: name="${rName}" (length ${rName.length}), record_type=${rType}`);
-                        console.log(`  nameMatch: ${nameMatch} | typeMatch: ${typeMatch} | fullMatch: ${fullMatch} | typeError: ${typeError || 'none'}`);
-
-                        if (fullMatch) {
-                            foundParent = r;
-                            console.log(`DEBUG ADD CHILD: MATCH FOUND at index ${i}`);
-                            break;
-                        }
-                        if (typeError) {
-                            console.log(`DEBUG ADD CHILD: STOPPING DEBUG - would crash here on typeError`);
-                        }
-                    }
-
-                    if (!foundParent) {
-                        safeShowError('Invalid parent selected - no matching Person record found (check console for debug details).');
-                        return;
-                    }
-
-                    const parent = foundParent;
-                    
+                    const parent = records.find(r => 
+                        r.name === data.parents && 
+                        (r.record_type === undefined || String(r.record_type).toLowerCase() === 'person')
+                    );
                     if (!parent) { safeShowError('Invalid parent selected.'); return; }
-                    if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
+
                     const parentGeneration = parseInt(parent.generation) || 0;
+                    const childGeneration = (parentGeneration + 1).toString();
+
+                    // Create the new child record
                     const newRecord = {
                         record_type: 'Person',
-                        generation: (parentGeneration + 1).toString(),
-                        name: data.name,
+                        generation: childGeneration,
+                        name: data.name.trim(),
                         sex: data.sex || '',
                         birth_date: data.birth_date || '',
                         birth_location: data.birth_location || '',
-                        parents: '',
                         death_date: '',
                         death_location: '',
                         burial_location: '',
                         service: '',
-                        marriage_date: '',
-                        relationship: '',
-                        divorce: '',
+                        parents: '',  // or data.parents if you want to store name
+                        partners: [],
+                        photos: [],
+                        story: '',
                         attributes: '',
-                        unprocessed_items: '',
-                        notes: ''
+                        notes: [],
+                        unprocessed_items: []
+                        // parent_ids, children_no_other_parent remain empty for now
                     };
-                    
-                    let insertIndex = records.indexOf(parent) + 1;
-                    let treeEnd = records.length;
 
-                    // First, find the end of this parent's descendant branch
-                    // Stop at the first Person with generation <= parentGeneration
-                    for (let i = insertIndex; i < records.length; i++) {
-                        const gen = parseInt(records[i].generation, 10);
-                        if (!isNaN(gen) && gen <= parentGeneration) {
-                            treeEnd = i;
-                            break;
-                        }
+                    // === FULL REORDER: Rebuild the entire tree with the new child included ===
+                    // First, temporarily add the new record at the end
+                    records.push(newRecord);
+
+                    // Helper: Convert date to comparable timestamp (inf for missing)
+                    function dateToTimestamp(dateStr) {
+                        if (!dateStr) return Infinity;
+                        const parts = dateStr.split('-').map(Number);
+                        if (parts.length === 1) return parts[0] * 10000 * 100;
+                        if (parts.length === 2) return parts[0] * 10000 * 100 + parts[1] * 100;
+                        return parts[0] * 10000 * 100 + parts[1] * 100 + parts[2];
                     }
 
-                    // Now, within the sibling range (insertIndex to treeEnd), 
-                    // find where to insert based on birth_date order
-                    if (data.birth_date) {
-                        const newTimestamp = dateToTimestamp(data.birth_date);
-
-                        for (let i = insertIndex; i < treeEnd; i++) {
-                            const sibling = records[i];
-                            const siblingGen = parseInt(sibling.generation, 10);
-                            if (siblingGen === parentGeneration + 1) {
-                                const siblingTs = dateToTimestamp(sibling.birth_date);
-                                if (newTimestamp < siblingTs) {
-                                    insertIndex = i;
-                                    break;
-                                }
-                            } else {
-                                // Should not happen, but safety
-                                treeEnd = i;
+                    // Build tree: parent index -> list of direct child indices
+                    const tree = {};
+                    for (let i = 0; i < records.length; i++) {
+                        const r = records[i];
+                        const gen = parseInt(r.generation || '0', 10);
+                        let parentIdx = null;
+                        for (let j = i - 1; j >= 0; j--) {
+                            const pGen = parseInt(records[j].generation || '0', 10);
+                            if (pGen < gen) {
+                                parentIdx = j;
                                 break;
                             }
                         }
-                        // If no earlier sibling found, insertIndex remains at the end of siblings
-                    } else {
-                        // No birth_date: append to end of current sibling group
-                        // treeEnd is already correct
+                        if (parentIdx !== null) {
+                            if (!tree[parentIdx]) tree[parentIdx] = [];
+                            tree[parentIdx].push(i);
+                        }
                     }
 
-                    records.splice(insertIndex, 0, newRecord);
-                    if (debugMode) console.log('Added child record:', newRecord, `at index ${insertIndex}`);
+                    // Recursive rebuild function
+                    function rebuildSubtree(rootIdx) {
+                        const subtree = [records[rootIdx]];
+                        const childrenIdxs = tree[rootIdx] || [];
 
+                        // Sort children by birth_date
+                        childrenIdxs.sort((a, b) => {
+                            const tsA = dateToTimestamp(records[a].birth_date);
+                            const tsB = dateToTimestamp(records[b].birth_date);
+                            return tsA - tsB;
+                        });
+
+                        for (const childIdx of childrenIdxs) {
+                            subtree.push(...rebuildSubtree(childIdx));
+                        }
+                        return subtree;
+                    }
+
+                    // Rebuild from root (assume index 0 is always root)
+                    const rootIdx = 0;
+                    const newOrderedRecords = rebuildSubtree(rootIdx);
+
+                    // Replace the records array
+                    records.length = 0;
+                    records.push(...newOrderedRecords);
+
+                    if (debugMode) {
+                        console.log('Tree fully reordered by birth date (siblings chronological)');
+                    }
+
+                    safeCloseModal();
+                    debounceDisplayRecords();
+                
                 } else if (mode === 'addPartner') {
                     if (!data.name || !data.partner || !data.relationship) { 
                         safeShowError('Name, Select Genealogical Partner, and Relationship are required.'); 
