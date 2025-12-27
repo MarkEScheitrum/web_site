@@ -49,7 +49,7 @@
         <div class="title-left">
             <h2>Genealogy Recorder
                 <span style="font-size:14px;">
-                    Version: <span id="pageVersion">2.0.33</span> — December 20, 2025
+                    Version: <span id="pageVersion">2.0.34</span> — December 26, 2025
                 </span>
             </h2>
             <span class="status-line" id="fileStatus">No records loaded</span>
@@ -1111,24 +1111,18 @@
                 }
                 if (debugMode) console.log(`Processing ${mode} with data:`, data);
                 
-                
                 if (mode === 'addChild') {
                     if (!data.name || !data.parents) { safeShowError('Name and Parent are required.'); return; }
+                    const parent = records.find(r => r.name === data.parents && (r.record_type || '').toLowerCase() === 'person');
+                    if (!parent) { safeShowError('Invalid parent selected.'); return; }
                     if (data.birth_date && !isValidDate(data.birth_date)) { safeShowError('Invalid birth date. Use YYYY, YYYY-MM, or YYYY-MM-DD.'); return; }
 
-                    const parent = records.find(r => 
-                        r.name === data.parents && 
-                        (r.record_type === undefined || String(r.record_type).toLowerCase() === 'person')
-                    );
-                    if (!parent) { safeShowError('Invalid parent selected.'); return; }
+                    const parentGeneration = parseInt(parent.generation || 1);
+                    const childGeneration = parentGeneration + 1;
 
-                    const parentGeneration = parseInt(parent.generation) || 0;
-                    const childGeneration = (parentGeneration + 1).toString();
-
-                    // Create the new child record
                     const newRecord = {
                         record_type: 'Person',
-                        generation: childGeneration,
+                        generation: childGeneration.toString(),
                         name: data.name.trim(),
                         sex: data.sex || '',
                         birth_date: data.birth_date || '',
@@ -1137,80 +1131,68 @@
                         death_location: '',
                         burial_location: '',
                         service: '',
-                        parents: '',  // or data.parents if you want to store name
                         partners: [],
                         photos: [],
                         story: '',
                         attributes: '',
+                        parents: null,
                         notes: [],
-                        unprocessed_items: []
-                        // parent_ids, children_no_other_parent remain empty for now
+                        unprocessed_items: [],
+                        parent_ids: [],
+                        children_no_other_parent: []
                     };
 
-                    // === FULL REORDER: Rebuild the entire tree with the new child included ===
-                    // First, temporarily add the new record at the end
-                    records.push(newRecord);
+                    // Find insertion point: after parent, within parent's subtree
+                    let insertIndex = records.indexOf(parent) + 1;
+                    let subtreeEnd = records.length;
 
-                    // Helper: Convert date to comparable timestamp (inf for missing)
-                    function dateToTimestamp(dateStr) {
-                        if (!dateStr) return Infinity;
-                        const parts = dateStr.split('-').map(Number);
-                        if (parts.length === 1) return parts[0] * 10000 * 100;
-                        if (parts.length === 2) return parts[0] * 10000 * 100 + parts[1] * 100;
-                        return parts[0] * 10000 * 100 + parts[1] * 100 + parts[2];
+                    // Find end of parent's subtree (first record with generation <= parentGeneration)
+                    for (let i = insertIndex; i < records.length; i++) {
+                        const gen = parseInt(records[i].generation || 9999);
+                        if (gen <= parentGeneration) {
+                            subtreeEnd = i;
+                            break;
+                        }
                     }
 
-                    // Build tree: parent index -> list of direct child indices
-                    const tree = {};
-                    for (let i = 0; i < records.length; i++) {
+                    if (debugMode) console.log(`Parent "${parent.name}" subtree ends at index ${subtreeEnd}`);
+
+                    // Collect current direct children of this parent
+                    const siblings = [];
+                    for (let i = insertIndex; i < subtreeEnd; i++) {
                         const r = records[i];
-                        const gen = parseInt(r.generation || '0', 10);
-                        let parentIdx = null;
-                        for (let j = i - 1; j >= 0; j--) {
-                            const pGen = parseInt(records[j].generation || '0', 10);
-                            if (pGen < gen) {
-                                parentIdx = j;
-                                break;
-                            }
-                        }
-                        if (parentIdx !== null) {
-                            if (!tree[parentIdx]) tree[parentIdx] = [];
-                            tree[parentIdx].push(i);
+                        if (parseInt(r.generation || 0) === childGeneration) {
+                            siblings.push({ index: i, timestamp: dateToTimestamp(r.birth_date) });
                         }
                     }
 
-                    // Recursive rebuild function
-                    function rebuildSubtree(rootIdx) {
-                        const subtree = [records[rootIdx]];
-                        const childrenIdxs = tree[rootIdx] || [];
+                    if (debugMode) console.log(`Found ${siblings.length} existing siblings`);
 
-                        // Sort children by birth_date
-                        childrenIdxs.sort((a, b) => {
-                            const tsA = dateToTimestamp(records[a].birth_date);
-                            const tsB = dateToTimestamp(records[b].birth_date);
-                            return tsA - tsB;
-                        });
+                    // If birth date provided, find correct chronological position
+                    if (data.birth_date) {
+                        const newTimestamp = dateToTimestamp(data.birth_date);
+                        if (debugMode) console.log(`New child timestamp: ${newTimestamp}`);
 
-                        for (const childIdx of childrenIdxs) {
-                            subtree.push(...rebuildSubtree(childIdx));
-                        }
-                        return subtree;
+                        // Sort siblings by timestamp
+                        siblings.sort((a, b) => a.timestamp - b.timestamp);
+
+                        // Find first sibling with later birth date
+                        let pos = siblings.findIndex(s => s.timestamp > newTimestamp);
+                        if (pos === -1) pos = siblings.length;  // append if latest
+
+                        insertIndex = pos === 0 ? insertIndex : siblings[pos - 1].index + 1;
+                    } else {
+                        // No birth date — append to end of siblings
+                        insertIndex = subtreeEnd;
                     }
 
-                    // Rebuild from root (assume index 0 is always root)
-                    const rootIdx = 0;
-                    const newOrderedRecords = rebuildSubtree(rootIdx);
+                    if (debugMode) console.log(`Inserting new child at index ${insertIndex}`);
 
-                    // Replace the records array
-                    records.length = 0;
-                    records.push(...newOrderedRecords);
+                    records.splice(insertIndex, 0, newRecord);
 
-                    if (debugMode) {
-                        console.log('Tree fully reordered by birth date (siblings chronological)');
-                    }
-
-                    safeCloseModal();
-                    debounceDisplayRecords();
+                    if (debugMode) console.log('Child added successfully');
+                }
+                
                 
                 } else if (mode === 'addPartner') {
                     if (!data.name || !data.partner || !data.relationship) { 
