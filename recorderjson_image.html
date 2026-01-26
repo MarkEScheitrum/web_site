@@ -1908,6 +1908,9 @@
                     } else {
                         console.log('Debug mode disabled - incorrect passphrase');
                     }
+                    debugMode = true;
+                    console.log('DEBUG MODE ON');
+                    document.getElementById('textFile').setAttribute('accept', '.zip,.json');
                     decryptionPassphrase = null;
                 })();
             }
