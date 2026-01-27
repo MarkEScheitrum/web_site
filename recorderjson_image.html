@@ -686,71 +686,89 @@
         async function downloadUpdates() {
             if (!records.length) return safeShowError('No data to save');
             if (!exchangePassphrase && isEncryptedZip) return safeShowError('Exchange passphrase required');
+        
+            // Prompt for custom filename (and optional path prefix)
+            let defaultFilename;
+            let isLocalJson = debugMode && !isEncryptedZip;
+        
+            if (isLocalJson) {
+                defaultFilename = `edited_${originalFileName.replace(/\.zip$/i, '.json')}`;
+            } else {
+                const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                const fileHash = CryptoJS.SHA256(exchangePassphrase).toString();
+                defaultFilename = `${fileHash}_edited_${timestamp}.zip`;
+            }
+        
+            const customInput = prompt(
+                `Enter filename for save (default: ${defaultFilename})\n` +
+                `For Dropbox: filename only (path is fixed to ${DROPBOX_FOLDER || 'root'})\n` +
+                `For local: full filename (browser chooses save location)`,
+                defaultFilename
+            ) || defaultFilename;
+        
+            // Ensure proper extension
+            let customFilename = customInput.trim();
+            if (isLocalJson && !customFilename.toLowerCase().endsWith('.json')) {
+                customFilename += '.json';
+            } else if (!isLocalJson && !customFilename.toLowerCase().endsWith('.zip')) {
+                customFilename += '.zip';
+            }
+        
             let blob;
-
-            if (debugMode && !isEncryptedZip) {
+            if (isLocalJson) {
                 // Build full JSON with preserved header + new metadata
                 const now = new Date();
                 const iso = now.toISOString().replace(/T/, ' ').replace(/\..+/, '');
-
                 const output = {
-                    ...originalHeader,                                   // keep everything from original file
-                    editor: "Genealogy Recorder Web Editor",
-                    editor_version: document.getElementById('pageVersion').textContent.trim(),
-                    last_edited: iso + " UTC",
-                    data: records                                        // current data
-                };
-
-                const jsonContent = JSON.stringify(output, null, 2);
-                const blob = new Blob([jsonContent], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `edited_${originalFileName.replace(/\.zip$/i, '.json')}`;
-                a.click();
-                URL.revokeObjectURL(url);
-
-                showPopup(`<h3 style="color:green">JSON Saved Locally</h3><p>edited_${originalFileName.replace(/\.zip$/i, '.json')}</p) <small>Includes header & editor info</small>`);
-                hasReturnedUpdates = true;
-                document.getElementById('exitBtn').style.display = 'block';
-                return;
-            }
-
-            // Normal flow: create encrypted ZIP with full JSON (header + metadata + data)
-                const now = new Date();
-                const iso = now.toISOString().replace(/T/, ' ').replace(/\..+/, '');
-
-                const fullOutput = {
                     ...originalHeader,
                     editor: "Genealogy Recorder Web Editor",
                     editor_version: document.getElementById('pageVersion').textContent.trim(),
                     last_edited: iso + " UTC",
                     data: records
                 };
-
-                const jsonContent = JSON.stringify(getOutputObject(fullOutput), null, 2);
-
-                const zip = new JSZip();
-                zip.file(`records_${ticketNumber}.json`, jsonContent);
-                const zipBin = await zip.generateAsync({ type: 'uint8array' });
-                const encrypted = encryptBlob(String.fromCharCode.apply(null, zipBin), decryptionPassphrase || exchangePassphrase);
-                const uint8 = new Uint8Array(encrypted.sigBytes);
-                for (let i = 0; i < encrypted.sigBytes; i++) {
-                    const w = encrypted.words[Math.floor(i / 4)];
-                    uint8[i] = (w >>> (24 - (i % 4) * 8)) & 0xFF;
-                }
-                blob = new Blob([uint8], { type: 'application/octet-stream' });
-
+                const jsonContent = JSON.stringify(output, null, 2);
+                blob = new Blob([jsonContent], { type: 'application/json' });
+        
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = customFilename;
+                a.click();
+                URL.revokeObjectURL(url);
+                showPopup(`<h3 style="color:green">JSON Saved Locally</h3><p>${customFilename}</p><small>Includes header & editor info</small>`);
+                hasReturnedUpdates = true;
+                document.getElementById('exitBtn').style.display = 'block';
+                return;
+            }
+        
+            // Normal flow: create encrypted ZIP
+            const now = new Date();
+            const iso = now.toISOString().replace(/T/, ' ').replace(/\..+/, '');
+            const fullOutput = {
+                ...originalHeader,
+                editor: "Genealogy Recorder Web Editor",
+                editor_version: document.getElementById('pageVersion').textContent.trim(),
+                last_edited: iso + " UTC",
+                data: records
+            };
+            const jsonContent = JSON.stringify(getOutputObject(fullOutput), null, 2);
+            const zip = new JSZip();
+            zip.file(`records_${ticketNumber}.json`, jsonContent);
+            const zipBin = await zip.generateAsync({ type: 'uint8array' });
+            const encrypted = encryptBlob(String.fromCharCode.apply(null, zipBin), decryptionPassphrase || exchangePassphrase);
+            const uint8 = new Uint8Array(encrypted.sigBytes);
+            for (let i = 0; i < encrypted.sigBytes; i++) {
+                const w = encrypted.words[Math.floor(i / 4)];
+                uint8[i] = (w >>> (24 - (i % 4) * 8)) & 0xFF;
+            }
+            blob = new Blob([uint8], { type: 'application/octet-stream' });
+        
             try {
                 const accessToken = await getAccessToken();
                 const dbx = new Dropbox.Dropbox({ accessToken });
-                const fileHash = CryptoJS.SHA256(exchangePassphrase).toString();
-                const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
-                const dropboxPath = `${DROPBOX_FOLDER}/${fileHash}_edited_${timestamp}.zip`;
-
+                const dropboxPath = `${DROPBOX_FOLDER}/${customFilename}`;
                 await dbx.filesUpload({ contents: blob, path: dropboxPath, mode: 'overwrite' });
-
-                showPopup(`Updated file saved to Dropbox as edited_${timestamp}.zip`);
+                showPopup(`Updated file saved to Dropbox as ${customFilename}`);
                 hasReturnedUpdates = true;
                 document.getElementById('exitBtn').style.display = 'block';
                 document.getElementById('fileStatus').textContent = `Ticket ${ticketNumber} Records Returned`;
